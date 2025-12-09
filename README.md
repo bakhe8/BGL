@@ -1,0 +1,3 @@
+﻿# BGL
+
+Initial project setup.
