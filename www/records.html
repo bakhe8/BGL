@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>السجلات</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="font-semibold text-lg">إدارة السجلات</div>
+      <nav class="flex gap-4 text-sm text-slate-600">
+        <a href="/import">استيراد</a>
+        <a href="/records" class="text-blue-600 font-semibold">السجلات</a>
+        <a href="/review">المراجعة</a>
+        <a href="/dictionary/suppliers">الموردون</a>
+        <a href="/dictionary/banks">البنوك</a>
+        <a href="/settings">الإعدادات</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 space-y-6">
+    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4 flex-wrap">
+      <div class="flex items-center gap-2 text-sm">
+        <label class="text-slate-600">تصفية الحالة:</label>
+        <select id="statusFilter" class="border border-slate-300 rounded-md px-3 py-2 text-sm">
+          <option value="all">الكل</option>
+          <option value="needs_review">Needs Review</option>
+          <option value="ready">Ready</option>
+        </select>
+      </div>
+      <button id="refresh" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">تحديث</button>
+    </section>
+
+    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-semibold">جميع السجلات</h1>
+        <div class="text-sm text-slate-500" id="meta"></div>
+      </div>
+      <div id="tableWrap" class="overflow-x-auto text-sm">
+        <div class="text-slate-500">لا يوجد سجلات بعد.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const tableWrap = document.getElementById('tableWrap');
+    const statusFilter = document.getElementById('statusFilter');
+    const refreshBtn = document.getElementById('refresh');
+    const meta = document.getElementById('meta');
+
+    let records = [];
+    let sortKey = 'id';
+    let sortDir = 'desc';
+
+    async function loadRecords() {
+      tableWrap.innerHTML = '<div class="text-slate-500">جارٍ التحميل...</div>';
+      const res = await fetch('/api/records');
+      const json = await res.json();
+      if (!json.success) {
+        tableWrap.innerHTML = '<div class="text-red-600">تعذر تحميل السجلات</div>';
+        return;
+      }
+      records = json.data || [];
+      render();
+    }
+
+    function applyFilter(data) {
+      const f = statusFilter.value;
+      if (f === 'all') return data;
+      return data.filter(r => (r.matchStatus || '') === f);
+    }
+
+    function sortData(data) {
+      return data.slice().sort((a, b) => {
+        const va = a[camel(sortKey)];
+        const vb = b[camel(sortKey)];
+        if (va == null && vb == null) return 0;
+        if (va == null) return sortDir === 'asc' ? -1 : 1;
+        if (vb == null) return sortDir === 'asc' ? 1 : -1;
+        if (!isNaN(va) && !isNaN(vb)) {
+          return sortDir === 'asc' ? va - vb : vb - va;
+        }
+        return sortDir === 'asc'
+          ? String(va).localeCompare(String(vb))
+          : String(vb).localeCompare(String(va));
+      });
+    }
+
+    function render() {
+      const filtered = applyFilter(records);
+      const data = sortData(filtered);
+      meta.textContent = `الإجمالي: ${records.length} | المعروض: ${data.length}`;
+
+      if (!data.length) {
+        tableWrap.innerHTML = '<div class="text-slate-500">لا يوجد سجلات بعد.</div>';
+        return;
+      }
+
+      const headers = [
+        { key: 'id', label: '#' },
+        { key: 'rawSupplierName', label: 'المورد' },
+        { key: 'rawBankName', label: 'البنك' },
+        { key: 'amount', label: 'المبلغ' },
+        { key: 'guaranteeNumber', label: 'رقم الضمان' },
+        { key: 'issueDate', label: 'تاريخ الإصدار' },
+        { key: 'expiryDate', label: 'تاريخ الانتهاء' },
+        { key: 'matchStatus', label: 'الحالة' },
+        { key: 'actions', label: 'إجراءات' },
+      ];
+
+      const head = headers.map(h => `
+        <th class="px-3 py-2 text-right cursor-pointer select-none" data-key="${h.key}">
+          ${h.label}
+          ${sortKey === h.key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+        </th>
+      `).join('');
+
+      const body = data.map(r => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-3 py-2">${r.id ?? ''}</td>
+          <td class="px-3 py-2">${r.rawSupplierName ?? ''}</td>
+          <td class="px-3 py-2">${r.rawBankName ?? ''}</td>
+          <td class="px-3 py-2">${r.amount ?? ''}</td>
+          <td class="px-3 py-2">${r.guaranteeNumber ?? ''}</td>
+          <td class="px-3 py-2">${r.issueDate ?? ''}</td>
+          <td class="px-3 py-2">${r.expiryDate ?? ''}</td>
+          <td class="px-3 py-2">
+            ${statusBadge(r.matchStatus)}
+          </td>
+          <td class="px-3 py-2">
+            <button class="text-blue-600 text-xs" onclick="viewRecord(${r.id})">عرض</button>
+          </td>
+        </tr>
+      `).join('');
+
+      tableWrap.innerHTML = `
+        <table class="min-w-full text-sm divide-y divide-slate-200">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>${head}</tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            ${body}
+          </tbody>
+        </table>
+      `;
+
+      tableWrap.querySelectorAll('th[data-key]').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.getAttribute('data-key');
+          if (key === 'actions') return;
+          if (sortKey === key) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortKey = key;
+            sortDir = 'asc';
+          }
+          render();
+        });
+      });
+    }
+
+    function statusBadge(status) {
+      const s = status || 'needs_review';
+      const map = {
+        needs_review: { text: 'Needs Review', cls: 'bg-amber-100 text-amber-800' },
+        ready: { text: 'Ready', cls: 'bg-green-100 text-green-800' },
+      };
+      const badge = map[s] || map.needs_review;
+      return `<span class="px-2 py-1 rounded-full text-xs font-medium ${badge.cls}">${badge.text}</span>`;
+    }
+
+    function camel(key) {
+      return key;
+    }
+
+    window.viewRecord = function(id) {
+      alert('سيتم ربط عرض التفاصيل بلوحة المراجعة لاحقاً. رقم السجل: ' + id);
+    };
+
+    statusFilter.addEventListener('change', render);
+    refreshBtn.addEventListener('click', loadRecords);
+    loadRecords();
+  </script>
+</body>
+</html>

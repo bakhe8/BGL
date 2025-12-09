@@ -26,6 +26,11 @@ if ($method === 'GET' && ($uri === '/' || $uri === '/import')) {
     exit;
 }
 
+if ($method === 'GET' && $uri === '/records') {
+    echo file_get_contents(__DIR__ . '/records.html');
+    exit;
+}
+
 // API
 if ($method === 'POST' && $uri === '/api/import/excel') {
     $importController->upload();
