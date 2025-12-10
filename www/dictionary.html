@@ -62,10 +62,19 @@
       suppliersDiv.innerHTML = `
         <table class="min-w-full text-sm divide-y divide-slate-200">
           <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th></tr>
+            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
-            ${rows.map(r => `<tr><td class="px-3 py-2">${r.id}</td><td class="px-3 py-2">${r.official_name}</td><td class="px-3 py-2 text-slate-500">${r.normalized_name}</td></tr>`).join('')}
+            ${rows.map(r => `
+              <tr>
+                <td class="px-3 py-2">${r.id}</td>
+                <td class="px-3 py-2">${r.official_name}</td>
+                <td class="px-3 py-2 text-slate-500">${r.normalized_name}</td>
+                <td class="px-3 py-2">
+                  <button class="text-xs text-blue-600" onclick="fillSupplier(${r.id}, '${r.official_name.replace(/'/g, "\\'")}', '${(r.display_name||'').replace(/'/g, "\\'")}')">تعديل</button>
+                  <button class="text-xs text-red-600 ml-2" onclick="deleteSupplier(${r.id})">حذف</button>
+                </td>
+              </tr>`).join('')}
           </tbody>
         </table>
       `;
@@ -81,10 +90,19 @@
       banksDiv.innerHTML = `
         <table class="min-w-full text-sm divide-y divide-slate-200">
           <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th></tr>
+            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
-            ${rows.map(r => `<tr><td class="px-3 py-2">${r.id}</td><td class="px-3 py-2">${r.official_name}</td><td class="px-3 py-2 text-slate-500">${r.normalized_name}</td></tr>`).join('')}
+            ${rows.map(r => `
+              <tr>
+                <td class="px-3 py-2">${r.id}</td>
+                <td class="px-3 py-2">${r.official_name}</td>
+                <td class="px-3 py-2 text-slate-500">${r.normalized_name}</td>
+                <td class="px-3 py-2">
+                  <button class="text-xs text-blue-600" onclick="fillBank(${r.id}, '${r.official_name.replace(/'/g, "\\'")}', '${(r.display_name||'').replace(/'/g, "\\'")}')">تعديل</button>
+                  <button class="text-xs text-red-600 ml-2" onclick="deleteBank(${r.id})">حذف</button>
+                </td>
+              </tr>`).join('')}
           </tbody>
         </table>
       `;
@@ -127,6 +145,70 @@
       document.getElementById('bDisplay').value = '';
       loadBanks();
     });
+
+    window.fillSupplier = (id, name, display) => {
+      document.getElementById('sName').value = name;
+      document.getElementById('sDisplay').value = display;
+      sForm.dataset.editId = id;
+      sMsg.textContent = `تعديل مورد #${id}`;
+    };
+
+    window.fillBank = (id, name, display) => {
+      document.getElementById('bName').value = name;
+      document.getElementById('bDisplay').value = display;
+      bForm.dataset.editId = id;
+      bMsg.textContent = `تعديل بنك #${id}`;
+    };
+
+    sForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = sForm.dataset.editId;
+      const url = id ? `/api/dictionary/suppliers/${id}` : '/api/dictionary/suppliers';
+      const method = 'POST';
+      const payload = {
+        official_name: document.getElementById('sName').value,
+        display_name: document.getElementById('sDisplay').value,
+      };
+      const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const json = await res.json();
+      if (!json.success) { sMsg.textContent = json.message || 'تعذر الحفظ'; sMsg.className='text-sm text-red-600'; return; }
+      sMsg.textContent = 'تم الحفظ';
+      sMsg.className='text-sm text-green-700';
+      sForm.dataset.editId = '';
+      document.getElementById('sName').value = '';
+      document.getElementById('sDisplay').value = '';
+      loadSuppliers();
+    }, {once:false});
+
+    bForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = bForm.dataset.editId;
+      const url = id ? `/api/dictionary/banks/${id}` : '/api/dictionary/banks';
+      const method = 'POST';
+      const payload = {
+        official_name: document.getElementById('bName').value,
+        display_name: document.getElementById('bDisplay').value,
+      };
+      const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const json = await res.json();
+      if (!json.success) { bMsg.textContent = json.message || 'تعذر الحفظ'; bMsg.className='text-sm text-red-600'; return; }
+      bMsg.textContent = 'تم الحفظ';
+      bMsg.className='text-sm text-green-700';
+      bForm.dataset.editId = '';
+      document.getElementById('bName').value = '';
+      document.getElementById('bDisplay').value = '';
+      loadBanks();
+    }, {once:false});
+
+    window.deleteSupplier = async (id) => {
+      await fetch(`/api/dictionary/suppliers/${id}`, { method: 'DELETE' });
+      loadSuppliers();
+    };
+
+    window.deleteBank = async (id) => {
+      await fetch(`/api/dictionary/banks/${id}`, { method: 'DELETE' });
+      loadBanks();
+    };
 
     loadSuppliers();
     loadBanks();

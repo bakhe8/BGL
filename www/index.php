@@ -83,6 +83,17 @@ if ($method === 'POST' && $uri === '/api/dictionary/suppliers') {
     exit;
 }
 
+if ($method === 'POST' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $dictionaryController->updateSupplier((int)$m[1], $payload);
+    exit;
+}
+
+if ($method === 'DELETE' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
+    $dictionaryController->deleteSupplier((int)$m[1]);
+    exit;
+}
+
 if ($method === 'GET' && $uri === '/api/dictionary/banks') {
     $dictionaryController->listBanks();
     exit;
@@ -94,13 +105,29 @@ if ($method === 'POST' && $uri === '/api/dictionary/banks') {
     exit;
 }
 
+if ($method === 'POST' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $dictionaryController->updateBank((int)$m[1], $payload);
+    exit;
+}
+
+if ($method === 'DELETE' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
+    $dictionaryController->deleteBank((int)$m[1]);
+    exit;
+}
+
 if ($method === 'GET' && $uri === '/api/settings') {
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => true, 'data' => [
-        'MATCH_AUTO_THRESHOLD' => \App\Support\Config::MATCH_AUTO_THRESHOLD,
-        'MATCH_REVIEW_THRESHOLD' => \App\Support\Config::MATCH_REVIEW_THRESHOLD,
-        'CONFLICT_DELTA' => \App\Support\Config::CONFLICT_DELTA,
-    ]]);
+    $settings = (new \App\Support\Settings())->all();
+    echo json_encode(['success' => true, 'data' => $settings]);
+    exit;
+}
+
+if ($method === 'POST' && $uri === '/api/settings') {
+    header('Content-Type: application/json; charset=utf-8');
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $settings = (new \App\Support\Settings())->save($payload);
+    echo json_encode(['success' => true, 'data' => $settings]);
     exit;
 }
 

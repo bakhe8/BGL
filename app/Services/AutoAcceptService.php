@@ -24,7 +24,14 @@ class AutoAcceptService
         $second = $supplierCandidates[1] ?? null;
         $delta = $second ? (($best['score'] ?? 0) - ($second['score'] ?? 0)) : 1;
 
-        if (($best['score'] ?? 0) >= Config::MATCH_AUTO_THRESHOLD && $delta >= Config::CONFLICT_DELTA && !empty($best['supplier_id'])) {
+        // اعتماد تلقائي فقط إذا المصدر رسمي أو بديل مؤكد (ليس fuzzy) وبفارق كافٍ
+        $allowedSources = ['official', 'alternative'];
+        if (
+            in_array($best['source'] ?? '', $allowedSources, true) &&
+            ($best['score'] ?? 0) >= Config::MATCH_AUTO_THRESHOLD &&
+            $delta >= Config::CONFLICT_DELTA &&
+            !empty($best['supplier_id'])
+        ) {
             $this->records->updateDecision($recordId, [
                 'supplier_id' => $best['supplier_id'] ?? null,
                 'match_status' => 'ready',

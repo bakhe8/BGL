@@ -45,6 +45,32 @@ class DictionaryController
         echo json_encode(['success' => true, 'data' => $supplier]);
     }
 
+    public function updateSupplier(int $id, array $payload): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $name = trim((string)($payload['official_name'] ?? ''));
+        $display = trim((string)($payload['display_name'] ?? ''));
+        if ($name === '') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'الاسم الرسمي مطلوب']);
+            return;
+        }
+        $normalized = $this->normalizer->normalizeName($name);
+        $this->suppliers->update($id, [
+            'official_name' => $name,
+            'display_name' => $display ?: null,
+            'normalized_name' => $normalized,
+        ]);
+        echo json_encode(['success' => true]);
+    }
+
+    public function deleteSupplier(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->suppliers->delete($id);
+        echo json_encode(['success' => true]);
+    }
+
     public function listBanks(): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -70,5 +96,31 @@ class DictionaryController
             'is_confirmed' => 1,
         ]);
         echo json_encode(['success' => true, 'data' => $bank]);
+    }
+
+    public function updateBank(int $id, array $payload): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $name = trim((string)($payload['official_name'] ?? ''));
+        $display = trim((string)($payload['display_name'] ?? ''));
+        if ($name === '') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'الاسم الرسمي مطلوب']);
+            return;
+        }
+        $normalized = $this->normalizer->normalizeName($name);
+        $this->banks->update($id, [
+            'official_name' => $name,
+            'display_name' => $display ?: null,
+            'normalized_name' => $normalized,
+        ]);
+        echo json_encode(['success' => true]);
+    }
+
+    public function deleteBank(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->banks->delete($id);
+        echo json_encode(['success' => true]);
     }
 }

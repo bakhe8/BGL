@@ -30,6 +30,25 @@ class SupplierRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function update(int $id, array $data): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE suppliers SET official_name=:o, display_name=:d, normalized_name=:n WHERE id=:id');
+        $stmt->execute([
+            'o' => $data['official_name'],
+            'd' => $data['display_name'] ?? null,
+            'n' => $data['normalized_name'],
+            'id' => $id,
+        ]);
+    }
+
+    public function delete(int $id): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('DELETE FROM suppliers WHERE id=:id');
+        $stmt->execute(['id' => $id]);
+    }
+
     public function findByNormalizedName(string $normalizedName): ?Supplier
     {
         $pdo = Database::connection();

@@ -56,4 +56,23 @@ class BankRepository
         $id = (int)$pdo->lastInsertId();
         return new Bank($id, $data['official_name'], $data['display_name'] ?? null, $data['normalized_name'], (int)($data['is_confirmed'] ?? 0), date('c'));
     }
+
+    public function update(int $id, array $data): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE banks SET official_name=:o, display_name=:d, normalized_name=:n WHERE id=:id');
+        $stmt->execute([
+            'o' => $data['official_name'],
+            'd' => $data['display_name'] ?? null,
+            'n' => $data['normalized_name'],
+            'id' => $id,
+        ]);
+    }
+
+    public function delete(int $id): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('DELETE FROM banks WHERE id=:id');
+        $stmt->execute(['id' => $id]);
+    }
 }
