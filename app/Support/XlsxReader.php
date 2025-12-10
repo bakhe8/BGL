@@ -26,7 +26,7 @@ class XlsxReader
         }
 
         $sharedStringsXml = $this->getEntryContent($zip, 'xl/sharedStrings.xml');
-        $sheetXml = $this->getEntryContent($zip, 'xl/worksheets/sheet1.xml');
+        $sheetXml = $this->getFirstSheetContent($zip);
 
         $sharedStrings = $this->parseSharedStrings($sharedStringsXml);
         $rows = $this->parseSheet($sheetXml, $sharedStrings);
@@ -121,5 +121,26 @@ class XlsxReader
         $content = stream_get_contents($stream);
         fclose($stream);
         return $content === false ? null : $content;
+    }
+
+    private function getFirstSheetContent(ZipArchive $zip): ?string
+    {
+        // ابحث عن أول ملف داخل xl/worksheets/
+        $first = null;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $stat = $zip->statIndex($i, ZipArchive::FL_NODIR);
+            if (!$stat || !isset($stat['name'])) {
+                continue;
+            }
+            $name = $stat['name'];
+            if (str_starts_with($name, 'xl/worksheets/') && str_ends_with($name, '.xml')) {
+                $first = $i;
+                break;
+            }
+        }
+        if ($first === null) {
+            return null;
+        }
+        return $zip->getFromIndex($first) ?: null;
     }
 }

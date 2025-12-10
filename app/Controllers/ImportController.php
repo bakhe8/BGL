@@ -21,18 +21,26 @@ class ImportController
             return;
         }
 
-        $tmpPath = $_FILES['file']['tmp_name'];
+        try {
+            $tmpPath = $_FILES['file']['tmp_name'];
 
-        // حفظ نسخة من الملف في uploads
-        $uploadDir = storage_path('uploads');
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+            // حفظ نسخة من الملف في uploads
+            $uploadDir = storage_path('uploads');
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            $destPath = $uploadDir . '/upload_' . date('Ymd_His') . '.xlsx';
+            move_uploaded_file($tmpPath, $destPath);
+
+            $result = $this->importService->importExcel($destPath);
+
+            echo json_encode(['success' => true, 'data' => $result]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'فشل الاستيراد: ' . $e->getMessage(),
+            ]);
         }
-        $destPath = $uploadDir . '/upload_' . date('Ymd_His') . '.xlsx';
-        move_uploaded_file($tmpPath, $destPath);
-
-        $result = $this->importService->importExcel($destPath);
-
-        echo json_encode(['success' => true, 'data' => $result]);
     }
 }
