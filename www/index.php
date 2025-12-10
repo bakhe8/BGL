@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use App\Controllers\ImportController;
 use App\Controllers\RecordsController;
+use App\Controllers\DictionaryController;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\ImportedRecordRepository;
 use App\Services\ImportService;
@@ -19,6 +20,7 @@ $importedRecordRepo = new ImportedRecordRepository();
 $importService = new ImportService($importSessionRepo, $importedRecordRepo);
 $importController = new ImportController($importService);
 $recordsController = new RecordsController($importedRecordRepo);
+$dictionaryController = new DictionaryController();
 
 // صفحات HTML
 if ($method === 'GET' && ($uri === '/' || $uri === '/import')) {
@@ -33,6 +35,16 @@ if ($method === 'GET' && $uri === '/records') {
 
 if ($method === 'GET' && $uri === '/review') {
     echo file_get_contents(__DIR__ . '/review.html');
+    exit;
+}
+
+if ($method === 'GET' && $uri === '/dictionary') {
+    echo file_get_contents(__DIR__ . '/dictionary.html');
+    exit;
+}
+
+if ($method === 'GET' && $uri === '/settings') {
+    echo file_get_contents(__DIR__ . '/settings.html');
     exit;
 }
 
@@ -57,6 +69,38 @@ if ($method === 'POST' && preg_match('#^/api/records/(\\d+)/decision$#', $uri, $
 if ($method === 'GET' && preg_match('#^/api/records/(\\d+)/candidates$#', $uri, $m)) {
     $id = (int)$m[1];
     $recordsController->candidates($id);
+    exit;
+}
+
+if ($method === 'GET' && $uri === '/api/dictionary/suppliers') {
+    $dictionaryController->listSuppliers();
+    exit;
+}
+
+if ($method === 'POST' && $uri === '/api/dictionary/suppliers') {
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $dictionaryController->createSupplier($payload);
+    exit;
+}
+
+if ($method === 'GET' && $uri === '/api/dictionary/banks') {
+    $dictionaryController->listBanks();
+    exit;
+}
+
+if ($method === 'POST' && $uri === '/api/dictionary/banks') {
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $dictionaryController->createBank($payload);
+    exit;
+}
+
+if ($method === 'GET' && $uri === '/api/settings') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => true, 'data' => [
+        'MATCH_AUTO_THRESHOLD' => \App\Support\Config::MATCH_AUTO_THRESHOLD,
+        'MATCH_REVIEW_THRESHOLD' => \App\Support\Config::MATCH_REVIEW_THRESHOLD,
+        'CONFLICT_DELTA' => \App\Support\Config::CONFLICT_DELTA,
+    ]]);
     exit;
 }
 

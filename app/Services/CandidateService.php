@@ -13,6 +13,7 @@ class CandidateService
         private SupplierRepository $suppliers,
         private SupplierAlternativeNameRepository $supplierAlts,
         private Normalizer $normalizer = new Normalizer(),
+        private \App\Repositories\BankRepository $banks = new \App\Repositories\BankRepository(),
     ) {
     }
 
@@ -145,5 +146,62 @@ class CandidateService
         $intersect = count(array_intersect($ta, $tb));
         $union = count(array_unique(array_merge($ta, $tb)));
         return $union === 0 ? 0.0 : $intersect / $union;
+    }
+
+    /**
+     * مرشحي البنوك (official + fuzzy بسيط).
+     *
+     * @return array{normalized:string, candidates: array<int, array{source:string, bank_id:int, name:string, score:float}>}
+     */
+    public function bankCandidates(string $rawBank): array
+    {
+        $normalized = $this->normalizer->normalizeName($rawBank);
+        if ($normalized === '') {
+            return ['normalized' => '', 'candidates' => []];
+        }
+
+        $candidates = [];
+        foreach ($this->banks->findAllByNormalized($normalized) as $bank) {
+            $candNorm = $this->normalizer->normalizeName($bank['normalized_name'] ?? $bank['official_name']);
+            $sim = $this->scoreComponents($normalized, $candNorm);
+            $scoreRaw = $this->maxScore($sim);
+            $candidates[] = [
+                'source' => 'official',
+                'bank_id' => $bank['id'],
+                'name' => $bank['official_name'],
+                'score' => $scoreRaw * \App\Support\Config::WEIGHT_OFFICIAL,
+                'score_raw' => $scoreRaw,
+            ];
+        }
+
+        foreach ($this->banks->allNormalized() as $bank) {
+            $candNorm = $this->normalizer->normalizeName($bank['normalized_name'] ?? $bank['official_name']);
+            $sim = $this->scoreComponents($normalized, $candNorm);
+            $scoreRaw = $this->maxScore($sim);
+            $score = $scoreRaw * \App\Support\Config::WEIGHT_FUZZY;
+            if ($score >= \App\Support\Config::MATCH_REVIEW_THRESHOLD) {
+                $candidates[] = [
+                    'source' => 'fuzzy_official',
+                    'bank_id' => $bank['id'],
+                    'name' => $bank['official_name'],
+                    'score' => $score,
+                    'score_raw' => $scoreRaw,
+                ];
+            }
+        }
+
+        // أفضل لكل بنك
+        $best = [];
+        foreach ($candidates as $c) {
+            $bid = $c['bank_id'];
+            if (!isset($best[$bid]) || $c['score'] > $best[$bid]['score']) {
+                $best[$bid] = $c;
+            }
+        }
+
+        $unique = array_values($best);
+        usort($unique, fn($a, $b) => $b['score'] <=> $a['score']);
+
+        return ['normalized' => $normalized, 'candidates' => $unique];
     }
 }

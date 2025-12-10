@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="font-semibold text-lg">Settings</div>
+      <nav class="flex gap-4 text-sm text-slate-600">
+        <a href="/import">Import</a>
+        <a href="/records">Records</a>
+        <a href="/review">Review Panel</a>
+        <a href="/dictionary">Dictionary</a>
+        <a href="/settings" class="text-blue-600 font-semibold">Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <h1 class="text-xl font-semibold mb-4">Thresholds</h1>
+      <div id="thresholds" class="text-sm text-slate-700">
+        <div>Match Auto Threshold: <span id="autoTh"></span></div>
+        <div>Match Review Threshold: <span id="revTh"></span></div>
+        <div>Conflict Delta: <span id="confDelta"></span></div>
+      </div>
+      <p class="text-slate-500 text-sm mt-3">هذه القيم ثابتة من Config.php. سيتم دعم التعديل والحفظ لاحقًا.</p>
+    </section>
+  </main>
+
+  <script>
+    async function loadSettings() {
+      const res = await fetch('/api/settings');
+      const json = await res.json();
+      if (!json.success) return;
+      document.getElementById('autoTh').textContent = json.data.MATCH_AUTO_THRESHOLD;
+      document.getElementById('revTh').textContent = json.data.MATCH_REVIEW_THRESHOLD;
+      document.getElementById('confDelta').textContent = json.data.CONFLICT_DELTA;
+    }
+    loadSettings();
+  </script>
+</body>
+</html>

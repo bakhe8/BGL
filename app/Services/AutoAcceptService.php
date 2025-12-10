@@ -21,7 +21,10 @@ class AutoAcceptService
             return;
         }
         $best = $supplierCandidates[0];
-        if (($best['score'] ?? 0) >= Config::MATCH_AUTO_THRESHOLD) {
+        $second = $supplierCandidates[1] ?? null;
+        $delta = $second ? (($best['score'] ?? 0) - ($second['score'] ?? 0)) : 1;
+
+        if (($best['score'] ?? 0) >= Config::MATCH_AUTO_THRESHOLD && $delta >= Config::CONFLICT_DELTA && !empty($best['supplier_id'])) {
             $this->records->updateDecision($recordId, [
                 'supplier_id' => $best['supplier_id'] ?? null,
                 'match_status' => 'ready',

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dictionary</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="font-semibold text-lg">Dictionary Management</div>
+      <nav class="flex gap-4 text-sm text-slate-600">
+        <a href="/import">Import</a>
+        <a href="/records">Records</a>
+        <a href="/review">Review Panel</a>
+        <a href="/dictionary" class="text-blue-600 font-semibold">Dictionary</a>
+        <a href="/settings">Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 space-y-8">
+    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <h1 class="text-xl font-semibold mb-4">الموردون</h1>
+      <form id="supplierForm" class="flex flex-wrap gap-3 mb-4 text-sm">
+        <input type="text" id="sName" placeholder="اسم المورد الرسمي" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
+        <input type="text" id="sDisplay" placeholder="اسم العرض (اختياري)" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">إضافة</button>
+        <div id="sMsg" class="text-sm text-slate-600"></div>
+      </form>
+      <div id="suppliers" class="overflow-x-auto text-sm"></div>
+    </section>
+
+    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <h1 class="text-xl font-semibold mb-4">البنوك</h1>
+      <form id="bankForm" class="flex flex-wrap gap-3 mb-4 text-sm">
+        <input type="text" id="bName" placeholder="اسم البنك الرسمي" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
+        <input type="text" id="bDisplay" placeholder="اسم العرض (اختياري)" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">إضافة</button>
+        <div id="bMsg" class="text-sm text-slate-600"></div>
+      </form>
+      <div id="banks" class="overflow-x-auto text-sm"></div>
+    </section>
+  </main>
+
+  <script>
+    const suppliersDiv = document.getElementById('suppliers');
+    const banksDiv = document.getElementById('banks');
+    const sForm = document.getElementById('supplierForm');
+    const bForm = document.getElementById('bankForm');
+    const sMsg = document.getElementById('sMsg');
+    const bMsg = document.getElementById('bMsg');
+
+    async function loadSuppliers() {
+      suppliersDiv.innerHTML = '...';
+      const res = await fetch('/api/dictionary/suppliers');
+      const json = await res.json();
+      if (!json.success) { suppliersDiv.innerHTML = 'تعذر التحميل'; return; }
+      const rows = json.data || [];
+      if (!rows.length) { suppliersDiv.innerHTML = '<div class="text-slate-500">لا يوجد بيانات.</div>'; return; }
+      suppliersDiv.innerHTML = `
+        <table class="min-w-full text-sm divide-y divide-slate-200">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th></tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            ${rows.map(r => `<tr><td class="px-3 py-2">${r.id}</td><td class="px-3 py-2">${r.official_name}</td><td class="px-3 py-2 text-slate-500">${r.normalized_name}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function loadBanks() {
+      banksDiv.innerHTML = '...';
+      const res = await fetch('/api/dictionary/banks');
+      const json = await res.json();
+      if (!json.success) { banksDiv.innerHTML = 'تعذر التحميل'; return; }
+      const rows = json.data || [];
+      if (!rows.length) { banksDiv.innerHTML = '<div class="text-slate-500">لا يوجد بيانات.</div>'; return; }
+      banksDiv.innerHTML = `
+        <table class="min-w-full text-sm divide-y divide-slate-200">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th></tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            ${rows.map(r => `<tr><td class="px-3 py-2">${r.id}</td><td class="px-3 py-2">${r.official_name}</td><td class="px-3 py-2 text-slate-500">${r.normalized_name}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    sForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      sMsg.textContent = 'جارٍ الإضافة...';
+      const payload = {
+        official_name: document.getElementById('sName').value,
+        display_name: document.getElementById('sDisplay').value,
+      };
+      const res = await fetch('/api/dictionary/suppliers', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!json.success) { sMsg.textContent = json.message || 'تعذر الإضافة'; sMsg.className='text-sm text-red-600'; return; }
+      sMsg.textContent = 'تمت الإضافة';
+      sMsg.className='text-sm text-green-700';
+      document.getElementById('sName').value = '';
+      document.getElementById('sDisplay').value = '';
+      loadSuppliers();
+    });
+
+    bForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      bMsg.textContent = 'جارٍ الإضافة...';
+      const payload = {
+        official_name: document.getElementById('bName').value,
+        display_name: document.getElementById('bDisplay').value,
+      };
+      const res = await fetch('/api/dictionary/banks', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!json.success) { bMsg.textContent = json.message || 'تعذر الإضافة'; bMsg.className='text-sm text-red-600'; return; }
+      bMsg.textContent = 'تمت الإضافة';
+      bMsg.className='text-sm text-green-700';
+      document.getElementById('bName').value = '';
+      document.getElementById('bDisplay').value = '';
+      loadBanks();
+    });
+
+    loadSuppliers();
+    loadBanks();
+  </script>
+</body>
+</html>

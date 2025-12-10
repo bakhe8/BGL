@@ -32,4 +32,28 @@ class BankRepository
             $row['created_at'] ?? null,
         );
     }
+
+    /**
+     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
+     */
+    public function allNormalized(): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->query('SELECT id, official_name, normalized_name FROM banks');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function create(array $data): Bank
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('INSERT INTO banks (official_name, display_name, normalized_name, is_confirmed) VALUES (:o, :d, :n, :c)');
+        $stmt->execute([
+            'o' => $data['official_name'],
+            'd' => $data['display_name'] ?? null,
+            'n' => $data['normalized_name'],
+            'c' => $data['is_confirmed'] ?? 0,
+        ]);
+        $id = (int)$pdo->lastInsertId();
+        return new Bank($id, $data['official_name'], $data['display_name'] ?? null, $data['normalized_name'], (int)($data['is_confirmed'] ?? 0), date('c'));
+    }
 }
