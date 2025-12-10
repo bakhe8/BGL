@@ -9,6 +9,17 @@ use PDO;
 
 class SupplierRepository
 {
+    /**
+     * @return array<int, array{id:int, official_name:string, display_name:?string, normalized_name:string}>
+     */
+    public function findAllByNormalized(string $normalizedName): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, official_name, display_name, normalized_name FROM suppliers WHERE normalized_name = :n');
+        $stmt->execute(['n' => $normalizedName]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function findByNormalizedName(string $normalizedName): ?Supplier
     {
         $pdo = Database::connection();

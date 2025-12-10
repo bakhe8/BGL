@@ -54,5 +54,11 @@ if ($method === 'POST' && preg_match('#^/api/records/(\\d+)/decision$#', $uri, $
     exit;
 }
 
+if ($method === 'GET' && preg_match('#^/api/records/(\\d+)/candidates$#', $uri, $m)) {
+    $id = (int)$m[1];
+    $recordsController->candidates($id);
+    exit;
+}
+
 http_response_code(404);
 echo 'Not Found';

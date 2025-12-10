@@ -92,12 +92,12 @@
 
       <div class="grid md:grid-cols-2 gap-6">
         <div>
-          <h3 class="font-semibold mb-2">اقتراحات المورد</h3>
+          <h3 class="font-semibold mb-2">اقتراحات المورد (official + alternative)</h3>
           <div id="supplierSuggestions" class="space-y-2 text-sm text-slate-700"></div>
         </div>
         <div>
           <h3 class="font-semibold mb-2">اقتراحات البنك</h3>
-          <div id="bankSuggestions" class="space-y-2 text-sm text-slate-700"></div>
+          <div id="bankSuggestions" class="space-y-2 text-sm text-slate-700 text-slate-500">لا توجد اقتراحات بعد (سيُضاف لاحقًا).</div>
         </div>
       </div>
 
@@ -249,7 +249,7 @@
       document.getElementById('fExpiry').value = r.expiryDate || '';
       document.getElementById('fStatus').value = r.matchStatus || 'needs_review';
       msg.textContent = '';
-      renderSuggestions(r);
+      await renderSuggestions(r);
     }
 
     function setText(id, val) {
@@ -287,51 +287,47 @@
       await loadRecords();
     }
 
-    function renderSuggestions(r) {
+    async function renderSuggestions(r) {
       const supplierSuggestions = document.getElementById('supplierSuggestions');
-      const bankSuggestions = document.getElementById('bankSuggestions');
+      supplierSuggestions.innerHTML = '<div class="text-slate-500">جارٍ تحميل المرشحين...</div>';
 
-      const supplierCandidates = [];
-      if (r.supplierId) supplierCandidates.push({label: `مورد معرف (ID ${r.supplierId})`, value: r.rawSupplierName, score: 0.9});
-      supplierCandidates.push({label: 'الاسم الخام', value: r.rawSupplierName, score: 0.5});
+      try {
+        const res = await fetch(`/api/records/${r.id}/candidates`);
+        const json = await res.json();
+        if (!json.success) {
+          supplierSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
+          return;
+        }
 
-      const bankCandidates = [];
-      if (r.bankId) bankCandidates.push({label: `بنك معرف (ID ${r.bankId})`, value: r.rawBankName, score: 0.9});
-      bankCandidates.push({label: 'الاسم الخام', value: r.rawBankName, score: 0.5});
+        const candidates = json.data?.supplier?.candidates || [];
+        const normalized = json.data?.supplier?.normalized || '';
 
-      supplierSuggestions.innerHTML = supplierCandidates.map((c, idx) => `
-        <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
-          <input type="radio" name="supplierCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
-          <div>
-            <div class="font-medium">${c.label}</div>
-            <div class="text-slate-600 text-xs">${c.value || '—'}</div>
-            <div class="text-xs text-slate-500">Score: ${c.score}</div>
-          </div>
-        </label>
-      `).join('');
+        if (!candidates.length) {
+          supplierSuggestions.innerHTML = '<div class="text-slate-500">لا توجد اقتراحات</div>';
+          return;
+        }
 
-      bankSuggestions.innerHTML = bankCandidates.map((c, idx) => `
-        <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
-          <input type="radio" name="bankCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
-          <div>
-            <div class="font-medium">${c.label}</div>
-            <div class="text-slate-600 text-xs">${c.value || '—'}</div>
-            <div class="text-xs text-slate-500">Score: ${c.score}</div>
-          </div>
-        </label>
-      `).join('');
+        supplierSuggestions.innerHTML = candidates.map((c, idx) => `
+          <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
+            <input type="radio" name="supplierCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
+            <div>
+              <div class="font-medium">${c.name || '—'}</div>
+              <div class="text-slate-600 text-xs">المصدر: ${c.source}</div>
+              <div class="text-slate-500 text-xs">normalized: ${normalized}</div>
+            </div>
+          </label>
+        `).join('');
 
-      // ربط اختيار المرشح مع الحقول
-      supplierSuggestions.querySelectorAll('input[name="supplierCandidate"]').forEach((input, idx) => {
-        input.addEventListener('change', () => {
-          document.getElementById('fSupplier').value = supplierCandidates[idx].value || '';
+        // ربط الاختيار لتعبئة الحقل
+        supplierSuggestions.querySelectorAll('input[name="supplierCandidate"]').forEach((input, idx) => {
+          input.addEventListener('change', () => {
+            const chosen = candidates[idx];
+            document.getElementById('fSupplier').value = chosen.name || '';
+          });
         });
-      });
-      bankSuggestions.querySelectorAll('input[name="bankCandidate"]').forEach((input, idx) => {
-        input.addEventListener('change', () => {
-          document.getElementById('fBank').value = bankCandidates[idx].value || '';
-        });
-      });
+      } catch (e) {
+        supplierSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
+      }
     }
 
     function renderConflicts(r) {

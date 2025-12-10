@@ -4,10 +4,17 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Repositories\ImportedRecordRepository;
+use App\Services\CandidateService;
 
 class RecordsController
 {
-    public function __construct(private ImportedRecordRepository $records)
+    public function __construct(
+        private ImportedRecordRepository $records,
+        private CandidateService $candidates = new CandidateService(
+            new \App\Repositories\SupplierRepository(),
+            new \App\Repositories\SupplierAlternativeNameRepository(),
+        ),
+    )
     {
     }
 
@@ -80,5 +87,25 @@ class RecordsController
         $updated = $this->records->find($id);
 
         echo json_encode(['success' => true, 'data' => $updated]);
+    }
+
+    public function candidates(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $record = $this->records->find($id);
+        if (!$record) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'السجل غير موجود']);
+            return;
+        }
+
+        $supplierCandidates = $this->candidates->supplierCandidates($record->rawSupplierName);
+
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'supplier' => $supplierCandidates,
+            ],
+        ]);
     }
 }

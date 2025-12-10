@@ -21,6 +21,17 @@ class SupplierAlternativeNameRepository
         return $this->map($row);
     }
 
+    /**
+     * @return array<int, array{id:int, supplier_id:int, raw_name:string, normalized_raw_name:string}>
+     */
+    public function findAllByNormalized(string $normalizedRawName): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, supplier_id, raw_name, normalized_raw_name FROM supplier_alternative_names WHERE normalized_raw_name = :n');
+        $stmt->execute(['n' => $normalizedRawName]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     private function map(array $row): SupplierAlternativeName
     {
         return new SupplierAlternativeName(
