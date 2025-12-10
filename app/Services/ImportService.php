@@ -6,6 +6,7 @@ namespace App\Services;
 use App\Models\ImportedRecord;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\ImportedRecordRepository;
+use App\Services\ExcelColumnDetector;
 use App\Support\XlsxReader;
 use RuntimeException;
 
@@ -15,6 +16,7 @@ class ImportService
         private ImportSessionRepository $sessions,
         private ImportedRecordRepository $records,
         private XlsxReader $xlsxReader = new XlsxReader(),
+        private ExcelColumnDetector $detector = new ExcelColumnDetector(),
     ) {
     }
 
@@ -31,17 +33,22 @@ class ImportService
         }
 
         // السطر الأول رؤوس
-        $headers = array_map([$this, 'normalizeHeader'], array_shift($rows));
-        $map = $this->buildColumnMap($headers);
+        $headers = array_shift($rows);
+        $map = $this->detector->detect($headers);
+
+        // التحقق من الأعمدة الأساسية
+        if (!isset($map['supplier']) || !isset($map['bank'])) {
+            throw new RuntimeException('⚠️ لم نستطع التعرف على عمود اسم المورد أو عمود البنك. يرجى التأكد من أن ملف Excel يحتوي على الأعمدة المطلوبة بصيغة معروفة.');
+        }
 
         $count = 0;
         foreach ($rows as $row) {
             $supplier = $this->colValue($row, $map['supplier'] ?? null);
             $bank = $this->colValue($row, $map['bank'] ?? null);
-            $amount = $this->colValue($row, $map['amount'] ?? null);
+            $amount = $this->normalizeAmount($this->colValue($row, $map['amount'] ?? null));
             $guarantee = $this->colValue($row, $map['guarantee'] ?? null);
-            $expiry = $this->colValue($row, $map['expiry'] ?? null);
-            $issue = $this->colValue($row, $map['issue'] ?? null);
+            $expiry = $this->normalizeDate($this->colValue($row, $map['expiry'] ?? null));
+            $issue = $this->normalizeDate($this->colValue($row, $map['issue'] ?? null));
 
             if ($supplier === '' && $bank === '') {
                 continue;
@@ -69,44 +76,34 @@ class ImportService
         ];
     }
 
-    private function normalizeHeader(?string $h): string
-    {
-        $h = trim((string)$h);
-        $h = preg_replace('/[^a-zA-Z0-9]+/u', '', strtolower($h));
-        return $h ?? '';
-    }
-
-    /**
-     * @param string[] $headers
-     * @return array{supplier?:int,bank?:int,amount?:int,guarantee?:int,expiry?:int,issue?:int}
-     */
-    private function buildColumnMap(array $headers): array
-    {
-        $aliases = [
-            'supplier' => ['supplier', 'contractorname'],
-            'bank' => ['bankname'],
-            'amount' => ['amount', 'bgamount'],
-            'guarantee' => ['bankguranteenumber', 'bankguaranteenumber', 'bgguaranteenumber'],
-            'expiry' => ['bgexpirydate', 'expirydate'],
-            'issue' => ['validitydate', 'issuedate', 'today'],
-        ];
-
-        $map = [];
-        foreach ($headers as $idx => $h) {
-            foreach ($aliases as $field => $list) {
-                if (in_array($h, $list, true) && !isset($map[$field])) {
-                    $map[$field] = $idx;
-                }
-            }
-        }
-        return $map;
-    }
-
     private function colValue(array $row, ?int $index): string
     {
         if ($index === null) {
             return '';
         }
         return isset($row[$index]) ? (string)$row[$index] : '';
+    }
+
+    private function normalizeAmount(string $amount): ?string
+    {
+        if ($amount === '') {
+            return null;
+        }
+        // إزالة الفواصل والمسافات
+        $clean = preg_replace('/[^\d\.\-]/', '', $amount);
+        return $clean === '' ? null : $clean;
+    }
+
+    private function normalizeDate(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+        // محاولة تحويل النص إلى تاريخ ISO
+        $ts = strtotime($value);
+        if ($ts === false) {
+            return $value; // نعيده كما هو، سيتم مراجعته لاحقًا
+        }
+        return date('Y-m-d', $ts);
     }
 }
