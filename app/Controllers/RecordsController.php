@@ -41,9 +41,38 @@ class RecordsController
         ];
 
         // مدخلات اختيارية للتحديث اليدوي
-        foreach (['raw_supplier_name', 'raw_bank_name', 'amount', 'guarantee_number', 'issue_date', 'expiry_date'] as $field) {
+        $fields = [
+            'raw_supplier_name' => 255,
+            'raw_bank_name' => 255,
+            'guarantee_number' => 255,
+        ];
+
+        foreach ($fields as $field => $max) {
             if (isset($payload[$field])) {
-                $update[$field] = $payload[$field];
+                $val = trim((string)$payload[$field]);
+                if (strlen($val) > $max) {
+                    http_response_code(422);
+                    echo json_encode(['success' => false, 'message' => "{$field} يتجاوز الحد الأقصى."]);
+                    return;
+                }
+                $update[$field] = $val;
+            }
+        }
+
+        if (isset($payload['amount'])) {
+            $cleanAmount = preg_replace('/[^\d\.\-]/', '', (string)$payload['amount']);
+            $update['amount'] = $cleanAmount === '' ? null : $cleanAmount;
+        }
+
+        foreach (['issue_date', 'expiry_date'] as $dateField) {
+            if (isset($payload[$dateField])) {
+                $val = trim((string)$payload[$dateField]);
+                if ($val !== '' && strtotime($val) === false) {
+                    http_response_code(422);
+                    echo json_encode(['success' => false, 'message' => "{$dateField} ليس تاريخاً صالحاً"});
+                    return;
+                }
+                $update[$dateField] = $val === '' ? null : date('Y-m-d', strtotime($val));
             }
         }
 

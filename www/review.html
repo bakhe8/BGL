@@ -45,6 +45,14 @@
           <div id="dBank" class="font-semibold"></div>
         </div>
         <div>
+          <label class="text-slate-600">المورد (مطبع)</label>
+          <div id="dSupplierNorm" class="text-slate-600"></div>
+        </div>
+        <div>
+          <label class="text-slate-600">البنك (مطبع)</label>
+          <div id="dBankNorm" class="text-slate-600"></div>
+        </div>
+        <div>
           <label class="text-slate-600">المبلغ</label>
           <div id="dAmount"></div>
         </div>
@@ -67,6 +75,14 @@
         <div>
           <label class="text-slate-600">تاريخ الإدخال</label>
           <div id="dCreated"></div>
+        </div>
+        <div>
+          <label class="text-slate-600">مورد مقترح</label>
+          <div id="dSupplierSuggested" class="text-slate-600">—</div>
+        </div>
+        <div>
+          <label class="text-slate-600">بنك مقترح</label>
+          <div id="dBankSuggested" class="text-slate-600">—</div>
         </div>
       </div>
 
@@ -198,12 +214,16 @@
       detailMeta.textContent = `ID: ${r.id} | Session: ${r.sessionId ?? ''}`;
       setText('dSupplier', r.rawSupplierName);
       setText('dBank', r.rawBankName);
+      setText('dSupplierNorm', r.normalizedSupplier);
+      setText('dBankNorm', r.normalizedBank);
       setText('dAmount', r.amount);
       setText('dGuarantee', r.guaranteeNumber);
       setText('dIssue', r.issueDate);
       setText('dExpiry', r.expiryDate);
       setText('dSession', r.sessionId);
       setText('dCreated', r.createdAt);
+      setText('dSupplierSuggested', r.supplierId ? `ID: ${r.supplierId}` : '—');
+      setText('dBankSuggested', r.bankId ? `ID: ${r.bankId}` : '—');
 
       document.getElementById('fSupplier').value = r.rawSupplierName || '';
       document.getElementById('fBank').value = r.rawBankName || '';

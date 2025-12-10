@@ -14,6 +14,12 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
+// Composer autoload (PhpSpreadsheet)
+$composerAutoload = base_path('vendor/autoload.php');
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+}
+
 function base_path(string $path = ''): string
 {
     $base = dirname(__DIR__, 1);
