@@ -15,6 +15,27 @@ require __DIR__ . '/../app/Support/autoload.php';
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
+// خدمة الملفات الثابتة (CSS/JS/ICO/صور) داخل www
+$staticPath = __DIR__ . $uri;
+if ($uri !== '/' && file_exists($staticPath) && !is_dir($staticPath)) {
+    $ext = pathinfo($staticPath, PATHINFO_EXTENSION);
+    $types = [
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'svg' => 'image/svg+xml',
+        'ico' => 'image/x-icon',
+        'woff2' => 'font/woff2',
+    ];
+    if (isset($types[$ext])) {
+        header('Content-Type: ' . $types[$ext]);
+    }
+    readfile($staticPath);
+    exit;
+}
+
 // حاوية بسيطة لإنشاء التبعيات
 $importSessionRepo = new ImportSessionRepository();
 $importedRecordRepo = new ImportedRecordRepository();
@@ -40,7 +61,7 @@ if ($method === 'GET' && $uri === '/review') {
     exit;
 }
 
-if ($method === 'GET' && $uri === '/dictionary') {
+if ($method === 'GET' && ($uri === '/dictionary' || $uri === '/dictionary/suppliers' || $uri === '/dictionary/banks')) {
     echo file_get_contents(__DIR__ . '/dictionary.html');
     exit;
 }

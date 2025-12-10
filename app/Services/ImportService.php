@@ -10,6 +10,7 @@ use App\Services\ExcelColumnDetector;
 use App\Services\CandidateService;
 use App\Services\AutoAcceptService;
 use App\Services\MatchingService;
+use App\Services\ConflictDetector;
 use App\Support\XlsxReader;
 use RuntimeException;
 
@@ -20,10 +21,10 @@ class ImportService
         private ImportedRecordRepository $records,
         private XlsxReader $xlsxReader = new XlsxReader(),
         private ExcelColumnDetector $detector = new ExcelColumnDetector(),
-        private MatchingService $matchingService = null,
-        private CandidateService $candidateService = null,
-        private AutoAcceptService $autoAcceptService = null,
-        private ConflictDetector $conflictDetector = new ConflictDetector(),
+        private ?MatchingService $matchingService = null,
+        private ?CandidateService $candidateService = null,
+        private ?AutoAcceptService $autoAcceptService = null,
+        private ?ConflictDetector $conflictDetector = null,
     ) {
         $this->matchingService ??= new MatchingService(
             new \App\Repositories\SupplierRepository(),
@@ -33,9 +34,11 @@ class ImportService
         $this->candidateService ??= new CandidateService(
             new \App\Repositories\SupplierRepository(),
             new \App\Repositories\SupplierAlternativeNameRepository(),
+            new \App\Support\Normalizer(),
             new \App\Repositories\BankRepository(),
         );
         $this->autoAcceptService ??= new AutoAcceptService($this->records);
+        $this->conflictDetector ??= new ConflictDetector();
     }
 
     /**

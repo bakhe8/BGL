@@ -117,7 +117,7 @@ class BankAlternativeNameRepository
             bank_id INTEGER NOT NULL,
             raw_name TEXT NOT NULL,
             normalized_raw_name TEXT NOT NULL,
-            source TEXT DEFAULT \"manual\",
+            source TEXT DEFAULT \'manual\',
             occurrence_count INTEGER DEFAULT 0,
             last_seen_at TEXT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP

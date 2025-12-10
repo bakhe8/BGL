@@ -6,25 +6,34 @@ namespace App\Controllers;
 use App\Repositories\ImportedRecordRepository;
 use App\Services\CandidateService;
 use App\Services\ConflictDetector;
+use App\Support\Normalizer;
 
 class RecordsController
 {
-    public function __construct(
-        private ImportedRecordRepository $records,
-        private CandidateService $candidates = new CandidateService(
+    private $candidates;
+    private $conflicts;
+    private $records;
+
+    public function __construct(ImportedRecordRepository $records, CandidateService $candidates = null, ConflictDetector $conflicts = null)
+    {
+        $this->records = $records;
+        $this->candidates = $candidates ?: new CandidateService(
             new \App\Repositories\SupplierRepository(),
             new \App\Repositories\SupplierAlternativeNameRepository(),
-        ),
-        private ConflictDetector $conflicts = new ConflictDetector(),
-    )
-    {
+            new Normalizer(),
+            new \App\Repositories\BankRepository(),
+            new \App\Repositories\BankAlternativeNameRepository(),
+            new \App\Repositories\SupplierOverrideRepository(),
+            new \App\Support\Settings()
+        );
+        $this->conflicts = $conflicts ?: new ConflictDetector();
     }
 
     public function index(): void
     {
         header('Content-Type: application/json; charset=utf-8');
         $data = $this->records->all();
-        echo json_encode(['success' => true, 'data' => $data]);
+        echo json_encode(array('success' => true, 'data' => $data));
     }
 
     public function saveDecision(int $id, array $payload): void
@@ -34,34 +43,34 @@ class RecordsController
         $record = $this->records->find($id);
         if (!$record) {
             http_response_code(404);
-            echo json_encode(['success' => false, 'message' => 'السجل غير موجود']);
+            echo json_encode(array('success' => false, 'message' => 'السجل غير موجود'));
             return;
         }
 
         $status = $payload['match_status'] ?? null;
-        if (!in_array($status, ['ready', 'needs_review'], true)) {
+        if (!in_array($status, array('ready', 'needs_review'), true)) {
             http_response_code(422);
-            echo json_encode(['success' => false, 'message' => 'حالة غير صالحة']);
+            echo json_encode(array('success' => false, 'message' => 'حالة غير صالحة'));
             return;
         }
 
-        $update = [
+        $update = array(
             'match_status' => $status,
-        ];
+        );
 
         // مدخلات اختيارية للتحديث اليدوي
-        $fields = [
+        $fields = array(
             'raw_supplier_name' => 255,
             'raw_bank_name' => 255,
             'guarantee_number' => 255,
-        ];
+        );
 
         foreach ($fields as $field => $max) {
             if (isset($payload[$field])) {
                 $val = trim((string)$payload[$field]);
                 if (strlen($val) > $max) {
                     http_response_code(422);
-                    echo json_encode(['success' => false, 'message' => "{$field} يتجاوز الحد الأقصى."]);
+                    echo json_encode(array('success' => false, 'message' => "{$field} يتجاوز الحد الأقصى."));
                     return;
                 }
                 $update[$field] = $val;
@@ -73,12 +82,12 @@ class RecordsController
             $update['amount'] = $cleanAmount === '' ? null : $cleanAmount;
         }
 
-        foreach (['issue_date', 'expiry_date'] as $dateField) {
+        foreach (array('issue_date', 'expiry_date') as $dateField) {
             if (isset($payload[$dateField])) {
                 $val = trim((string)$payload[$dateField]);
                 if ($val !== '' && strtotime($val) === false) {
                     http_response_code(422);
-                    echo json_encode(['success' => false, 'message' => "{$dateField} ليس تاريخاً صالحاً"});
+                    echo json_encode(array('success' => false, 'message' => "{$dateField} ليس تاريخاً صالحاً"));
                     return;
                 }
                 $update[$dateField] = $val === '' ? null : date('Y-m-d', strtotime($val));
@@ -88,7 +97,7 @@ class RecordsController
         $this->records->updateDecision($id, $update);
         $updated = $this->records->find($id);
 
-        echo json_encode(['success' => true, 'data' => $updated]);
+        echo json_encode(array('success' => true, 'data' => $updated));
     }
 
     public function candidates(int $id): void
@@ -97,7 +106,7 @@ class RecordsController
         $record = $this->records->find($id);
         if (!$record) {
             http_response_code(404);
-            echo json_encode(['success' => false, 'message' => 'السجل غير موجود']);
+            echo json_encode(array('success' => false, 'message' => 'السجل غير موجود'));
             return;
         }
 
@@ -105,20 +114,20 @@ class RecordsController
         $bankCandidates = $this->candidates->bankCandidates($record->rawBankName);
 
         $conflicts = $this->conflicts->detect(
-            ['supplier' => $supplierCandidates, 'bank' => $bankCandidates],
-            [
+            array('supplier' => $supplierCandidates, 'bank' => $bankCandidates),
+            array(
                 'raw_supplier_name' => $record->rawSupplierName,
                 'raw_bank_name' => $record->rawBankName,
-            ]
+            )
         );
 
-        echo json_encode([
+        echo json_encode(array(
             'success' => true,
-            'data' => [
+            'data' => array(
                 'supplier' => $supplierCandidates,
                 'bank' => $bankCandidates,
                 'conflicts' => $conflicts,
-            ],
-        ]);
+            ),
+        ));
     }
 }

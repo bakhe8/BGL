@@ -18,6 +18,25 @@ class SupplierOverrideRepository
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
+    public function create(int $supplierId, string $overrideName, string $normalized): void
+    {
+        $this->ensureTable();
+        $pdo = Database::connection();
+        // منع التكرار
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM supplier_overrides WHERE supplier_id = :sid AND normalized_override = :n');
+        $stmt->execute(['sid' => $supplierId, 'n' => $normalized]);
+        if ((int)$stmt->fetchColumn() > 0) {
+            return;
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO supplier_overrides (supplier_id, override_name, normalized_override) VALUES (:sid, :o, :n)');
+        $stmt->execute([
+            'sid' => $supplierId,
+            'o' => $overrideName,
+            'n' => $normalized,
+        ]);
+    }
+
     private function ensureTable(): void
     {
         static $created = false;
@@ -33,6 +52,15 @@ class SupplierOverrideRepository
             notes TEXT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )');
+        // تأكد من وجود العمود normalized_override في قواعد بيانات قديمة
+        $cols = [];
+        $res = $pdo->query("PRAGMA table_info('supplier_overrides')");
+        while ($row = $res->fetch(\PDO::FETCH_ASSOC)) {
+            $cols[] = $row['name'];
+        }
+        if (!in_array('normalized_override', $cols, true)) {
+            $pdo->exec("ALTER TABLE supplier_overrides ADD COLUMN normalized_override TEXT");
+        }
         $created = true;
     }
 }

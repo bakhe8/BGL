@@ -29,7 +29,8 @@ class XlsxReader
         for ($row = 1; $row <= $highestRow; $row++) {
             $cells = [];
             for ($col = 1; $col <= $highestColIndex; $col++) {
-                $cells[] = $sheet->getCellByColumnAndRow($col, $row)->getFormattedValue();
+                $coord = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . $row;
+                $cells[] = $sheet->getCell($coord)->getFormattedValue();
             }
             $nonEmpty = array_filter($cells, fn($v) => $v !== null && $v !== '');
             if ($nonEmpty) {

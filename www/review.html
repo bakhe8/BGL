@@ -35,7 +35,7 @@
         <h2 class="text-lg font-semibold">تفاصيل السجل</h2>
         <div id="detailMeta" class="text-sm text-slate-500"></div>
       </div>
-      <div id="conflicts" class="mb-4 text-sm text-red-700"></div>
+      <div id="conflicts" class="mb-4 text-sm"></div>
 
       <div class="grid md:grid-cols-2 gap-4 text-sm">
         <div>
@@ -316,8 +316,7 @@
           <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
             <input type="radio" name="supplierCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
             <div>
-              <div class="font-medium">${c.name || '—'}</div>
-              <div class="text-slate-600 text-xs">المصدر: ${c.source}</div>
+              <div class="font-medium flex items-center gap-2">${c.name || '—'} <span class="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">${c.source}</span></div>
               <div class="text-slate-500 text-xs">normalized: ${normalized}</div>
               <div class="text-slate-500 text-xs">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
             </div>
@@ -328,8 +327,7 @@
           <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
             <input type="radio" name="bankCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
             <div>
-              <div class="font-medium">${c.name || '—'}</div>
-              <div class="text-slate-600 text-xs">المصدر: ${c.source}</div>
+              <div class="font-medium flex items-center gap-2">${c.name || '—'} <span class="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">${c.source}</span></div>
               <div class="text-slate-500 text-xs">normalized: ${bankNormalized}</div>
               <div class="text-slate-500 text-xs">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
             </div>
@@ -359,7 +357,7 @@
     function renderConflicts(list) {
       const conf = list || window.lastConflicts || [];
       const el = document.getElementById('conflicts');
-      el.innerHTML = conf.length ? conf.map(c => `<div>${c}</div>`).join('') : '';
+      el.innerHTML = conf.length ? conf.map(c => `<div class="px-3 py-2 mb-2 rounded-md bg-red-50 text-red-700 border border-red-100">${c}</div>`).join('') : '<div class="text-slate-500">لا تعارضات</div>';
     }
 
     document.getElementById('saveDecision').addEventListener('click', saveDecision);
