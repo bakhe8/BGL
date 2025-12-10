@@ -30,6 +30,17 @@ class SupplierRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
+     */
+    public function search(string $normalizedLike): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, official_name, normalized_name FROM suppliers WHERE normalized_name LIKE :q');
+        $stmt->execute(['q' => "%{$normalizedLike}%"]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function update(int $id, array $data): void
     {
         $pdo = Database::connection();

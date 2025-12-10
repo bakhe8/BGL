@@ -5,6 +5,7 @@ namespace App\Controllers;
 
 use App\Repositories\ImportedRecordRepository;
 use App\Services\CandidateService;
+use App\Services\ConflictDetector;
 
 class RecordsController
 {
@@ -14,6 +15,7 @@ class RecordsController
             new \App\Repositories\SupplierRepository(),
             new \App\Repositories\SupplierAlternativeNameRepository(),
         ),
+        private ConflictDetector $conflicts = new ConflictDetector(),
     )
     {
     }
@@ -100,11 +102,22 @@ class RecordsController
         }
 
         $supplierCandidates = $this->candidates->supplierCandidates($record->rawSupplierName);
+        $bankCandidates = $this->candidates->bankCandidates($record->rawBankName);
+
+        $conflicts = $this->conflicts->detect(
+            ['supplier' => $supplierCandidates, 'bank' => $bankCandidates],
+            [
+                'raw_supplier_name' => $record->rawSupplierName,
+                'raw_bank_name' => $record->rawBankName,
+            ]
+        );
 
         echo json_encode([
             'success' => true,
             'data' => [
                 'supplier' => $supplierCandidates,
+                'bank' => $bankCandidates,
+                'conflicts' => $conflicts,
             ],
         ]);
     }

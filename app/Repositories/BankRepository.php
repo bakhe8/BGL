@@ -43,6 +43,28 @@ class BankRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
+     */
+    public function findAllByNormalized(string $normalizedName): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, official_name, normalized_name FROM banks WHERE normalized_name = :n');
+        $stmt->execute(['n' => $normalizedName]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
+     */
+    public function search(string $normalizedLike): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, official_name, normalized_name FROM banks WHERE normalized_name LIKE :q');
+        $stmt->execute(['q' => "%{$normalizedLike}%"]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function create(array $data): Bank
     {
         $pdo = Database::connection();

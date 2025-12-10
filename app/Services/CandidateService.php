@@ -5,7 +5,10 @@ namespace App\Services;
 
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\SupplierRepository;
+use App\Repositories\BankAlternativeNameRepository;
 use App\Support\Normalizer;
+use App\Support\Settings;
+use App\Support\Config;
 
 class CandidateService
 {
@@ -14,6 +17,9 @@ class CandidateService
         private SupplierAlternativeNameRepository $supplierAlts,
         private Normalizer $normalizer = new Normalizer(),
         private \App\Repositories\BankRepository $banks = new \App\Repositories\BankRepository(),
+        private BankAlternativeNameRepository $bankAlts = new BankAlternativeNameRepository(),
+        private \App\Repositories\SupplierOverrideRepository $overrides = new \App\Repositories\SupplierOverrideRepository(),
+        private Settings $settings = new Settings(),
     ) {
     }
 
@@ -26,18 +32,33 @@ class CandidateService
     public function supplierCandidates(string $rawSupplier): array
     {
         $normalized = $this->normalizer->normalizeName($rawSupplier);
+        $reviewThreshold = $this->settings->get('MATCH_REVIEW_THRESHOLD', Config::MATCH_REVIEW_THRESHOLD);
         if ($normalized === '') {
             return ['normalized' => '', 'candidates' => []];
         }
 
         $candidates = [];
 
+        // Overrides
+        foreach ($this->overrides->allNormalized() as $ov) {
+            $candNorm = $this->normalizer->normalizeName($ov['override_name']);
+            $sim = $this->scoreComponents($normalized, $candNorm);
+            $scoreRaw = $this->maxScore($sim);
+            $candidates[] = [
+                'source' => 'override',
+                'supplier_id' => $ov['supplier_id'],
+                'name' => $ov['override_name'],
+                'score' => $scoreRaw * Config::WEIGHT_OFFICIAL,
+                'score_raw' => $scoreRaw,
+            ];
+        }
+
         // تطابق رسمي
         foreach ($this->suppliers->findAllByNormalized($normalized) as $supplier) {
             $candNorm = $this->normalizer->normalizeName($supplier['normalized_name'] ?? $supplier['official_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
-            $scoreWeighted = $scoreRaw * \App\Support\Config::WEIGHT_OFFICIAL;
+            $scoreWeighted = $scoreRaw * Config::WEIGHT_OFFICIAL;
             $candidates[] = [
                 'source' => 'official',
                 'supplier_id' => $supplier['id'],
@@ -52,7 +73,7 @@ class CandidateService
             $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
-            $scoreWeighted = $scoreRaw * \App\Support\Config::WEIGHT_ALT_CONFIRMED;
+            $scoreWeighted = $scoreRaw * Config::WEIGHT_ALT_CONFIRMED;
             $candidates[] = [
                 'source' => 'alternative',
                 'supplier_id' => $alt['supplier_id'],
@@ -67,8 +88,8 @@ class CandidateService
             $candNorm = $this->normalizer->normalizeName($supplier['normalized_name'] ?? $supplier['official_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
-            $score = $scoreRaw * \App\Support\Config::WEIGHT_FUZZY;
-            if ($score >= \App\Support\Config::MATCH_REVIEW_THRESHOLD) {
+            $score = $scoreRaw * Config::WEIGHT_FUZZY;
+            if ($score >= $reviewThreshold) {
                 $candidates[] = [
                     'source' => 'fuzzy_official',
                     'supplier_id' => $supplier['id'],
@@ -84,8 +105,8 @@ class CandidateService
             $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
-            $score = $scoreRaw * \App\Support\Config::WEIGHT_FUZZY;
-            if ($score >= \App\Support\Config::MATCH_REVIEW_THRESHOLD) {
+            $score = $scoreRaw * Config::WEIGHT_FUZZY;
+            if ($score >= $reviewThreshold) {
                 $candidates[] = [
                     'source' => 'fuzzy_alternative',
                     'supplier_id' => $alt['supplier_id'],
@@ -156,6 +177,7 @@ class CandidateService
     public function bankCandidates(string $rawBank): array
     {
         $normalized = $this->normalizer->normalizeName($rawBank);
+        $reviewThreshold = $this->settings->get('MATCH_REVIEW_THRESHOLD', Config::MATCH_REVIEW_THRESHOLD);
         if ($normalized === '') {
             return ['normalized' => '', 'candidates' => []];
         }
@@ -169,7 +191,21 @@ class CandidateService
                 'source' => 'official',
                 'bank_id' => $bank['id'],
                 'name' => $bank['official_name'],
-                'score' => $scoreRaw * \App\Support\Config::WEIGHT_OFFICIAL,
+                'score' => $scoreRaw * Config::WEIGHT_OFFICIAL,
+                'score_raw' => $scoreRaw,
+            ];
+        }
+
+        // أسماء بديلة للبنوك
+        foreach ($this->bankAlts->findAllByNormalized($normalized) as $alt) {
+            $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
+            $sim = $this->scoreComponents($normalized, $candNorm);
+            $scoreRaw = $this->maxScore($sim);
+            $candidates[] = [
+                'source' => 'alternative',
+                'bank_id' => $alt['bank_id'],
+                'name' => $alt['raw_name'],
+                'score' => $scoreRaw * Config::WEIGHT_ALT_CONFIRMED,
                 'score_raw' => $scoreRaw,
             ];
         }
@@ -178,8 +214,8 @@ class CandidateService
             $candNorm = $this->normalizer->normalizeName($bank['normalized_name'] ?? $bank['official_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
-            $score = $scoreRaw * \App\Support\Config::WEIGHT_FUZZY;
-            if ($score >= \App\Support\Config::MATCH_REVIEW_THRESHOLD) {
+            $score = $scoreRaw * Config::WEIGHT_FUZZY;
+            if ($score >= $reviewThreshold) {
                 $candidates[] = [
                     'source' => 'fuzzy_official',
                     'bank_id' => $bank['id'],

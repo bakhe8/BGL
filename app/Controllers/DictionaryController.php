@@ -7,6 +7,7 @@ use App\Repositories\BankRepository;
 use App\Repositories\SupplierRepository;
 use App\Support\Normalizer;
 use App\Repositories\SupplierAlternativeNameRepository;
+use App\Repositories\BankAlternativeNameRepository;
 
 class DictionaryController
 {
@@ -16,6 +17,7 @@ class DictionaryController
         private SupplierRepository $suppliers = new SupplierRepository(),
         private BankRepository $banks = new BankRepository(),
         private SupplierAlternativeNameRepository $altNames = new SupplierAlternativeNameRepository(),
+        private BankAlternativeNameRepository $bankAlts = new BankAlternativeNameRepository(),
     ) {
         $this->normalizer = new Normalizer();
     }
@@ -23,7 +25,10 @@ class DictionaryController
     public function listSuppliers(): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $data = $this->suppliers->allNormalized();
+        $q = trim((string)($_GET['q'] ?? ''));
+        $data = $q !== ''
+            ? $this->suppliers->search($this->normalizer->normalizeName($q))
+            : $this->suppliers->allNormalized();
         echo json_encode(['success' => true, 'data' => $data]);
     }
 
@@ -82,7 +87,10 @@ class DictionaryController
     public function listBanks(): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $data = $this->banks->allNormalized();
+        $q = trim((string)($_GET['q'] ?? ''));
+        $data = $q !== ''
+            ? $this->banks->search($this->normalizer->normalizeName($q))
+            : $this->banks->allNormalized();
         echo json_encode(['success' => true, 'data' => $data]);
     }
 
@@ -163,6 +171,35 @@ class DictionaryController
     {
         header('Content-Type: application/json; charset=utf-8');
         $this->altNames->delete($id);
+        echo json_encode(['success' => true]);
+    }
+
+    // بدائل البنوك
+    public function listBankAlternativeNames(int $bankId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $data = $this->bankAlts->listByBank($bankId);
+        echo json_encode(['success' => true, 'data' => $data]);
+    }
+
+    public function createBankAlternativeName(int $bankId, array $payload): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $raw = trim((string)($payload['raw_name'] ?? ''));
+        if ($raw === '') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'اسم بديل مطلوب']);
+            return;
+        }
+        $normalized = $this->normalizer->normalizeName($raw);
+        $created = $this->bankAlts->create($bankId, $raw, $normalized, 'manual');
+        echo json_encode(['success' => true, 'data' => $created]);
+    }
+
+    public function deleteBankAlternativeName(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->bankAlts->delete($id);
         echo json_encode(['success' => true]);
     }
 }
