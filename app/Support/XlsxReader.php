@@ -5,11 +5,12 @@ namespace App\Support;
 
 use RuntimeException;
 use SimpleXMLElement;
+use ZipArchive;
 
 class XlsxReader
 {
     /**
-     * قراءة ملف XLSX باستخدام Expand-Archive (PowerShell) ثم تحليل XML.
+     * قراءة ملف XLSX باستخدام ZipArchive لتحليل XML.
      *
      * @return array<int, array<int, string|null>>
      */
@@ -19,39 +20,31 @@ class XlsxReader
             throw new RuntimeException("File not found: {$filePath}");
         }
 
-        $tmpDir = storage_path('uploads/tmp_' . uniqid('', true));
-        if (!mkdir($tmpDir, 0777, true) && !is_dir($tmpDir)) {
-            throw new RuntimeException('Failed to create temp dir');
+        $zip = new ZipArchive();
+        if ($zip->open($filePath) !== true) {
+            throw new RuntimeException('فشل فتح ملف XLSX (ZipArchive).');
         }
 
-        $psCmd = 'Expand-Archive -Path ' . escapeshellarg($filePath) .
-            ' -DestinationPath ' . escapeshellarg($tmpDir) . ' -Force';
-        $cmd = 'powershell -NoLogo -NoProfile -Command "' . $psCmd . '"';
-        exec($cmd, $_, $code);
-        if ($code !== 0) {
-            $this->cleanup($tmpDir);
-            throw new RuntimeException('فشل فك ضغط ملف XLSX (تأكد من توفر PowerShell).');
-        }
+        $sharedStringsXml = $this->getEntryContent($zip, 'xl/sharedStrings.xml');
+        $sheetXml = $this->getEntryContent($zip, 'xl/worksheets/sheet1.xml');
 
-        $sharedStringsPath = $tmpDir . '/xl/sharedStrings.xml';
-        $sheetPath = $tmpDir . '/xl/worksheets/sheet1.xml';
+        $sharedStrings = $this->parseSharedStrings($sharedStringsXml);
+        $rows = $this->parseSheet($sheetXml, $sharedStrings);
 
-        $sharedStrings = $this->parseSharedStrings($sharedStringsPath);
-        $rows = $this->parseSheet($sheetPath, $sharedStrings);
-
-        $this->cleanup($tmpDir);
+        $zip->close();
         return $rows;
     }
 
     /**
      * @return array<int, string>
      */
-    private function parseSharedStrings(string $path): array
+    private function parseSharedStrings(?string $xmlContent): array
     {
-        if (!file_exists($path)) {
+        if (!$xmlContent) {
             return [];
         }
-        $xml = simplexml_load_file($path);
+
+        $xml = simplexml_load_string($xmlContent);
         if (!$xml instanceof SimpleXMLElement) {
             return [];
         }
@@ -74,12 +67,12 @@ class XlsxReader
     /**
      * @return array<int, array<int, string|null>>
      */
-    private function parseSheet(string $path, array $sharedStrings): array
+    private function parseSheet(?string $xmlContent, array $sharedStrings): array
     {
-        if (!file_exists($path)) {
+        if (!$xmlContent) {
             throw new RuntimeException('لم يتم العثور على الورقة الأولى داخل ملف XLSX.');
         }
-        $xml = simplexml_load_file($path);
+        $xml = simplexml_load_string($xmlContent);
         if (!$xml instanceof SimpleXMLElement) {
             throw new RuntimeException('تعذر قراءة الورقة الأولى.');
         }
@@ -115,18 +108,18 @@ class XlsxReader
         return null;
     }
 
-    private function cleanup(string $dir): void
+    private function getEntryContent(ZipArchive $zip, string $entry): ?string
     {
-        if (!is_dir($dir)) {
-            return;
+        $index = $zip->locateName($entry, ZipArchive::FL_NODIR);
+        if ($index === false) {
+            return null;
         }
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($items as $item) {
-            $item->isDir() ? rmdir($item->getRealPath()) : unlink($item->getRealPath());
+        $stream = $zip->getStream($entry);
+        if (!$stream) {
+            return null;
         }
-        rmdir($dir);
+        $content = stream_get_contents($stream);
+        fclose($stream);
+        return $content === false ? null : $content;
     }
 }
