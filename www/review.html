@@ -250,6 +250,7 @@
       document.getElementById('fStatus').value = r.matchStatus || 'needs_review';
       msg.textContent = '';
       await renderSuggestions(r);
+      renderConflicts(r);
     }
 
     function setText(id, val) {
@@ -289,26 +290,27 @@
 
     async function renderSuggestions(r) {
       const supplierSuggestions = document.getElementById('supplierSuggestions');
+      const bankSuggestions = document.getElementById('bankSuggestions');
       supplierSuggestions.innerHTML = '<div class="text-slate-500">جارٍ تحميل المرشحين...</div>';
+      bankSuggestions.innerHTML = '<div class="text-slate-500">جارٍ تحميل المرشحين...</div>';
 
       try {
         const res = await fetch(`/api/records/${r.id}/candidates`);
         const json = await res.json();
         if (!json.success) {
           supplierSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
+          bankSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
           return;
         }
 
         const candidates = json.data?.supplier?.candidates || [];
+        const bankCands = json.data?.bank?.candidates || [];
+        const conflicts = json.data?.conflicts || [];
         window.lastCandidates = candidates;
+        window.lastBankCandidates = bankCands;
         const normalized = json.data?.supplier?.normalized || '';
 
-        if (!candidates.length) {
-          supplierSuggestions.innerHTML = '<div class="text-slate-500">لا توجد اقتراحات</div>';
-          return;
-        }
-
-        supplierSuggestions.innerHTML = candidates.map((c, idx) => `
+        supplierSuggestions.innerHTML = candidates.length ? candidates.map((c, idx) => `
           <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
             <input type="radio" name="supplierCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
             <div>
@@ -318,17 +320,37 @@
               <div class="text-slate-500 text-xs">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
             </div>
           </label>
-        `).join('');
+        `).join('') : '<div class="text-slate-500">لا توجد اقتراحات</div>';
 
-        // ربط الاختيار لتعبئة الحقل
+        bankSuggestions.innerHTML = bankCands.length ? bankCands.map((c, idx) => `
+          <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
+            <input type="radio" name="bankCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
+            <div>
+              <div class="font-medium">${c.name || '—'}</div>
+              <div class="text-slate-600 text-xs">المصدر: ${c.source}</div>
+              <div class="text-slate-500 text-xs">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
+            </div>
+          </label>
+        `).join('') : '<div class="text-slate-500">لا توجد اقتراحات</div>';
+
         supplierSuggestions.querySelectorAll('input[name="supplierCandidate"]').forEach((input, idx) => {
-          input.addEventListener('change', () => {
-            const chosen = candidates[idx];
-            document.getElementById('fSupplier').value = chosen.name || '';
-          });
+            input.addEventListener('change', () => {
+              const chosen = candidates[idx];
+              document.getElementById('fSupplier').value = chosen.name || '';
+            });
         });
+        bankSuggestions.querySelectorAll('input[name="bankCandidate"]').forEach((input, idx) => {
+            input.addEventListener('change', () => {
+              const chosen = bankCands[idx];
+              document.getElementById('fBank').value = chosen.name || '';
+            });
+        });
+
+        const confEl = document.getElementById('conflicts');
+        confEl.innerHTML = conflicts.length ? conflicts.map(c => `<div>${c}</div>`).join('') : '';
       } catch (e) {
         supplierSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
+        bankSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
       }
     }
 
@@ -337,12 +359,13 @@
       if (!r.rawSupplierName) conf.push('⚠️ لا يوجد اسم مورد خام.');
       if (!r.rawBankName) conf.push('⚠️ لا يوجد اسم بنك خام.');
       if (!r.supplierId) conf.push('⚠️ لم يتم التعرف على مورد، يحتاج مراجعة.');
-      // تباين أعلى مرشحين؟
       if (window.lastCandidates && window.lastCandidates.length > 1) {
         const diff = window.lastCandidates[0].score - window.lastCandidates[1].score;
-        if (diff < 0.1) {
-          conf.push('⚠️ يوجد مرشحان متقاربان في الدرجة، يرجى التدقيق يدوياً.');
-        }
+        if (diff < 0.1) conf.push('⚠️ يوجد مرشحان متقاربان في الدرجة، يرجى التدقيق يدوياً.');
+      }
+      if (window.lastBankCandidates && window.lastBankCandidates.length > 1) {
+        const diff = window.lastBankCandidates[0].score - window.lastBankCandidates[1].score;
+        if (diff < 0.1) conf.push('⚠️ مرشحا بنك متقاربان في الدرجة.');
       }
       const el = document.getElementById('conflicts');
       el.innerHTML = conf.length ? conf.map(c => `<div>${c}</div>`).join('') : '';
