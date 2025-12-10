@@ -19,6 +19,7 @@ class ImportedRecord
         public ?string $matchStatus = null,
         public ?int $supplierId = null,
         public ?int $bankId = null,
+        public ?string $createdAt = null,
     ) {
     }
 }

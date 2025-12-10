@@ -26,16 +26,22 @@ class ImportService
         $session = $this->sessions->create('excel');
 
         $rows = $this->xlsxReader->read($filePath);
-        $count = 0;
+        if (count($rows) < 2) {
+            throw new RuntimeException('لم يتم العثور على صفوف صالحة في الملف.');
+        }
 
+        // السطر الأول رؤوس
+        $headers = array_map([$this, 'normalizeHeader'], array_shift($rows));
+        $map = $this->buildColumnMap($headers);
+
+        $count = 0;
         foreach ($rows as $row) {
-            // الترتيب المتوقع للأعمدة: المورد، البنك، المبلغ، رقم الضمان، تاريخ الانتهاء، تاريخ الإصدار
-            $supplier = $row[0] ?? '';
-            $bank = $row[1] ?? '';
-            $amount = $row[2] ?? null;
-            $guarantee = $row[3] ?? null;
-            $expiry = $row[4] ?? null;
-            $issue = $row[5] ?? null;
+            $supplier = $this->colValue($row, $map['supplier'] ?? null);
+            $bank = $this->colValue($row, $map['bank'] ?? null);
+            $amount = $this->colValue($row, $map['amount'] ?? null);
+            $guarantee = $this->colValue($row, $map['guarantee'] ?? null);
+            $expiry = $this->colValue($row, $map['expiry'] ?? null);
+            $issue = $this->colValue($row, $map['issue'] ?? null);
 
             if ($supplier === '' && $bank === '') {
                 continue;
@@ -46,10 +52,10 @@ class ImportService
                 sessionId: $session->id ?? 0,
                 rawSupplierName: (string)$supplier,
                 rawBankName: (string)$bank,
-                amount: $amount ? (string)$amount : null,
-                guaranteeNumber: $guarantee ? (string)$guarantee : null,
-                expiryDate: $expiry ? (string)$expiry : null,
-                issueDate: $issue ? (string)$issue : null,
+                amount: $amount ?: null,
+                guaranteeNumber: $guarantee ?: null,
+                expiryDate: $expiry ?: null,
+                issueDate: $issue ?: null,
                 matchStatus: 'needs_review',
             );
             $this->records->create($record);
@@ -57,13 +63,50 @@ class ImportService
             $count++;
         }
 
-        if ($count === 0) {
-            throw new RuntimeException('لم يتم العثور على صفوف صالحة في الملف.');
-        }
-
         return [
             'session_id' => $session->id,
             'records_count' => $count,
         ];
+    }
+
+    private function normalizeHeader(?string $h): string
+    {
+        $h = trim((string)$h);
+        $h = preg_replace('/[^a-zA-Z0-9]+/u', '', strtolower($h));
+        return $h ?? '';
+    }
+
+    /**
+     * @param string[] $headers
+     * @return array{supplier?:int,bank?:int,amount?:int,guarantee?:int,expiry?:int,issue?:int}
+     */
+    private function buildColumnMap(array $headers): array
+    {
+        $aliases = [
+            'supplier' => ['supplier', 'contractorname'],
+            'bank' => ['bankname'],
+            'amount' => ['amount', 'bgamount'],
+            'guarantee' => ['bankguranteenumber', 'bankguaranteenumber', 'bgguaranteenumber'],
+            'expiry' => ['bgexpirydate', 'expirydate'],
+            'issue' => ['validitydate', 'issuedate', 'today'],
+        ];
+
+        $map = [];
+        foreach ($headers as $idx => $h) {
+            foreach ($aliases as $field => $list) {
+                if (in_array($h, $list, true) && !isset($map[$field])) {
+                    $map[$field] = $idx;
+                }
+            }
+        }
+        return $map;
+    }
+
+    private function colValue(array $row, ?int $index): string
+    {
+        if ($index === null) {
+            return '';
+        }
+        return isset($row[$index]) ? (string)$row[$index] : '';
     }
 }

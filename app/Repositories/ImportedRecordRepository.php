@@ -62,6 +62,7 @@ class ImportedRecordRepository
             $row['match_status'] ?? null,
             $row['supplier_id'] ? (int)$row['supplier_id'] : null,
             $row['bank_id'] ? (int)$row['bank_id'] : null,
+            $row['created_at'] ?? null,
         ), $rows);
     }
 }
