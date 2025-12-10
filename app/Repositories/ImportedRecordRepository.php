@@ -39,6 +39,40 @@ class ImportedRecordRepository
         return $record;
     }
 
+    public function updateDecision(int $id, array $data): void
+    {
+        $pdo = Database::connection();
+        $fields = [];
+        $params = ['id' => $id];
+
+        $allowed = [
+            'raw_supplier_name' => 'raw_supplier_name',
+            'raw_bank_name' => 'raw_bank_name',
+            'amount' => 'amount',
+            'guarantee_number' => 'guarantee_number',
+            'issue_date' => 'issue_date',
+            'expiry_date' => 'expiry_date',
+            'match_status' => 'match_status',
+            'supplier_id' => 'supplier_id',
+            'bank_id' => 'bank_id',
+        ];
+
+        foreach ($allowed as $key => $col) {
+            if (array_key_exists($key, $data)) {
+                $fields[] = "{$col} = :{$key}";
+                $params[$key] = $data[$key];
+            }
+        }
+
+        if (empty($fields)) {
+            return;
+        }
+
+        $sql = 'UPDATE imported_records SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+    }
+
     /**
      * @return ImportedRecord[]
      */
@@ -64,5 +98,32 @@ class ImportedRecordRepository
             $row['bank_id'] ? (int)$row['bank_id'] : null,
             $row['created_at'] ?? null,
         ), $rows);
+    }
+
+    public function find(int $id): ?ImportedRecord
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM imported_records WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        return new ImportedRecord(
+            (int)$row['id'],
+            (int)$row['session_id'],
+            $row['raw_supplier_name'],
+            $row['raw_bank_name'],
+            $row['amount'] ?? null,
+            $row['guarantee_number'] ?? null,
+            $row['issue_date'] ?? null,
+            $row['expiry_date'] ?? null,
+            $row['normalized_supplier'] ?? null,
+            $row['normalized_bank'] ?? null,
+            $row['match_status'] ?? null,
+            $row['supplier_id'] ? (int)$row['supplier_id'] : null,
+            $row['bank_id'] ? (int)$row['bank_id'] : null,
+            $row['created_at'] ?? null,
+        );
     }
 }

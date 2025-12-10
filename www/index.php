@@ -31,6 +31,11 @@ if ($method === 'GET' && $uri === '/records') {
     exit;
 }
 
+if ($method === 'GET' && $uri === '/review') {
+    echo file_get_contents(__DIR__ . '/review.html');
+    exit;
+}
+
 // API
 if ($method === 'POST' && $uri === '/api/import/excel') {
     $importController->upload();
@@ -39,6 +44,13 @@ if ($method === 'POST' && $uri === '/api/import/excel') {
 
 if ($method === 'GET' && $uri === '/api/records') {
     $recordsController->index();
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/api/records/(\\d+)/decision$#', $uri, $m)) {
+    $id = (int)$m[1];
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $recordsController->saveDecision($id, $payload);
     exit;
 }
 
