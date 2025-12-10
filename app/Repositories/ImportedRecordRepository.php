@@ -41,6 +41,7 @@ class ImportedRecordRepository
 
     public function updateDecision(int $id, array $data): void
     {
+        $this->ensureDecisionColumns();
         $pdo = Database::connection();
         $fields = [];
         $params = ['id' => $id];
@@ -55,6 +56,7 @@ class ImportedRecordRepository
             'match_status' => 'match_status',
             'supplier_id' => 'supplier_id',
             'bank_id' => 'bank_id',
+            'decision_result' => 'decision_result',
         ];
 
         foreach ($allowed as $key => $col) {
@@ -125,5 +127,23 @@ class ImportedRecordRepository
             $row['bank_id'] ? (int)$row['bank_id'] : null,
             $row['created_at'] ?? null,
         );
+    }
+
+    private function ensureDecisionColumns(): void
+    {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $pdo = Database::connection();
+        $cols = [];
+        $res = $pdo->query("PRAGMA table_info('imported_records')");
+        while ($row = $res->fetch(\PDO::FETCH_ASSOC)) {
+            $cols[] = $row['name'];
+        }
+        if (!in_array('decision_result', $cols, true)) {
+            $pdo->exec("ALTER TABLE imported_records ADD COLUMN decision_result TEXT NULL");
+        }
+        $checked = true;
     }
 }

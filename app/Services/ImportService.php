@@ -23,6 +23,7 @@ class ImportService
         private MatchingService $matchingService = null,
         private CandidateService $candidateService = null,
         private AutoAcceptService $autoAcceptService = null,
+        private ConflictDetector $conflictDetector = new ConflictDetector(),
     ) {
         $this->matchingService ??= new MatchingService(
             new \App\Repositories\SupplierRepository(),
@@ -74,6 +75,11 @@ class ImportService
             $match = $this->matchingService->matchSupplier($supplier);
             $bankMatch = $this->matchingService->matchBank($bank);
             $candidates = $this->candidateService->supplierCandidates($supplier)['candidates'] ?? [];
+            $bankCandidates = $this->candidateService->bankCandidates($bank);
+            $conflicts = $this->conflictDetector->detect(
+                ['supplier' => ['candidates' => $candidates, 'normalized' => $match['normalized'] ?? ''], 'bank' => $bankCandidates],
+                ['raw_supplier_name' => $supplier, 'raw_bank_name' => $bank]
+            );
 
             $record = new ImportedRecord(
                 id: null,
@@ -92,7 +98,7 @@ class ImportService
             );
             $this->records->create($record);
             $this->sessions->incrementRecordCount($session->id ?? 0);
-            $this->autoAcceptService->tryAutoAccept($record->id ?? 0, $candidates);
+            $this->autoAcceptService->tryAutoAccept($record, $candidates, $conflicts);
             $count++;
         }
 

@@ -47,6 +47,11 @@ class ConflictDetector
             if (($top['source'] ?? '') === 'override' && ($top['score'] ?? 0) < $autoTh) {
                 $conflicts[] = 'يوجد Override لكن الدرجة منخفضة، راجع المدخلات';
             }
+            // إذا وُجد Override وليس هو الأعلى
+            $hasOverride = array_filter($supplierList, fn($c) => ($c['source'] ?? '') === 'override');
+            if ($hasOverride && ($top['source'] ?? '') !== 'override') {
+                $conflicts[] = 'يوجد Override لكن لم يكن أعلى نتيجة، تحقق من التعارض';
+            }
         }
         // Normalization conflict: if normalized empty or too short
         if (empty($candidates['supplier']['normalized']) || mb_strlen($candidates['supplier']['normalized']) < 3) {
@@ -72,9 +77,18 @@ class ConflictDetector
             if (($top['score'] ?? 0) < $autoTh) {
                 $conflicts[] = 'أعلى مرشح بنك بدرجة منخفضة، يحتاج مراجعة';
             }
+            if (($top['source'] ?? '') === 'alternative' && ($top['score'] ?? 0) < $autoTh) {
+                $conflicts[] = 'مرشح بنك بديل بدرجة منخفضة، يفضّل مراجعة الاسم الرسمي';
+            }
         }
         if (empty($candidates['bank']['normalized']) || mb_strlen($candidates['bank']['normalized']) < 3) {
             $conflicts[] = 'التطبيع أرجع قيمة قصيرة أو فارغة للبنك';
+        }
+        if (!empty($candidates['bank']['normalized']) && !empty($record['raw_bank_name'])) {
+            $rawShort = mb_strlen(trim((string)$record['raw_bank_name'])) < 3;
+            if ($rawShort) {
+                $conflicts[] = 'اسم البنك الخام قصير جداً بعد التطبيع';
+            }
         }
 
         return $conflicts;

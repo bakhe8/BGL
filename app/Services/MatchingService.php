@@ -6,8 +6,10 @@ namespace App\Services;
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\BankRepository;
+use App\Repositories\SupplierOverrideRepository;
 use App\Support\Config;
 use App\Support\Normalizer;
+use App\Support\Settings;
 
 class MatchingService
 {
@@ -16,6 +18,8 @@ class MatchingService
         private SupplierAlternativeNameRepository $supplierAlts,
         private BankRepository $banks,
         private Normalizer $normalizer = new Normalizer(),
+        private SupplierOverrideRepository $overrides = new SupplierOverrideRepository(),
+        private Settings $settings = new Settings(),
     ) {
     }
 
@@ -25,6 +29,7 @@ class MatchingService
     public function matchSupplier(string $rawSupplier): array
     {
         $normalized = $this->normalizer->normalizeName($rawSupplier);
+        $autoTh = $this->settings->get('MATCH_AUTO_THRESHOLD', Config::MATCH_AUTO_THRESHOLD);
         $result = [
             'normalized' => $normalized,
             'match_status' => 'needs_review',
@@ -34,11 +39,21 @@ class MatchingService
             return $result;
         }
 
+        // Overrides أولاً
+        foreach ($this->overrides->allNormalized() as $ov) {
+            $ovNorm = $this->normalizer->normalizeName($ov['override_name']);
+            if ($ovNorm === $normalized) {
+                $result['supplier_id'] = $ov['supplier_id'];
+                $result['match_status'] = 'ready';
+                return $result;
+            }
+        }
+
         // official
         $supplier = $this->suppliers->findByNormalizedName($normalized);
         if ($supplier) {
             $result['supplier_id'] = $supplier->id;
-            $result['match_status'] = Config::MATCH_AUTO_THRESHOLD >= 0.9 ? 'ready' : 'needs_review';
+            $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
             return $result;
         }
 
@@ -47,7 +62,7 @@ class MatchingService
         if ($alt) {
             $result['supplier_id'] = $alt->supplierId;
             // أقل ثقة -> يظل needs_review، يمكن رفعها لاحقاً
-            $result['match_status'] = Config::MATCH_AUTO_THRESHOLD >= 0.9 ? 'needs_review' : 'needs_review';
+            $result['match_status'] = 'needs_review';
             return $result;
         }
 

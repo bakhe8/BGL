@@ -26,9 +26,15 @@ class DictionaryController
     {
         header('Content-Type: application/json; charset=utf-8');
         $q = trim((string)($_GET['q'] ?? ''));
-        $data = $q !== ''
+        $dataRaw = $q !== ''
             ? $this->suppliers->search($this->normalizer->normalizeName($q))
             : $this->suppliers->allNormalized();
+        $data = array_map(function ($row) {
+            $alts = $this->altNames->listBySupplier((int)$row['id']);
+            $row['alternatives'] = $alts;
+            $row['alternatives_count'] = count($alts);
+            return $row;
+        }, $dataRaw);
         echo json_encode(['success' => true, 'data' => $data]);
     }
 
@@ -88,9 +94,15 @@ class DictionaryController
     {
         header('Content-Type: application/json; charset=utf-8');
         $q = trim((string)($_GET['q'] ?? ''));
-        $data = $q !== ''
+        $dataRaw = $q !== ''
             ? $this->banks->search($this->normalizer->normalizeName($q))
             : $this->banks->allNormalized();
+        $data = array_map(function ($row) {
+            $alts = $this->bankAlts->listByBank((int)$row['id']);
+            $row['alternatives'] = $alts;
+            $row['alternatives_count'] = count($alts);
+            return $row;
+        }, $dataRaw);
         echo json_encode(['success' => true, 'data' => $data]);
     }
 

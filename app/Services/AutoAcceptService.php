@@ -8,6 +8,7 @@ use App\Support\Config;
 use App\Support\Settings;
 use App\Repositories\LearningLogRepository;
 use App\Support\Normalizer;
+use App\Models\ImportedRecord;
 
 class AutoAcceptService
 {
@@ -23,7 +24,7 @@ class AutoAcceptService
     /**
      * يحاول اعتماد السجل تلقائيًا بناءً على أعلى مرشح وعتبة AUTO.
      */
-    public function tryAutoAccept(int $recordId, array $supplierCandidates): void
+    public function tryAutoAccept(ImportedRecord $record, array $supplierCandidates, array $conflicts = []): void
     {
         if (empty($supplierCandidates)) {
             return;
@@ -32,8 +33,13 @@ class AutoAcceptService
         $second = $supplierCandidates[1] ?? null;
         $delta = $second ? (($best['score'] ?? 0) - ($second['score'] ?? 0)) : 1;
 
-        // اعتماد تلقائي فقط إذا المصدر رسمي أو بديل مؤكد (ليس fuzzy) وبفارق كافٍ
-        $allowedSources = ['official', 'alternative'];
+        // إيقاف الاعتماد التلقائي إذا وُجد أي تعارض مسجّل
+        if (!empty($conflicts)) {
+            return;
+        }
+
+        // اعتماد تلقائي فقط إذا المصدر رسمي أو Override أو بديل مؤكد (ليس fuzzy) وبفارق كافٍ
+        $allowedSources = ['official', 'override', 'alternative'];
         $autoTh = $this->settings->get('MATCH_AUTO_THRESHOLD', Config::MATCH_AUTO_THRESHOLD);
         $confDelta = $this->settings->get('CONFLICT_DELTA', Config::CONFLICT_DELTA);
         if (
@@ -42,16 +48,25 @@ class AutoAcceptService
             $delta >= $confDelta &&
             !empty($best['supplier_id'])
         ) {
-            $this->records->updateDecision($recordId, [
+            $this->records->updateDecision($record->id ?? 0, [
                 'supplier_id' => $best['supplier_id'] ?? null,
                 'match_status' => 'ready',
             ]);
             // تسجيل في learning_log
             $this->learningLog->create([
-                'raw_input' => $best['name'] ?? '',
-                'normalized_input' => $this->normalizer->normalizeName($best['name'] ?? ''),
+                'raw_input' => $record->rawSupplierName,
+                'normalized_input' => $this->normalizer->normalizeName($record->rawSupplierName),
                 'suggested_supplier_id' => $best['supplier_id'] ?? null,
                 'decision_result' => 'auto',
+                'candidate_source' => $best['source'] ?? '',
+                'score' => $best['score'] ?? null,
+                'score_raw' => $best['score_raw'] ?? null,
+            ]);
+
+            // تحديث الحقلين للتوضيح داخل السجل
+            $this->records->updateDecision($record->id ?? 0, [
+                'decision_result' => 'auto',
+                'match_status' => 'ready',
             ]);
         }
     }

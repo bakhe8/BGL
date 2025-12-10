@@ -71,7 +71,7 @@
       suppliersDiv.innerHTML = `
         <table class="min-w-full text-sm divide-y divide-slate-200">
           <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
+            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">بدائل</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
             ${rows.map(r => `
@@ -79,9 +79,11 @@
                 <td class="px-3 py-2">${r.id}</td>
                 <td class="px-3 py-2">${r.official_name}</td>
                 <td class="px-3 py-2 text-slate-500">${r.normalized_name}</td>
+                <td class="px-3 py-2 text-slate-500">${r.alternatives_count ?? 0}</td>
                 <td class="px-3 py-2">
                   <button class="text-xs text-blue-600" onclick="fillSupplier(${r.id}, '${r.official_name.replace(/'/g, "\\'")}', '${(r.display_name||'').replace(/'/g, "\\'")}')">تعديل</button>
                   <button class="text-xs text-red-600 ml-2" onclick="deleteSupplier(${r.id})">حذف</button>
+                  <button class="text-xs text-slate-600 ml-2" onclick="showAltList(${r.id}, 'supplier')">عرض البدائل</button>
                 </td>
               </tr>`).join('')}
           </tbody>
@@ -100,7 +102,7 @@
       banksDiv.innerHTML = `
         <table class="min-w-full text-sm divide-y divide-slate-200">
           <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
+            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">بدائل</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
             ${rows.map(r => `
@@ -108,9 +110,11 @@
                 <td class="px-3 py-2">${r.id}</td>
                 <td class="px-3 py-2">${r.official_name}</td>
                 <td class="px-3 py-2 text-slate-500">${r.normalized_name}</td>
+                <td class="px-3 py-2 text-slate-500">${r.alternatives_count ?? 0}</td>
                 <td class="px-3 py-2">
                   <button class="text-xs text-blue-600" onclick="fillBank(${r.id}, '${r.official_name.replace(/'/g, "\\'")}', '${(r.display_name||'').replace(/'/g, "\\'")}')">تعديل</button>
                   <button class="text-xs text-red-600 ml-2" onclick="deleteBank(${r.id})">حذف</button>
+                  <button class="text-xs text-slate-600 ml-2" onclick="showAltList(${r.id}, 'bank')">عرض البدائل</button>
                 </td>
               </tr>`).join('')}
           </tbody>
@@ -246,6 +250,18 @@
     window.deleteAlt = async (id) => {
       await fetch(`/api/dictionary/alternatives/${id}`, { method: 'DELETE' });
       loadAlternatives();
+    };
+
+    window.showAltList = (id, type) => {
+      if (type === 'supplier') {
+        document.getElementById('altSupplierId').value = id;
+        loadAlternatives();
+        window.scrollTo({top: altDiv.offsetTop, behavior:'smooth'});
+      } else {
+        document.getElementById('altBankId').value = id;
+        loadBankAlternatives();
+        window.scrollTo({top: altDiv.offsetTop, behavior:'smooth'});
+      }
     };
 
     document.getElementById('altSupplierId').addEventListener('change', loadAlternatives);

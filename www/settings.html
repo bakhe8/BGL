@@ -43,12 +43,13 @@
 
     <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
       <h2 class="text-lg font-semibold mb-3">النسخ الاحتياطي والتصدير</h2>
-      <p class="text-sm text-slate-600 mb-3">حسب الوثائق: سيتم دعم التصدير/الاستيراد والنسخ الاحتياطي لقاعدة البيانات والإعدادات. الأزرار أدناه موضوعة كبداية للمرحلة التالية.</p>
+      <p class="text-sm text-slate-600 mb-3">حسب الوثائق: دعم التصدير/الاستيراد والنسخ الاحتياطي لقاعدة البيانات والإعدادات.</p>
       <div class="flex flex-wrap gap-3 text-sm">
-        <button class="px-4 py-2 rounded-md border border-slate-300 bg-slate-100 text-slate-600 cursor-not-allowed" disabled>تصدير القاموس (قريباً)</button>
-        <button class="px-4 py-2 rounded-md border border-slate-300 bg-slate-100 text-slate-600 cursor-not-allowed" disabled>استيراد القاموس (قريباً)</button>
-        <button class="px-4 py-2 rounded-md border border-slate-300 bg-slate-100 text-slate-600 cursor-not-allowed" disabled>نسخ احتياطي كامل (قريباً)</button>
+        <button id="btnBackup" class="px-4 py-2 rounded-md border border-slate-300 bg-blue-50 text-blue-700">نسخ احتياطي كامل</button>
+        <button id="btnExportDict" class="px-4 py-2 rounded-md border border-slate-300 bg-blue-50 text-blue-700">تصدير القاموس</button>
+        <button id="btnImportDict" class="px-4 py-2 rounded-md border border-slate-300 bg-blue-50 text-blue-700">استيراد القاموس (JSON)</button>
       </div>
+      <div id="backupMsg" class="text-sm text-slate-600 mt-3"></div>
     </section>
   </main>
 
@@ -78,6 +79,47 @@
       msg.className='text-sm text-green-700';
     }
     loadSettings();
+
+    async function doBackup() {
+      const res = await fetch('/api/settings/backup', {method:'POST'});
+      const json = await res.json();
+      const el = document.getElementById('backupMsg');
+      el.textContent = json.success ? `تم إنشاء النسخة الاحتياطية: ${json.path}` : 'تعذر إنشاء النسخة الاحتياطية';
+      el.className = json.success ? 'text-sm text-green-700' : 'text-sm text-red-600';
+    }
+
+    async function exportDict() {
+      const res = await fetch('/api/settings/export-dictionary', {method:'POST'});
+      const json = await res.json();
+      const el = document.getElementById('backupMsg');
+      el.textContent = json.success ? `تم تصدير القاموس إلى: ${json.path}` : 'تعذر التصدير';
+      el.className = json.success ? 'text-sm text-green-700' : 'text-sm text-red-600';
+    }
+
+    async function importDict() {
+      const path = prompt('أدخل مسار ملف القاموس JSON (داخل الجهاز المحلي):');
+      if (!path) return;
+      try {
+        const content = await (await fetch(path)).json();
+        const res = await fetch('/api/settings/import-dictionary', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({dictionary: content})
+        });
+        const json = await res.json();
+        const el = document.getElementById('backupMsg');
+        el.textContent = json.success ? `تم الاستيراد: ${JSON.stringify(json.stats)}` : (json.message || 'تعذر الاستيراد');
+        el.className = json.success ? 'text-sm text-green-700' : 'text-sm text-red-600';
+      } catch (e) {
+        const el = document.getElementById('backupMsg');
+        el.textContent = 'تعذر قراءة الملف المحدد';
+        el.className = 'text-sm text-red-600';
+      }
+    }
+
+    document.getElementById('btnBackup').addEventListener('click', doBackup);
+    document.getElementById('btnExportDict').addEventListener('click', exportDict);
+    document.getElementById('btnImportDict').addEventListener('click', importDict);
   </script>
 </body>
 </html>

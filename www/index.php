@@ -4,6 +4,7 @@ declare(strict_types=1);
 use App\Controllers\ImportController;
 use App\Controllers\RecordsController;
 use App\Controllers\DictionaryController;
+use App\Controllers\SettingsController;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\ImportedRecordRepository;
 use App\Services\ImportService;
@@ -21,6 +22,7 @@ $importService = new ImportService($importSessionRepo, $importedRecordRepo);
 $importController = new ImportController($importService);
 $recordsController = new RecordsController($importedRecordRepo);
 $dictionaryController = new DictionaryController();
+$settingsController = new SettingsController();
 
 // صفحات HTML
 if ($method === 'GET' && ($uri === '/' || $uri === '/import')) {
@@ -149,17 +151,29 @@ if ($method === 'DELETE' && preg_match('#^/api/dictionary/bank-alternatives/(\\d
 }
 
 if ($method === 'GET' && $uri === '/api/settings') {
-    header('Content-Type: application/json; charset=utf-8');
-    $settings = (new \App\Support\Settings())->all();
-    echo json_encode(['success' => true, 'data' => $settings]);
+    $settingsController->all();
     exit;
 }
 
 if ($method === 'POST' && $uri === '/api/settings') {
-    header('Content-Type: application/json; charset=utf-8');
     $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $settings = (new \App\Support\Settings())->save($payload);
-    echo json_encode(['success' => true, 'data' => $settings]);
+    $settingsController->save($payload);
+    exit;
+}
+
+if ($method === 'POST' && $uri === '/api/settings/backup') {
+    $settingsController->backup();
+    exit;
+}
+
+if ($method === 'POST' && $uri === '/api/settings/export-dictionary') {
+    $settingsController->exportDictionary();
+    exit;
+}
+
+if ($method === 'POST' && $uri === '/api/settings/import-dictionary') {
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $settingsController->importDictionary($payload);
     exit;
 }
 
