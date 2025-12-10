@@ -20,6 +20,16 @@ class SupplierRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
+     */
+    public function allNormalized(): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->query('SELECT id, official_name, normalized_name FROM suppliers');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function findByNormalizedName(string $normalizedName): ?Supplier
     {
         $pdo = Database::connection();
