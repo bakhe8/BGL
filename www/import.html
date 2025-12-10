@@ -6,110 +6,129 @@
   <title>استيراد الضمانات</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+<body>
+  <header class="app-header">
     <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="font-semibold text-lg">لوحة الاستيراد</div>
-      <nav class="flex gap-4 text-sm text-slate-600">
-        <a href="/import" class="text-blue-600">استيراد</a>
-        <a href="/records">السجلات</a>
-        <a href="/review">المراجعة</a>
-        <a href="/dictionary/suppliers">الموردون</a>
-        <a href="/dictionary/banks">البنوك</a>
-        <a href="/settings">الإعدادات</a>
+      <div class="font-semibold text-lg">استيراد الضمانات</div>
+      <nav class="nav">
+        <a href="/import" class="active">Import</a>
+        <a href="/records">Records</a>
+        <a href="/review">Review Panel</a>
+        <a href="/dictionary">Dictionary</a>
+        <a href="/settings">Settings</a>
       </nav>
     </div>
   </header>
 
-  <main class="max-w-5xl mx-auto px-6 py-8">
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <h1 class="text-xl font-semibold mb-4">رفع ملف Excel</h1>
-      <p class="text-sm text-slate-600 mb-4">اختر ملف Excel (5–10 صفوف للتجربة) وسيتم إنشاء جلسة في قاعدة البيانات.</p>
-      <form id="uploadForm" class="flex flex-col gap-4" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".xlsx,.xls" class="border border-slate-300 rounded-md p-2">
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">رفع ومعالجة</button>
+  <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <section class="card">
+      <h1 class="card-title">رفع ملف Excel</h1>
+      <p class="muted text-sm" id="instructions">الملفات المدعومة: XLSX فقط. سيتم اكتشاف الأعمدة تلقائيًا (Supplier, Bank, Amount, Dates...)</p>
+      <form id="uploadForm" class="space-y-4">
+        <div>
+          <label class="label">اختر الملف</label>
+          <input type="file" id="fileInput" accept=".xlsx" class="input" />
+        </div>
+        <div class="flex gap-3 items-center">
+          <button type="submit" class="btn btn-primary">رفع ومعالجة</button>
+          <span id="uploadMsg" class="text-sm muted"></span>
+        </div>
       </form>
-      <div id="message" class="mt-4 text-sm"></div>
+      <div id="detectedCols" class="alert alert-warn" style="display:none;"></div>
+      <div id="uploadError" class="alert alert-error" style="display:none;"></div>
     </section>
 
-    <section class="mt-8 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold">السجلات</h2>
-        <button id="refresh" class="text-blue-600 text-sm">تحديث</button>
+    <section class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="section-title">آخر جلسات الاستيراد (عرض سريع)</h2>
+        <div class="tag">أحدث 10 سجلات</div>
       </div>
-      <div id="records" class="overflow-x-auto text-sm">
-        <div class="text-slate-500">لا يوجد سجلات بعد.</div>
+      <div class="table-wrap">
+        <table class="table" id="sessionsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>المورد</th>
+              <th>البنك</th>
+              <th>الحالة</th>
+            </tr>
+          </thead>
+          <tbody id="sessionsBody">
+            <tr><td colspan="4" class="muted">لا يوجد بيانات.</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </main>
 
   <script>
-    const form = document.getElementById('uploadForm');
-    const msg = document.getElementById('message');
-    const recordsDiv = document.getElementById('records');
-    const refreshBtn = document.getElementById('refresh');
+    const uploadForm = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const uploadMsg = document.getElementById('uploadMsg');
+    const uploadError = document.getElementById('uploadError');
+    const detectedCols = document.getElementById('detectedCols');
+    const sessionsBody = document.getElementById('sessionsBody');
 
-    form.addEventListener('submit', async (e) => {
+    uploadForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      msg.textContent = 'جارٍ الرفع...';
-      const formData = new FormData(form);
-      const res = await fetch('/api/import/excel', { method: 'POST', body: formData });
-      const json = await res.json();
-      if (json.success) {
-        msg.textContent = `تم إنشاء جلسة رقم ${json.data.session_id} بعدد سجلات ${json.data.records_count}.`;
-        loadRecords();
-      } else {
-        msg.textContent = json.message || 'حدث خطأ في الاستيراد.';
+      hideAlerts();
+      if (!fileInput.files.length) {
+        showError('اختر ملفًا أولاً');
+        return;
+      }
+      uploadMsg.textContent = 'جارٍ الرفع...';
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      try {
+        const res = await fetch('/api/import/excel', { method: 'POST', body: formData });
+        const json = await res.json();
+        if (!json.success) {
+          showError(json.message || 'فشل الرفع');
+          return;
+        }
+        uploadMsg.textContent = `تم الاستيراد: ${json.records_count || ''} سجل (جلسة ${json.session_id || ''})`;
+        uploadMsg.className = 'text-sm text-green-700';
+        fileInput.value = '';
+        loadSessions();
+      } catch (err) {
+        showError('تعذر الاتصال بالخادم');
       }
     });
 
-    async function loadRecords() {
+    function hideAlerts() {
+      uploadError.style.display = 'none';
+      detectedCols.style.display = 'none';
+      uploadMsg.textContent = '';
+      uploadMsg.className = 'text-sm muted';
+    }
+
+    function showError(msg) {
+      uploadError.textContent = msg;
+      uploadError.style.display = 'block';
+    }
+
+    async function loadSessions() {
       const res = await fetch('/api/records');
       const json = await res.json();
       if (!json.success) {
-        recordsDiv.innerHTML = '<div class="text-red-600">تعذر تحميل السجلات</div>';
+        sessionsBody.innerHTML = '<tr><td colspan="4" class="muted">تعذر تحميل السجلات</td></tr>';
         return;
       }
-      const rows = json.data;
+      const rows = (json.data || []).slice(0, 10);
       if (!rows.length) {
-        recordsDiv.innerHTML = '<div class="text-slate-500">لا يوجد سجلات بعد.</div>';
+        sessionsBody.innerHTML = '<tr><td colspan="4" class="muted">لا يوجد بيانات.</td></tr>';
         return;
       }
-      const html = `
-        <table class="min-w-full text-sm divide-y divide-slate-200">
-          <thead class="bg-slate-100 text-slate-700">
-            <tr>
-              <th class="px-3 py-2 text-right">#</th>
-              <th class="px-3 py-2 text-right">المورد</th>
-              <th class="px-3 py-2 text-right">البنك</th>
-              <th class="px-3 py-2 text-right">المبلغ</th>
-              <th class="px-3 py-2 text-right">رقم الضمان</th>
-              <th class="px-3 py-2 text-right">تاريخ الإصدار</th>
-              <th class="px-3 py-2 text-right">تاريخ الانتهاء</th>
-              <th class="px-3 py-2 text-right">حالة المطابقة</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            ${rows.map(r => `
-              <tr>
-                <td class="px-3 py-2">${r.id}</td>
-                <td class="px-3 py-2">${r.rawSupplierName}</td>
-                <td class="px-3 py-2">${r.rawBankName}</td>
-                <td class="px-3 py-2">${r.amount ?? ''}</td>
-                <td class="px-3 py-2">${r.guaranteeNumber ?? ''}</td>
-                <td class="px-3 py-2">${r.issueDate ?? ''}</td>
-                <td class="px-3 py-2">${r.expiryDate ?? ''}</td>
-                <td class="px-3 py-2">${r.matchStatus ?? ''}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-      recordsDiv.innerHTML = html;
+      sessionsBody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.id ?? ''}</td>
+          <td>${r.rawSupplierName ?? ''}</td>
+          <td>${r.rawBankName ?? ''}</td>
+          <td><span class="status-badge ${r.matchStatus === 'ready' ? 'status-ready' : 'status-review'}">${r.matchStatus || 'needs_review'}</span></td>
+        </tr>
+      `).join('');
     }
-
-    refreshBtn.addEventListener('click', loadRecords);
-    loadRecords();
+    loadSessions();
   </script>
 </body>
 </html>

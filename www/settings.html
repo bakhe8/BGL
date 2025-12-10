@@ -6,50 +6,49 @@
   <title>Settings</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+<body>
+  <header class="app-header">
     <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
       <div class="font-semibold text-lg">Settings</div>
-      <nav class="flex gap-4 text-sm text-slate-600">
+      <nav class="nav">
         <a href="/import">Import</a>
         <a href="/records">Records</a>
         <a href="/review">Review Panel</a>
         <a href="/dictionary">Dictionary</a>
-        <a href="/settings" class="text-blue-600 font-semibold">Settings</a>
+        <a href="/settings" class="active">Settings</a>
       </nav>
     </div>
   </header>
 
   <main class="max-w-4xl mx-auto px-6 py-8 space-y-6">
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <h1 class="text-xl font-semibold mb-4">Thresholds</h1>
-      <form id="settingsForm" class="grid gap-3 text-sm">
-        <label class="flex flex-col gap-1">
-          <span>Match Auto Threshold</span>
-          <input type="number" step="0.01" id="autoTh" class="border border-slate-300 rounded-md px-3 py-2" />
+    <section class="card">
+      <h1 class="card-title">Thresholds</h1>
+      <form id="settingsForm" class="grid-3">
+        <label class="label">
+          Match Auto Threshold
+          <input type="number" step="0.01" id="autoTh" class="input" />
         </label>
-        <label class="flex flex-col gap-1">
-          <span>Match Review Threshold</span>
-          <input type="number" step="0.01" id="revTh" class="border border-slate-300 rounded-md px-3 py-2" />
+        <label class="label">
+          Match Review Threshold
+          <input type="number" step="0.01" id="revTh" class="input" />
         </label>
-        <label class="flex flex-col gap-1">
-          <span>Conflict Delta</span>
-          <input type="number" step="0.01" id="confDelta" class="border border-slate-300 rounded-md px-3 py-2" />
+        <label class="label">
+          Conflict Delta
+          <input type="number" step="0.01" id="confDelta" class="input" />
         </label>
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 w-fit">حفظ</button>
-        <div id="sMsg" class="text-sm text-slate-600"></div>
+        <button type="submit" class="btn btn-primary" style="grid-column: 1 / span 3; width:max-content;">حفظ</button>
+        <div id="sMsg" class="muted text-sm" style="grid-column: 1 / span 3;"></div>
       </form>
     </section>
 
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <h2 class="text-lg font-semibold mb-3">النسخ الاحتياطي والتصدير</h2>
-      <p class="text-sm text-slate-600 mb-3">حسب الوثائق: دعم التصدير/الاستيراد والنسخ الاحتياطي لقاعدة البيانات والإعدادات.</p>
-      <div class="flex flex-wrap gap-3 text-sm">
-        <button id="btnBackup" class="px-4 py-2 rounded-md border border-slate-300 bg-blue-50 text-blue-700">نسخ احتياطي كامل</button>
-        <button id="btnExportDict" class="px-4 py-2 rounded-md border border-slate-300 bg-blue-50 text-blue-700">تصدير القاموس</button>
-        <button id="btnImportDict" class="px-4 py-2 rounded-md border border-slate-300 bg-blue-50 text-blue-700">استيراد القاموس (JSON)</button>
+    <section class="card">
+      <h2 class="section-title">النسخ الاحتياطي والتصدير</h2>
+      <div class="grid-3">
+        <button id="btnBackup" class="btn btn-secondary">نسخ احتياطي كامل</button>
+        <button id="btnExportDict" class="btn btn-secondary">تصدير القاموس</button>
+        <button id="btnImportDict" class="btn btn-secondary">استيراد القاموس (JSON)</button>
       </div>
-      <div id="backupMsg" class="text-sm text-slate-600 mt-3"></div>
+      <div id="backupMsg" class="muted text-sm" style="margin-top:10px;"></div>
     </section>
   </main>
 
@@ -74,9 +73,9 @@
       });
       const json = await res.json();
       const msg = document.getElementById('sMsg');
-      if (!json.success) { msg.textContent = json.message || 'تعذر الحفظ'; msg.className='text-sm text-red-600'; return; }
+      if (!json.success) { msg.textContent = json.message || 'تعذر الحفظ'; msg.className='alert alert-error'; return; }
       msg.textContent = 'تم الحفظ';
-      msg.className='text-sm text-green-700';
+      msg.className='alert alert-success';
     });
     loadSettings();
 
@@ -85,17 +84,15 @@
       const json = await res.json();
       const el = document.getElementById('backupMsg');
       el.textContent = json.success ? `تم إنشاء النسخة الاحتياطية: ${json.path}` : 'تعذر إنشاء النسخة الاحتياطية';
-      el.className = json.success ? 'text-sm text-green-700' : 'text-sm text-red-600';
+      el.className = json.success ? 'alert alert-success' : 'alert alert-error';
     }
-
     async function exportDict() {
       const res = await fetch('/api/settings/export-dictionary', {method:'POST'});
       const json = await res.json();
       const el = document.getElementById('backupMsg');
       el.textContent = json.success ? `تم تصدير القاموس إلى: ${json.path}` : 'تعذر التصدير';
-      el.className = json.success ? 'text-sm text-green-700' : 'text-sm text-red-600';
+      el.className = json.success ? 'alert alert-success' : 'alert alert-error';
     }
-
     async function importDict() {
       const path = prompt('أدخل مسار ملف القاموس JSON (داخل الجهاز المحلي):');
       if (!path) return;
@@ -109,14 +106,13 @@
         const json = await res.json();
         const el = document.getElementById('backupMsg');
         el.textContent = json.success ? `تم الاستيراد: ${JSON.stringify(json.stats)}` : (json.message || 'تعذر الاستيراد');
-        el.className = json.success ? 'text-sm text-green-700' : 'text-sm text-red-600';
+        el.className = json.success ? 'alert alert-success' : 'alert alert-error';
       } catch (e) {
         const el = document.getElementById('backupMsg');
         el.textContent = 'تعذر قراءة الملف المحدد';
-        el.className = 'text-sm text-red-600';
+        el.className = 'alert alert-error';
       }
     }
-
     document.getElementById('btnBackup').addEventListener('click', doBackup);
     document.getElementById('btnExportDict').addEventListener('click', exportDict);
     document.getElementById('btnImportDict').addEventListener('click', importDict);

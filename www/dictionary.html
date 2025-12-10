@@ -6,308 +6,300 @@
   <title>Dictionary</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+<body>
+  <header class="app-header">
     <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
       <div class="font-semibold text-lg">Dictionary Management</div>
-      <nav class="flex gap-4 text-sm text-slate-600">
+      <nav class="nav">
         <a href="/import">Import</a>
         <a href="/records">Records</a>
         <a href="/review">Review Panel</a>
-        <a href="/dictionary" class="text-blue-600 font-semibold">Dictionary</a>
+        <a href="/dictionary" class="active">Dictionary</a>
         <a href="/settings">Settings</a>
       </nav>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-6 py-8 space-y-8">
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <h1 class="text-xl font-semibold mb-4">الموردون</h1>
-      <div class="flex flex-wrap gap-3 mb-3 text-sm">
-        <input type="search" id="sSearch" placeholder="بحث (normalized)" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[180px]">
-        <button type="button" id="sSearchBtn" class="bg-slate-200 text-slate-700 px-3 py-2 rounded-md text-sm">بحث</button>
+  <main class="max-w-6xl mx-auto px-6 py-8 space-y-6">
+    <section class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h1 class="card-title">الموردون</h1>
+        <div class="flex gap-2">
+          <input type="search" id="sSearch" class="input" placeholder="بحث (normalized)">
+          <button id="sSearchBtn" class="btn btn-secondary">بحث</button>
+        </div>
       </div>
-      <form id="supplierForm" class="flex flex-wrap gap-3 mb-4 text-sm">
-        <input type="text" id="sName" placeholder="اسم المورد الرسمي" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
-        <input type="text" id="sDisplay" placeholder="اسم العرض (اختياري)" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">حفظ</button>
-        <div id="sMsg" class="text-sm text-slate-600"></div>
+      <form id="supplierForm" class="grid-2 mb-4">
+        <div>
+          <label class="label">اسم المورد الرسمي</label>
+          <input type="text" id="sName" class="input">
+        </div>
+        <div>
+          <label class="label">اسم العرض (اختياري)</label>
+          <input type="text" id="sDisplay" class="input">
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="submit" class="btn btn-primary">حفظ</button>
+          <span id="sMsg" class="muted text-sm"></span>
+        </div>
       </form>
-      <div id="suppliers" class="overflow-x-auto text-sm"></div>
+      <div class="table-wrap">
+        <table class="table" id="suppliersTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>الاسم</th>
+              <th>normalized</th>
+              <th>بدائل</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="suppliersBody">
+            <tr><td colspan="5" class="muted">لا يوجد بيانات.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <h1 class="text-xl font-semibold mb-4">البنوك</h1>
-      <div class="flex flex-wrap gap-3 mb-3 text-sm">
-        <input type="search" id="bSearch" placeholder="بحث (normalized)" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[180px]">
-        <button type="button" id="bSearchBtn" class="bg-slate-200 text-slate-700 px-3 py-2 rounded-md text-sm">بحث</button>
+    <section class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h1 class="card-title">البنوك</h1>
+        <div class="flex gap-2">
+          <input type="search" id="bSearch" class="input" placeholder="بحث (normalized)">
+          <button id="bSearchBtn" class="btn btn-secondary">بحث</button>
+        </div>
       </div>
-      <form id="bankForm" class="flex flex-wrap gap-3 mb-4 text-sm">
-        <input type="text" id="bName" placeholder="اسم البنك الرسمي" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
-        <input type="text" id="bDisplay" placeholder="اسم العرض (اختياري)" class="border border-slate-300 rounded-md px-3 py-2 flex-1 min-w-[220px]">
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">حفظ</button>
-        <div id="bMsg" class="text-sm text-slate-600"></div>
+      <form id="bankForm" class="grid-2 mb-4">
+        <div>
+          <label class="label">اسم البنك الرسمي</label>
+          <input type="text" id="bName" class="input">
+        </div>
+        <div>
+          <label class="label">اسم العرض (اختياري)</label>
+          <input type="text" id="bDisplay" class="input">
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="submit" class="btn btn-primary">حفظ</button>
+          <span id="bMsg" class="muted text-sm"></span>
+        </div>
       </form>
-      <div id="banks" class="overflow-x-auto text-sm"></div>
+      <div class="table-wrap">
+        <table class="table" id="banksTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>الاسم</th>
+              <th>normalized</th>
+              <th>بدائل</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="banksBody">
+            <tr><td colspan="5" class="muted">لا يوجد بيانات.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">الأسماء البديلة</h2>
+      <div class="grid-2">
+        <div class="card" style="padding:16px;">
+          <div class="grid-2 gap-2">
+            <input type="number" id="altSupplierId" class="input" placeholder="Supplier ID">
+            <input type="text" id="altRaw" class="input" placeholder="اسم بديل">
+          </div>
+          <div class="flex items-center gap-3 mt-2">
+            <button id="altAdd" class="btn btn-secondary">إضافة</button>
+            <span id="altMsg" class="muted text-sm"></span>
+          </div>
+          <div id="altList" class="table-wrap" style="margin-top:10px;"></div>
+        </div>
+        <div class="card" style="padding:16px;">
+          <div class="grid-2 gap-2">
+            <input type="number" id="altBankId" class="input" placeholder="Bank ID">
+            <input type="text" id="altBankRaw" class="input" placeholder="اسم بديل للبنك">
+          </div>
+          <div class="flex items-center gap-3 mt-2">
+            <button id="altBankAdd" class="btn btn-secondary">إضافة</button>
+            <span id="altBankMsg" class="muted text-sm"></span>
+          </div>
+          <div id="altBankList" class="table-wrap" style="margin-top:10px;"></div>
+        </div>
+      </div>
     </section>
   </main>
 
   <script>
-    const suppliersDiv = document.getElementById('suppliers');
-    const banksDiv = document.getElementById('banks');
+    const suppliersBody = document.getElementById('suppliersBody');
+    const banksBody = document.getElementById('banksBody');
     const sForm = document.getElementById('supplierForm');
     const bForm = document.getElementById('bankForm');
     const sMsg = document.getElementById('sMsg');
     const bMsg = document.getElementById('bMsg');
 
     async function loadSuppliers() {
-      suppliersDiv.innerHTML = '...';
       const q = document.getElementById('sSearch').value || '';
       const res = await fetch('/api/dictionary/suppliers' + (q ? `?q=${encodeURIComponent(q)}` : ''));
       const json = await res.json();
-      if (!json.success) { suppliersDiv.innerHTML = 'تعذر التحميل'; return; }
+      if (!json.success) { suppliersBody.innerHTML = '<tr><td colspan="5" class="muted">تعذر التحميل</td></tr>'; return; }
       const rows = json.data || [];
-      if (!rows.length) { suppliersDiv.innerHTML = '<div class="text-slate-500">لا يوجد بيانات.</div>'; return; }
-      suppliersDiv.innerHTML = `
-        <table class="min-w-full text-sm divide-y divide-slate-200">
-          <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">بدائل</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            ${rows.map(r => `
-              <tr>
-                <td class="px-3 py-2">${r.id}</td>
-                <td class="px-3 py-2">${r.official_name}</td>
-                <td class="px-3 py-2 text-slate-500">${r.normalized_name}</td>
-                <td class="px-3 py-2 text-slate-500">${r.alternatives_count ?? 0}</td>
-                <td class="px-3 py-2">
-                  <button class="text-xs text-blue-600" onclick="fillSupplier(${r.id}, '${r.official_name.replace(/'/g, "\\'")}', '${(r.display_name||'').replace(/'/g, "\\'")}')">تعديل</button>
-                  <button class="text-xs text-red-600 ml-2" onclick="deleteSupplier(${r.id})">حذف</button>
-                  <button class="text-xs text-slate-600 ml-2" onclick="showAltList(${r.id}, 'supplier')">عرض البدائل</button>
-                </td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      `;
+      if (!rows.length) { suppliersBody.innerHTML = '<tr><td colspan="5" class="muted">لا يوجد بيانات.</td></tr>'; return; }
+      suppliersBody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td>${r.official_name}</td>
+          <td class="muted">${r.normalized_name}</td>
+          <td class="muted">${r.alternatives_count ?? 0}</td>
+          <td>
+            <button class="btn btn-ghost" onclick="fillSupplier(${r.id}, '${r.official_name.replace(/'/g, \"\\\\'\")}', '${(r.display_name||'').replace(/'/g, \"\\\\'\")}')">تعديل</button>
+            <button class="btn btn-ghost" onclick="deleteSupplier(${r.id})">حذف</button>
+            <button class="btn btn-secondary" onclick="showAltList(${r.id}, 'supplier')">عرض البدائل</button>
+          </td>
+        </tr>`).join('');
     }
 
     async function loadBanks() {
-      banksDiv.innerHTML = '...';
       const q = document.getElementById('bSearch').value || '';
       const res = await fetch('/api/dictionary/banks' + (q ? `?q=${encodeURIComponent(q)}` : ''));
       const json = await res.json();
-      if (!json.success) { banksDiv.innerHTML = 'تعذر التحميل'; return; }
+      if (!json.success) { banksBody.innerHTML = '<tr><td colspan="5" class="muted">تعذر التحميل</td></tr>'; return; }
       const rows = json.data || [];
-      if (!rows.length) { banksDiv.innerHTML = '<div class="text-slate-500">لا يوجد بيانات.</div>'; return; }
-      banksDiv.innerHTML = `
-        <table class="min-w-full text-sm divide-y divide-slate-200">
-          <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">بدائل</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            ${rows.map(r => `
-              <tr>
-                <td class="px-3 py-2">${r.id}</td>
-                <td class="px-3 py-2">${r.official_name}</td>
-                <td class="px-3 py-2 text-slate-500">${r.normalized_name}</td>
-                <td class="px-3 py-2 text-slate-500">${r.alternatives_count ?? 0}</td>
-                <td class="px-3 py-2">
-                  <button class="text-xs text-blue-600" onclick="fillBank(${r.id}, '${r.official_name.replace(/'/g, "\\'")}', '${(r.display_name||'').replace(/'/g, "\\'")}')">تعديل</button>
-                  <button class="text-xs text-red-600 ml-2" onclick="deleteBank(${r.id})">حذف</button>
-                  <button class="text-xs text-slate-600 ml-2" onclick="showAltList(${r.id}, 'bank')">عرض البدائل</button>
-                </td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      `;
+      if (!rows.length) { banksBody.innerHTML = '<tr><td colspan="5" class="muted">لا يوجد بيانات.</td></tr>'; return; }
+      banksBody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td>${r.official_name}</td>
+          <td class="muted">${r.normalized_name}</td>
+          <td class="muted">${r.alternatives_count ?? 0}</td>
+          <td>
+            <button class="btn btn-ghost" onclick="fillBank(${r.id}, '${r.official_name.replace(/'/g, \"\\\\'\")}', '${(r.display_name||'').replace(/'/g, \"\\\\'\")}')">تعديل</button>
+            <button class="btn btn-ghost" onclick="deleteBank(${r.id})">حذف</button>
+            <button class="btn btn-secondary" onclick="showAltList(${r.id}, 'bank')">عرض البدائل</button>
+          </td>
+        </tr>`).join('');
     }
+
+    sForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = sForm.dataset.editId;
+      const url = id ? `/api/dictionary/suppliers/${id}` : '/api/dictionary/suppliers';
+      const payload = {
+        official_name: document.getElementById('sName').value,
+        display_name: document.getElementById('sDisplay').value,
+      };
+      const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const json = await res.json();
+      if (!json.success) { sMsg.textContent = json.message || 'تعذر الحفظ'; sMsg.className='alert alert-error'; return; }
+      sMsg.textContent = 'تم الحفظ'; sMsg.className='alert alert-success';
+      sForm.dataset.editId = '';
+      document.getElementById('sName').value = '';
+      document.getElementById('sDisplay').value = '';
+      loadSuppliers();
+    });
+
+    bForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = bForm.dataset.editId;
+      const url = id ? `/api/dictionary/banks/${id}` : '/api/dictionary/banks';
+      const payload = {
+        official_name: document.getElementById('bName').value,
+        display_name: document.getElementById('bDisplay').value,
+      };
+      const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const json = await res.json();
+      if (!json.success) { bMsg.textContent = json.message || 'تعذر الحفظ'; bMsg.className='alert alert-error'; return; }
+      bMsg.textContent = 'تم الحفظ'; bMsg.className='alert alert-success';
+      bForm.dataset.editId = '';
+      document.getElementById('bName').value = '';
+      document.getElementById('bDisplay').value = '';
+      loadBanks();
+    });
 
     window.fillSupplier = (id, name, display) => {
       document.getElementById('sName').value = name;
       document.getElementById('sDisplay').value = display;
       sForm.dataset.editId = id;
       sMsg.textContent = `تعديل مورد #${id}`;
+      sMsg.className = 'muted text-sm';
     };
-
     window.fillBank = (id, name, display) => {
       document.getElementById('bName').value = name;
       document.getElementById('bDisplay').value = display;
       bForm.dataset.editId = id;
       bMsg.textContent = `تعديل بنك #${id}`;
+      bMsg.className = 'muted text-sm';
     };
 
-    sForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const id = sForm.dataset.editId;
-      const url = id ? `/api/dictionary/suppliers/${id}` : '/api/dictionary/suppliers';
-      const method = 'POST';
-      const payload = {
-        official_name: document.getElementById('sName').value,
-        display_name: document.getElementById('sDisplay').value,
-      };
-      const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-      const json = await res.json();
-      if (!json.success) { sMsg.textContent = json.message || 'تعذر الحفظ'; sMsg.className='text-sm text-red-600'; return; }
-      sMsg.textContent = 'تم الحفظ';
-      sMsg.className='text-sm text-green-700';
-      sForm.dataset.editId = '';
-      document.getElementById('sName').value = '';
-      document.getElementById('sDisplay').value = '';
-      loadSuppliers();
-    }, {once:false});
-
-    bForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const id = bForm.dataset.editId;
-      const url = id ? `/api/dictionary/banks/${id}` : '/api/dictionary/banks';
-      const method = 'POST';
-      const payload = {
-        official_name: document.getElementById('bName').value,
-        display_name: document.getElementById('bDisplay').value,
-      };
-      const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-      const json = await res.json();
-      if (!json.success) { bMsg.textContent = json.message || 'تعذر الحفظ'; bMsg.className='text-sm text-red-600'; return; }
-      bMsg.textContent = 'تم الحفظ';
-      bMsg.className='text-sm text-green-700';
-      bForm.dataset.editId = '';
-      document.getElementById('bName').value = '';
-      document.getElementById('bDisplay').value = '';
-      loadBanks();
-    }, {once:false});
-
-    window.deleteSupplier = async (id) => {
-      await fetch(`/api/dictionary/suppliers/${id}`, { method: 'DELETE' });
-      loadSuppliers();
-    };
-
-    window.deleteBank = async (id) => {
-      await fetch(`/api/dictionary/banks/${id}`, { method: 'DELETE' });
-      loadBanks();
-    };
-
+    window.deleteSupplier = async (id) => { await fetch(`/api/dictionary/suppliers/${id}`, { method:'DELETE' }); loadSuppliers(); };
+    window.deleteBank = async (id) => { await fetch(`/api/dictionary/banks/${id}`, { method:'DELETE' }); loadBanks(); };
     document.getElementById('sSearchBtn').addEventListener('click', loadSuppliers);
     document.getElementById('bSearchBtn').addEventListener('click', loadBanks);
 
-    // الأسماء البديلة للموردين
-    const altDiv = document.createElement('div');
-    altDiv.className = 'bg-white p-6 rounded-xl shadow-sm border border-slate-200';
-    altDiv.innerHTML = `
-      <h1 class="text-xl font-semibold mb-4">الأسماء البديلة</h1>
-      <div class="flex gap-3 mb-3 text-sm">
-        <input type="number" id="altSupplierId" placeholder="Supplier ID" class="border border-slate-300 rounded-md px-3 py-2 w-32">
-        <input type="text" id="altRaw" placeholder="اسم بديل" class="border border-slate-300 rounded-md px-3 py-2 flex-1">
-        <button id="altAdd" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">إضافة</button>
-      </div>
-      <div id="altMsg" class="text-sm text-slate-600 mb-3"></div>
-      <div id="altList" class="overflow-x-auto text-sm"></div>
-      <hr class="my-4 border-slate-200">
-      <h2 class="text-lg font-semibold mb-3">بدائل البنوك</h2>
-      <div class="flex gap-3 mb-3 text-sm">
-        <input type="number" id="altBankId" placeholder="Bank ID" class="border border-slate-300 rounded-md px-3 py-2 w-32">
-        <input type="text" id="altBankRaw" placeholder="اسم بديل للبنك" class="border border-slate-300 rounded-md px-3 py-2 flex-1">
-        <button id="altBankAdd" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">إضافة</button>
-      </div>
-      <div id="altBankMsg" class="text-sm text-slate-600 mb-3"></div>
-      <div id="altBankList" class="overflow-x-auto text-sm"></div>
-    `;
-    document.querySelector('main').appendChild(altDiv);
-
     async function loadAlternatives() {
       const sid = document.getElementById('altSupplierId').value;
-      if (!sid) { document.getElementById('altList').innerHTML = '<div class="text-slate-500">أدخل Supplier ID للعرض</div>'; return; }
+      const box = document.getElementById('altList');
+      if (!sid) { box.innerHTML = '<div class="muted">أدخل Supplier ID للعرض</div>'; return; }
       const res = await fetch(`/api/dictionary/suppliers/${sid}/alternatives`);
       const json = await res.json();
-      if (!json.success) { document.getElementById('altList').innerHTML = 'تعذر التحميل'; return; }
+      if (!json.success) { box.innerHTML = '<div class="muted">تعذر التحميل</div>'; return; }
       const rows = json.data || [];
-      document.getElementById('altList').innerHTML = rows.length ? `
-        <table class="min-w-full text-sm divide-y divide-slate-200">
-          <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم الخام</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            ${rows.map(r => `<tr><td class="px-3 py-2">${r.id}</td><td class="px-3 py-2">${r.raw_name}</td><td class="px-3 py-2 text-slate-500">${r.normalized_raw_name}</td><td class="px-3 py-2"><button class="text-xs text-red-600" onclick="deleteAlt(${r.id})">حذف</button></td></tr>`).join('')}
-          </tbody>
-        </table>
-      ` : '<div class="text-slate-500">لا توجد أسماء بديلة.</div>';
+      box.innerHTML = rows.length ? `
+        <table class="table"><thead><tr><th>#</th><th>الاسم الخام</th><th>normalized</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr><td>${r.id}</td><td>${r.raw_name}</td><td class="muted">${r.normalized_raw_name}</td><td><button class="btn btn-ghost" onclick="deleteAlt(${r.id})">حذف</button></td></tr>`).join('')}
+        </tbody></table>
+      ` : '<div class="muted">لا توجد أسماء بديلة.</div>';
     }
-
+    document.getElementById('altSupplierId').addEventListener('change', loadAlternatives);
     document.getElementById('altAdd').addEventListener('click', async () => {
       const sid = document.getElementById('altSupplierId').value;
       const raw = document.getElementById('altRaw').value;
       const msg = document.getElementById('altMsg');
-      if (!sid || !raw) { msg.textContent = 'Supplier ID والاسم البديل مطلوبان'; msg.className='text-sm text-red-600'; return; }
-      const res = await fetch(`/api/dictionary/suppliers/${sid}/alternatives`, {
-        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({raw_name: raw})
-      });
+      if (!sid || !raw) { msg.textContent='Supplier ID والاسم البديل مطلوبان'; msg.className='alert alert-error'; return; }
+      const res = await fetch(`/api/dictionary/suppliers/${sid}/alternatives`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({raw_name: raw})});
       const json = await res.json();
-      if (!json.success) { msg.textContent = json.message || 'تعذر الإضافة'; msg.className='text-sm text-red-600'; return; }
-      msg.textContent = 'تمت الإضافة'; msg.className='text-sm text-green-700';
-      document.getElementById('altRaw').value = '';
+      if (!json.success) { msg.textContent = json.message || 'تعذر الإضافة'; msg.className='alert alert-error'; return; }
+      msg.textContent='تمت الإضافة'; msg.className='alert alert-success';
+      document.getElementById('altRaw').value='';
       loadAlternatives();
     });
+    window.deleteAlt = async (id) => { await fetch(`/api/dictionary/alternatives/${id}`, { method:'DELETE' }); loadAlternatives(); };
 
-    window.deleteAlt = async (id) => {
-      await fetch(`/api/dictionary/alternatives/${id}`, { method: 'DELETE' });
-      loadAlternatives();
-    };
-
-    window.showAltList = (id, type) => {
-      if (type === 'supplier') {
-        document.getElementById('altSupplierId').value = id;
-        loadAlternatives();
-        window.scrollTo({top: altDiv.offsetTop, behavior:'smooth'});
-      } else {
-        document.getElementById('altBankId').value = id;
-        loadBankAlternatives();
-        window.scrollTo({top: altDiv.offsetTop, behavior:'smooth'});
-      }
-    };
-
-    document.getElementById('altSupplierId').addEventListener('change', loadAlternatives);
-
-    // بدائل البنوك
     async function loadBankAlternatives() {
       const bid = document.getElementById('altBankId').value;
       const box = document.getElementById('altBankList');
-      if (!bid) { box.innerHTML = '<div class="text-slate-500">أدخل Bank ID للعرض</div>'; return; }
+      if (!bid) { box.innerHTML = '<div class="muted">أدخل Bank ID للعرض</div>'; return; }
       const res = await fetch(`/api/dictionary/banks/${bid}/alternatives`);
       const json = await res.json();
-      if (!json.success) { box.innerHTML = 'تعذر التحميل'; return; }
+      if (!json.success) { box.innerHTML = '<div class="muted">تعذر التحميل</div>'; return; }
       const rows = json.data || [];
       box.innerHTML = rows.length ? `
-        <table class="min-w-full text-sm divide-y divide-slate-200">
-          <thead class="bg-slate-100 text-slate-700">
-            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم الخام</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            ${rows.map(r => `<tr><td class="px-3 py-2">${r.id}</td><td class="px-3 py-2">${r.raw_name}</td><td class="px-3 py-2 text-slate-500">${r.normalized_raw_name}</td><td class="px-3 py-2"><button class="text-xs text-red-600" onclick="deleteBankAlt(${r.id})">حذف</button></td></tr>`).join('')}
-          </tbody>
-        </table>
-      ` : '<div class="text-slate-500">لا توجد أسماء بديلة.</div>';
+        <table class="table"><thead><tr><th>#</th><th>الاسم الخام</th><th>normalized</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr><td>${r.id}</td><td>${r.raw_name}</td><td class="muted">${r.normalized_raw_name}</td><td><button class="btn btn-ghost" onclick="deleteBankAlt(${r.id})">حذف</button></td></tr>`).join('')}
+        </tbody></table>
+      ` : '<div class="muted">لا توجد أسماء بديلة.</div>';
     }
-
+    document.getElementById('altBankId').addEventListener('change', loadBankAlternatives);
     document.getElementById('altBankAdd').addEventListener('click', async () => {
       const bid = document.getElementById('altBankId').value;
       const raw = document.getElementById('altBankRaw').value;
       const msg = document.getElementById('altBankMsg');
-      if (!bid || !raw) { msg.textContent = 'Bank ID والاسم البديل مطلوبان'; msg.className='text-sm text-red-600'; return; }
-      const res = await fetch(`/api/dictionary/banks/${bid}/alternatives`, {
-        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({raw_name: raw})
-      });
+      if (!bid || !raw) { msg.textContent='Bank ID والاسم البديل مطلوبان'; msg.className='alert alert-error'; return; }
+      const res = await fetch(`/api/dictionary/banks/${bid}/alternatives`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({raw_name: raw})});
       const json = await res.json();
-      if (!json.success) { msg.textContent = json.message || 'تعذر الإضافة'; msg.className='text-sm text-red-600'; return; }
-      msg.textContent = 'تمت الإضافة'; msg.className='text-sm text-green-700';
-      document.getElementById('altBankRaw').value = '';
+      if (!json.success) { msg.textContent = json.message || 'تعذر الإضافة'; msg.className='alert alert-error'; return; }
+      msg.textContent='تمت الإضافة'; msg.className='alert alert-success';
+      document.getElementById('altBankRaw').value='';
       loadBankAlternatives();
     });
-
-    window.deleteBankAlt = async (id) => {
-      await fetch(`/api/dictionary/bank-alternatives/${id}`, { method: 'DELETE' });
-      loadBankAlternatives();
+    window.deleteBankAlt = async (id) => { await fetch(`/api/dictionary/bank-alternatives/${id}`, { method:'DELETE' }); loadBankAlternatives(); };
+    window.showAltList = (id, type) => {
+      if (type === 'supplier') { document.getElementById('altSupplierId').value = id; loadAlternatives(); }
+      else { document.getElementById('altBankId').value = id; loadBankAlternatives(); }
+      window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'});
     };
-
-    document.getElementById('altBankId').addEventListener('change', loadBankAlternatives);
 
     loadSuppliers();
     loadBanks();

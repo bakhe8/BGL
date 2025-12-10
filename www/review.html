@@ -6,216 +6,193 @@
   <title>لوحة المراجعة</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+<body>
+  <header class="app-header">
     <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
       <div class="font-semibold text-lg">لوحة المراجعة</div>
-      <nav class="flex gap-4 text-sm text-slate-600">
+      <nav class="nav">
         <a href="/import">Import</a>
         <a href="/records">Records</a>
-        <a href="/review" class="text-blue-600 font-semibold">Review Panel</a>
-        <a href="/dictionary/suppliers">Dictionary</a>
+        <a href="/review" class="active">Review Panel</a>
+        <a href="/dictionary">Dictionary</a>
+        <a href="/settings">Settings</a>
       </nav>
     </div>
   </header>
 
   <main class="max-w-6xl mx-auto px-6 py-8 space-y-6">
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-semibold">السجلات قيد المراجعة</h1>
-        <button id="refresh" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">تحديث</button>
+    <section class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h1 class="card-title">السجلات قيد المراجعة</h1>
+        <div class="flex gap-2">
+          <button id="refresh" class="btn btn-secondary">تحديث</button>
+          <button class="btn btn-ghost" disabled>Filter (لاحقًا)</button>
+        </div>
       </div>
-      <div id="tableWrap" class="overflow-x-auto text-sm max-h-[50vh]">
-        <div class="text-slate-500">لا يوجد سجلات.</div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>المورد</th>
+              <th>البنك</th>
+              <th>المبلغ</th>
+              <th>تاريخ الانتهاء</th>
+              <th>الحالة</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTable">
+            <tr><td colspan="6" class="muted">لا يوجد سجلات.</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
-    <section id="detailSection" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hidden">
+    <section id="detailSection" class="card" style="display:none;">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold">تفاصيل السجل</h2>
-        <div id="detailMeta" class="text-sm text-slate-500"></div>
+        <h2 class="section-title">تفاصيل السجل</h2>
+        <div id="detailMeta" class="muted text-sm"></div>
       </div>
-      <div id="conflicts" class="mb-4 text-sm"></div>
 
-      <div class="grid md:grid-cols-2 gap-4 text-sm">
-        <div>
-          <label class="text-slate-600">المورد</label>
+      <div class="card" style="background:#f8fafc; padding:16px; margin-bottom:16px;">
+        <h3 class="card-subtitle" style="margin-bottom:10px;">التعارضات</h3>
+        <div id="conflicts" class="conflict-item" style="display:none;"></div>
+      </div>
+
+      <div class="grid-2 mb-3">
+        <div class="card" style="padding:16px;">
+          <h3 class="card-subtitle">المورد</h3>
+          <div class="muted text-sm">الأصلي</div>
           <div id="dSupplier" class="font-semibold"></div>
+          <div class="muted text-sm">المطبع</div>
+          <div id="dSupplierNorm"></div>
+          <div class="muted text-sm">المقترح</div>
+          <div id="dSupplierSuggested">—</div>
         </div>
-        <div>
-          <label class="text-slate-600">البنك</label>
+        <div class="card" style="padding:16px;">
+          <h3 class="card-subtitle">البنك</h3>
+          <div class="muted text-sm">الأصلي</div>
           <div id="dBank" class="font-semibold"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">المورد (مطبع)</label>
-          <div id="dSupplierNorm" class="text-slate-600"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">البنك (مطبع)</label>
-          <div id="dBankNorm" class="text-slate-600"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">المبلغ</label>
-          <div id="dAmount"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">رقم الضمان</label>
-          <div id="dGuarantee"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">تاريخ الإصدار</label>
-          <div id="dIssue"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">تاريخ الانتهاء</label>
-          <div id="dExpiry"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">جلسة الاستيراد</label>
-          <div id="dSession"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">تاريخ الإدخال</label>
-          <div id="dCreated"></div>
-        </div>
-        <div>
-          <label class="text-slate-600">مورد مقترح</label>
-          <div id="dSupplierSuggested" class="text-slate-600">—</div>
-        </div>
-        <div>
-          <label class="text-slate-600">بنك مقترح</label>
-          <div id="dBankSuggested" class="text-slate-600">—</div>
+          <div class="muted text-sm">المطبع</div>
+          <div id="dBankNorm"></div>
+          <div class="muted text-sm">المقترح</div>
+          <div id="dBankSuggested">—</div>
         </div>
       </div>
 
-      <hr class="my-4 border-slate-200">
-
-      <div class="grid md:grid-cols-2 gap-6">
+      <div class="grid-2 mb-3">
         <div>
-          <h3 class="font-semibold mb-2">اقتراحات المورد (official + alternative)</h3>
-          <div id="supplierSuggestions" class="space-y-2 text-sm text-slate-700"></div>
+          <h3 class="card-subtitle">بيانات الضمان</h3>
+          <div class="grid-2">
+            <div><span class="label">رقم الضمان</span><div id="dGuarantee"></div></div>
+            <div><span class="label">المبلغ</span><div id="dAmount"></div></div>
+            <div><span class="label">تاريخ الإصدار</span><div id="dIssue"></div></div>
+            <div><span class="label">تاريخ الانتهاء</span><div id="dExpiry"></div></div>
+          </div>
         </div>
         <div>
-          <h3 class="font-semibold mb-2">اقتراحات البنك</h3>
-          <div id="bankSuggestions" class="space-y-2 text-sm text-slate-700 text-slate-500">لا توجد اقتراحات بعد (سيُضاف لاحقًا).</div>
+          <h3 class="card-subtitle">معلومات الاستيراد</h3>
+          <div class="grid-2">
+            <div><span class="label">جلسة الاستيراد</span><div id="dSession"></div></div>
+            <div><span class="label">تاريخ الإدخال</span><div id="dCreated"></div></div>
+          </div>
         </div>
       </div>
 
-      <hr class="my-4 border-slate-200">
+      <div class="grid-2">
+        <div>
+          <h3 class="section-title">اقتراحات المورد</h3>
+          <div id="supplierSuggestions"></div>
+        </div>
+        <div>
+          <h3 class="section-title">اقتراحات البنك</h3>
+          <div id="bankSuggestions"></div>
+        </div>
+      </div>
 
-      <form id="decisionForm" class="grid md:grid-cols-2 gap-4 text-sm">
+      <hr style="margin:16px 0;border-color:#e2e8f0;">
+
+      <form id="decisionForm" class="grid-2">
         <div>
-          <label class="text-slate-600">اسم المورد (تعديل اختياري)</label>
-          <input type="text" id="fSupplier" class="w-full border border-slate-300 rounded-md px-3 py-2" />
+          <label class="label">اسم المورد (تعديل اختياري)</label>
+          <input type="text" id="fSupplier" class="input" />
         </div>
         <div>
-          <label class="text-slate-600">اسم البنك (تعديل اختياري)</label>
-          <input type="text" id="fBank" class="w-full border border-slate-300 rounded-md px-3 py-2" />
+          <label class="label">اسم البنك (تعديل اختياري)</label>
+          <input type="text" id="fBank" class="input" />
         </div>
         <div>
-          <label class="text-slate-600">المبلغ</label>
-          <input type="text" id="fAmount" class="w-full border border-slate-300 rounded-md px-3 py-2" />
+          <label class="label">المبلغ</label>
+          <input type="text" id="fAmount" class="input" />
         </div>
         <div>
-          <label class="text-slate-600">رقم الضمان</label>
-          <input type="text" id="fGuarantee" class="w-full border border-slate-300 rounded-md px-3 py-2" />
+          <label class="label">رقم الضمان</label>
+          <input type="text" id="fGuarantee" class="input" />
         </div>
         <div>
-          <label class="text-slate-600">تاريخ الإصدار</label>
-          <input type="text" id="fIssue" class="w-full border border-slate-300 rounded-md px-3 py-2" placeholder="YYYY-MM-DD" />
+          <label class="label">تاريخ الإصدار</label>
+          <input type="text" id="fIssue" class="input" placeholder="YYYY-MM-DD" />
         </div>
         <div>
-          <label class="text-slate-600">تاريخ الانتهاء</label>
-          <input type="text" id="fExpiry" class="w-full border border-slate-300 rounded-md px-3 py-2" placeholder="YYYY-MM-DD" />
+          <label class="label">تاريخ الانتهاء</label>
+          <input type="text" id="fExpiry" class="input" placeholder="YYYY-MM-DD" />
         </div>
         <div>
-          <label class="text-slate-600">الحالة</label>
-          <select id="fStatus" class="w-full border border-slate-300 rounded-md px-3 py-2">
+          <label class="label">الحالة</label>
+          <select id="fStatus" class="input">
             <option value="needs_review">Needs Review</option>
             <option value="ready">Ready</option>
           </select>
         </div>
       </form>
       <div class="mt-4 flex items-center gap-3">
-        <button id="saveDecision" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm">حفظ القرار</button>
-        <div id="decisionMsg" class="text-sm text-slate-600"></div>
+        <button id="saveDecision" class="btn btn-primary">حفظ القرار</button>
+        <div id="decisionMsg" class="muted text-sm"></div>
       </div>
     </section>
   </main>
 
   <script>
-    const tableWrap = document.getElementById('tableWrap');
+    const tableBody = document.getElementById('recordsTable');
     const refreshBtn = document.getElementById('refresh');
     const detailSection = document.getElementById('detailSection');
     const detailMeta = document.getElementById('detailMeta');
-    const decisionForm = document.getElementById('decisionForm');
-    const msg = document.getElementById('decisionMsg');
-
+    const decisionMsg = document.getElementById('decisionMsg');
     let records = [];
     let selected = null;
 
     async function loadRecords() {
-      tableWrap.innerHTML = '<div class="text-slate-500">جارٍ التحميل...</div>';
+      tableBody.innerHTML = '<tr><td colspan="6" class="muted">جارٍ التحميل...</td></tr>';
       const res = await fetch('/api/records');
       const json = await res.json();
       if (!json.success) {
-        tableWrap.innerHTML = '<div class="text-red-600">تعذر تحميل السجلات</div>';
+        tableBody.innerHTML = '<tr><td colspan="6" class="muted">تعذر تحميل السجلات</td></tr>';
         return;
       }
-      records = (json.data || []).filter(r => (r.matchStatus || '') === 'needs_review');
+      records = (json.data || []);
       renderTable();
       if (records.length) {
         showDetail(records[0]);
       } else {
-        detailSection.classList.add('hidden');
+        detailSection.style.display = 'none';
       }
     }
 
     function renderTable() {
       if (!records.length) {
-        tableWrap.innerHTML = '<div class="text-slate-500">لا يوجد سجلات.</div>';
+        tableBody.innerHTML = '<tr><td colspan="6" class="muted">لا يوجد سجلات.</td></tr>';
         return;
       }
-      const rows = records.map(r => `
-        <tr class="hover:bg-gray-100 cursor-pointer" onclick="selectRecord(${r.id})">
-          <td class="px-3 py-2">${r.id ?? ''}</td>
-          <td class="px-3 py-2">${r.rawSupplierName ?? ''}</td>
-          <td class="px-3 py-2">${r.rawBankName ?? ''}</td>
-          <td class="px-3 py-2">${r.amount ?? ''}</td>
-          <td class="px-3 py-2">${r.guaranteeNumber ?? ''}</td>
-          <td class="px-3 py-2">${r.expiryDate ?? ''}</td>
-          <td class="px-3 py-2">${statusBadge(r.matchStatus)}</td>
+      tableBody.innerHTML = records.map(r => `
+        <tr class="${selected && selected.id === r.id ? 'selected' : ''}" onclick="selectRecord(${r.id})">
+          <td>${r.id ?? ''}</td>
+          <td>${r.rawSupplierName ?? ''}</td>
+          <td>${r.rawBankName ?? ''}</td>
+          <td>${r.amount ?? ''}</td>
+          <td>${r.expiryDate ?? ''}</td>
+          <td><span class="status-badge ${r.matchStatus === 'ready' ? 'status-ready' : 'status-review'}">${r.matchStatus || 'needs_review'}</span></td>
         </tr>
       `).join('');
-
-      tableWrap.innerHTML = `
-        <table class="min-w-full text-sm divide-y divide-slate-200">
-          <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10">
-            <tr>
-              <th class="px-3 py-2 text-right">#</th>
-              <th class="px-3 py-2 text-right">المورد</th>
-              <th class="px-3 py-2 text-right">البنك</th>
-              <th class="px-3 py-2 text-right">المبلغ</th>
-              <th class="px-3 py-2 text-right">رقم الضمان</th>
-              <th class="px-3 py-2 text-right">تاريخ الانتهاء</th>
-              <th class="px-3 py-2 text-right">الحالة</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            ${rows}
-          </tbody>
-        </table>
-      `;
-    }
-
-    function statusBadge(status) {
-      const s = status || 'needs_review';
-      const map = {
-        needs_review: { text: 'Needs Review', cls: 'bg-amber-100 text-amber-800' },
-        ready: { text: 'Ready', cls: 'bg-green-100 text-green-800' },
-      };
-      const badge = map[s] || map.needs_review;
-      return `<span class="px-2 py-1 rounded-full text-xs font-medium ${badge.cls}">${badge.text}</span>`;
     }
 
     window.selectRecord = function(id) {
@@ -225,7 +202,8 @@
 
     async function showDetail(r) {
       selected = r;
-      detailSection.classList.remove('hidden');
+      renderTable();
+      detailSection.style.display = 'block';
       detailMeta.textContent = `ID: ${r.id} | Session: ${r.sessionId ?? ''}`;
       setText('dSupplier', r.rawSupplierName);
       setText('dBank', r.rawBankName);
@@ -239,7 +217,6 @@
       setText('dCreated', r.createdAt);
       setText('dSupplierSuggested', r.supplierId ? `ID: ${r.supplierId}` : '—');
       setText('dBankSuggested', r.bankId ? `ID: ${r.bankId}` : '—');
-
       document.getElementById('fSupplier').value = r.rawSupplierName || '';
       document.getElementById('fBank').value = r.rawBankName || '';
       document.getElementById('fAmount').value = r.amount || '';
@@ -247,7 +224,7 @@
       document.getElementById('fIssue').value = r.issueDate || '';
       document.getElementById('fExpiry').value = r.expiryDate || '';
       document.getElementById('fStatus').value = r.matchStatus || 'needs_review';
-      msg.textContent = '';
+      decisionMsg.textContent = '';
       await renderSuggestions(r);
     }
 
@@ -267,8 +244,7 @@
         expiry_date: document.getElementById('fExpiry').value,
         match_status: document.getElementById('fStatus').value,
       };
-
-      msg.textContent = 'جارٍ الحفظ...';
+      decisionMsg.textContent = 'جارٍ الحفظ...';
       const res = await fetch(`/api/records/${selected.id}/decision`, {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
@@ -276,88 +252,81 @@
       });
       const json = await res.json();
       if (!json.success) {
-        msg.textContent = json.message || 'تعذر الحفظ';
-        msg.className = 'text-sm text-red-600';
+        decisionMsg.textContent = json.message || 'تعذر الحفظ';
+        decisionMsg.className = 'alert alert-error';
         return;
       }
-
-      msg.textContent = 'تم الحفظ';
-      msg.className = 'text-sm text-green-700';
+      decisionMsg.textContent = 'تم الحفظ';
+      decisionMsg.className = 'alert alert-success';
       await loadRecords();
     }
 
     async function renderSuggestions(r) {
       const supplierSuggestions = document.getElementById('supplierSuggestions');
       const bankSuggestions = document.getElementById('bankSuggestions');
-      supplierSuggestions.innerHTML = '<div class="text-slate-500">جارٍ تحميل المرشحين...</div>';
-      bankSuggestions.innerHTML = '<div class="text-slate-500">جارٍ تحميل المرشحين...</div>';
-
+      supplierSuggestions.innerHTML = '<div class="muted">جارٍ تحميل المرشحين...</div>';
+      bankSuggestions.innerHTML = '<div class="muted">جارٍ تحميل المرشحين...</div>';
+      document.getElementById('conflicts').style.display = 'none';
       try {
         const res = await fetch(`/api/records/${r.id}/candidates`);
         const json = await res.json();
         if (!json.success) {
-          supplierSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
-          bankSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
+          supplierSuggestions.innerHTML = '<div class="alert alert-error">تعذر تحميل المرشحين</div>';
+          bankSuggestions.innerHTML = '<div class="alert alert-error">تعذر تحميل المرشحين</div>';
           return;
         }
-
         const candidates = json.data?.supplier?.candidates || [];
         const bankCands = json.data?.bank?.candidates || [];
         const conflicts = json.data?.conflicts || [];
-        window.lastCandidates = candidates;
-        window.lastBankCandidates = bankCands;
-        window.lastConflicts = conflicts;
         const normalized = json.data?.supplier?.normalized || '';
         const bankNormalized = json.data?.bank?.normalized || '';
-        setText('dSupplierNorm', normalized);
-        setText('dBankNorm', bankNormalized);
 
         supplierSuggestions.innerHTML = candidates.length ? candidates.map((c, idx) => `
-          <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
+          <label class="candidate">
             <input type="radio" name="supplierCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
             <div>
-              <div class="font-medium flex items-center gap-2">${c.name || '—'} <span class="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">${c.source}</span></div>
-              <div class="text-slate-500 text-xs">normalized: ${normalized}</div>
-              <div class="text-slate-500 text-xs">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
+              <div class="name">${c.name || '—'} <span class="tag tag-source">${c.source}</span></div>
+              <div class="score">normalized: ${normalized}</div>
+              <div class="score">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
             </div>
           </label>
-        `).join('') : '<div class="text-slate-500">لا توجد اقتراحات</div>';
+        `).join('') : '<div class="muted">لا توجد اقتراحات</div>';
 
         bankSuggestions.innerHTML = bankCands.length ? bankCands.map((c, idx) => `
-          <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
+          <label class="candidate">
             <input type="radio" name="bankCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
             <div>
-              <div class="font-medium flex items-center gap-2">${c.name || '—'} <span class="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">${c.source}</span></div>
-              <div class="text-slate-500 text-xs">normalized: ${bankNormalized}</div>
-              <div class="text-slate-500 text-xs">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
+              <div class="name">${c.name || '—'} <span class="tag tag-source">${c.source}</span></div>
+              <div class="score">normalized: ${bankNormalized}</div>
+              <div class="score">Score: ${c.score?.toFixed(2) ?? '—'} (raw: ${c.score_raw?.toFixed(2) ?? '—'})</div>
             </div>
           </label>
-        `).join('') : '<div class="text-slate-500">لا توجد اقتراحات</div>';
+        `).join('') : '<div class="muted">لا توجد اقتراحات</div>';
 
         supplierSuggestions.querySelectorAll('input[name="supplierCandidate"]').forEach((input, idx) => {
-            input.addEventListener('change', () => {
-              const chosen = candidates[idx];
-              document.getElementById('fSupplier').value = chosen.name || '';
-            });
+          input.addEventListener('change', () => {
+            const chosen = candidates[idx];
+            document.getElementById('fSupplier').value = chosen.name || '';
+          });
         });
         bankSuggestions.querySelectorAll('input[name="bankCandidate"]').forEach((input, idx) => {
-            input.addEventListener('change', () => {
-              const chosen = bankCands[idx];
-              document.getElementById('fBank').value = chosen.name || '';
-            });
+          input.addEventListener('change', () => {
+            const chosen = bankCands[idx];
+            document.getElementById('fBank').value = chosen.name || '';
+          });
         });
 
-        renderConflicts(conflicts);
+        const confEl = document.getElementById('conflicts');
+        if (conflicts.length) {
+          confEl.innerHTML = conflicts.map(c => `<div class="conflict-item">${c}</div>`).join('');
+          confEl.style.display = 'block';
+        } else {
+          confEl.style.display = 'none';
+        }
       } catch (e) {
-        supplierSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
-        bankSuggestions.innerHTML = '<div class="text-red-600">تعذر تحميل المرشحين</div>';
+        supplierSuggestions.innerHTML = '<div class="alert alert-error">تعذر تحميل المرشحين</div>';
+        bankSuggestions.innerHTML = '<div class="alert alert-error">تعذر تحميل المرشحين</div>';
       }
-    }
-
-    function renderConflicts(list) {
-      const conf = list || window.lastConflicts || [];
-      const el = document.getElementById('conflicts');
-      el.innerHTML = conf.length ? conf.map(c => `<div class="px-3 py-2 mb-2 rounded-md bg-red-50 text-red-700 border border-red-100">${c}</div>`).join('') : '<div class="text-slate-500">لا تعارضات</div>';
     }
 
     document.getElementById('saveDecision').addEventListener('click', saveDecision);

@@ -6,61 +6,83 @@
   <title>السجلات</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body class="bg-slate-50 text-slate-800 font-[Tajawal]">
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+<body>
+  <header class="app-header">
     <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
       <div class="font-semibold text-lg">إدارة السجلات</div>
-      <nav class="flex gap-4 text-sm text-slate-600">
-        <a href="/import">استيراد</a>
-        <a href="/records" class="text-blue-600 font-semibold">السجلات</a>
-        <a href="/review">المراجعة</a>
-        <a href="/dictionary/suppliers">الموردون</a>
-        <a href="/dictionary/banks">البنوك</a>
-        <a href="/settings">الإعدادات</a>
+      <nav class="nav">
+        <a href="/import">Import</a>
+        <a href="/records" class="active">Records</a>
+        <a href="/review">Review Panel</a>
+        <a href="/dictionary">Dictionary</a>
+        <a href="/settings">Settings</a>
       </nav>
     </div>
   </header>
 
   <main class="max-w-6xl mx-auto px-6 py-8 space-y-6">
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4 flex-wrap">
-      <div class="flex items-center gap-2 text-sm">
-        <label class="text-slate-600">تصفية الحالة:</label>
-        <select id="statusFilter" class="border border-slate-300 rounded-md px-3 py-2 text-sm">
-          <option value="all">الكل</option>
-          <option value="needs_review">Needs Review</option>
-          <option value="ready">Ready</option>
-        </select>
+    <section class="card">
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          <span class="label">تصفية الحالة</span>
+          <select id="statusFilter" class="input" style="width:160px;">
+            <option value="all">الكل</option>
+            <option value="needs_review">Needs Review</option>
+            <option value="ready">Ready</option>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <button id="refresh" class="btn btn-primary">تحديث</button>
+          <button class="btn btn-ghost" disabled>فرز متقدم (لاحقًا)</button>
+        </div>
+        <div id="meta" class="muted text-sm"></div>
       </div>
-      <button id="refresh" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700">تحديث</button>
     </section>
 
-    <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-semibold">جميع السجلات</h1>
-        <div class="text-sm text-slate-500" id="meta"></div>
+    <section class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h1 class="card-title">جميع السجلات</h1>
       </div>
-      <div id="tableWrap" class="overflow-x-auto text-sm max-h-[70vh]">
-        <div class="text-slate-500">لا يوجد سجلات بعد.</div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-key="id">#</th>
+              <th data-key="rawSupplierName">supplier_raw</th>
+              <th data-key="rawBankName">bank_raw</th>
+              <th data-key="amount">amount_raw</th>
+              <th data-key="guaranteeNumber">رقم الضمان</th>
+              <th data-key="issueDate">تاريخ الإصدار</th>
+              <th data-key="expiryDate">expiry_raw</th>
+              <th data-key="matchStatus">الحالة</th>
+              <th data-key="sessionId">import_session_id</th>
+              <th data-key="createdAt">created_at</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="11" class="muted">لا يوجد سجلات بعد.</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </main>
 
   <script>
-    const tableWrap = document.getElementById('tableWrap');
+    const tableBody = document.getElementById('tableBody');
     const statusFilter = document.getElementById('statusFilter');
     const refreshBtn = document.getElementById('refresh');
     const meta = document.getElementById('meta');
-
     let records = [];
     let sortKey = 'id';
     let sortDir = 'desc';
 
     async function loadRecords() {
-      tableWrap.innerHTML = '<div class="text-slate-500">جارٍ التحميل...</div>';
+      tableBody.innerHTML = '<tr><td colspan="11" class="muted">جارٍ التحميل...</td></tr>';
       const res = await fetch('/api/records');
       const json = await res.json();
       if (!json.success) {
-        tableWrap.innerHTML = '<div class="text-red-600">تعذر تحميل السجلات</div>';
+        tableBody.innerHTML = '<tr><td colspan="11" class="muted">تعذر تحميل السجلات</td></tr>';
         return;
       }
       records = json.data || [];
@@ -75,8 +97,8 @@
 
     function sortData(data) {
       return data.slice().sort((a, b) => {
-        const va = a[camel(sortKey)];
-        const vb = b[camel(sortKey)];
+        const va = a[sortKey];
+        const vb = b[sortKey];
         if (va == null && vb == null) return 0;
         if (va == null) return sortDir === 'asc' ? -1 : 1;
         if (vb == null) return sortDir === 'asc' ? 1 : -1;
@@ -93,95 +115,38 @@
       const filtered = applyFilter(records);
       const data = sortData(filtered);
       meta.textContent = `الإجمالي: ${records.length} | المعروض: ${data.length}`;
-
       if (!data.length) {
-        tableWrap.innerHTML = '<div class="text-slate-500">لا يوجد سجلات بعد.</div>';
+        tableBody.innerHTML = '<tr><td colspan="11" class="muted">لا يوجد سجلات.</td></tr>';
         return;
       }
-
-      const headers = [
-        { key: 'id', label: '#' },
-        { key: 'rawSupplierName', label: 'supplier_raw' },
-        { key: 'rawBankName', label: 'bank_raw' },
-        { key: 'amount', label: 'amount_raw' },
-        { key: 'guaranteeNumber', label: 'رقم الضمان' },
-        { key: 'issueDate', label: 'تاريخ الإصدار' },
-        { key: 'expiryDate', label: 'expiry_raw' },
-        { key: 'matchStatus', label: 'الحالة' },
-        { key: 'sessionId', label: 'import_session_id' },
-        { key: 'createdAt', label: 'created_at' },
-        { key: 'actions', label: 'إجراءات' },
-      ];
-
-      const head = headers.map(h => `
-        <th class="px-3 py-2 text-right cursor-pointer select-none ${h.key !== 'actions' ? 'bg-slate-100 sticky top-0 z-10' : 'bg-slate-100 sticky top-0 z-10'}" data-key="${h.key}">
-          ${h.label}
-          ${sortKey === h.key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-        </th>
-      `).join('');
-
-      const body = data.map(r => `
-        <tr class="hover:bg-gray-100">
-          <td class="px-3 py-2">${r.id ?? ''}</td>
-          <td class="px-3 py-2">${r.rawSupplierName ?? ''}</td>
-          <td class="px-3 py-2">${r.rawBankName ?? ''}</td>
-          <td class="px-3 py-2">${r.amount ?? ''}</td>
-          <td class="px-3 py-2">${r.guaranteeNumber ?? ''}</td>
-          <td class="px-3 py-2">${r.issueDate ?? ''}</td>
-          <td class="px-3 py-2">${r.expiryDate ?? ''}</td>
-          <td class="px-3 py-2">
-            ${statusBadge(r.matchStatus)}
-          </td>
-          <td class="px-3 py-2">${r.sessionId ?? ''}</td>
-          <td class="px-3 py-2">${r.createdAt ?? ''}</td>
-          <td class="px-3 py-2">
-            <button class="text-blue-600 text-xs" onclick="viewRecord(${r.id})">Review / مراجعة</button>
-          </td>
+      tableBody.innerHTML = data.map(r => `
+        <tr>
+          <td>${r.id ?? ''}</td>
+          <td>${r.rawSupplierName ?? ''}</td>
+          <td>${r.rawBankName ?? ''}</td>
+          <td>${r.amount ?? ''}</td>
+          <td>${r.guaranteeNumber ?? ''}</td>
+          <td>${r.issueDate ?? ''}</td>
+          <td>${r.expiryDate ?? ''}</td>
+          <td><span class="status-badge ${r.matchStatus === 'ready' ? 'status-ready' : 'status-review'}">${r.matchStatus || 'needs_review'}</span></td>
+          <td>${r.sessionId ?? ''}</td>
+          <td>${r.createdAt ?? ''}</td>
+          <td><button class="btn btn-ghost" onclick="viewRecord(${r.id})">Review / مراجعة</button></td>
         </tr>
       `).join('');
-
-      tableWrap.innerHTML = `
-        <table class="min-w-full text-sm divide-y divide-slate-200">
-          <thead class="bg-slate-100 text-slate-700">
-            <tr>${head}</tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200">
-            ${body}
-          </tbody>
-        </table>
-      `;
-
-      tableWrap.querySelectorAll('th[data-key]').forEach(th => {
-        th.addEventListener('click', () => {
+      document.querySelectorAll('th[data-key]').forEach(th => {
+        th.onclick = () => {
           const key = th.getAttribute('data-key');
-          if (key === 'actions') return;
-          if (sortKey === key) {
-            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-          } else {
-            sortKey = key;
-            sortDir = 'asc';
-          }
+          if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+          else { sortKey = key; sortDir = 'asc'; }
           render();
-        });
+        };
       });
     }
 
-    function statusBadge(status) {
-      const s = status || 'needs_review';
-      const map = {
-        needs_review: { text: 'Needs Review', cls: 'bg-amber-100 text-amber-800' },
-        ready: { text: 'Ready', cls: 'bg-green-100 text-green-800' },
-      };
-      const badge = map[s] || map.needs_review;
-      return `<span class="px-2 py-1 rounded-full text-xs font-medium ${badge.cls}">${badge.text}</span>`;
-    }
-
-    function camel(key) {
-      return key;
-    }
-
     window.viewRecord = function(id) {
-      alert('سيتم ربط عرض التفاصيل بلوحة المراجعة لاحقاً. رقم السجل: ' + id);
+      // Placeholder: يمكن ربطه بفتح Modal أو الانتقال للوحة المراجعة
+      window.location.href = '/review#' + id;
     };
 
     statusFilter.addEventListener('change', render);
