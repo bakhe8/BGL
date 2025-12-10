@@ -7,6 +7,7 @@ use App\Models\ImportedRecord;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\ImportedRecordRepository;
 use App\Services\ExcelColumnDetector;
+use App\Services\MatchingService;
 use App\Support\XlsxReader;
 use RuntimeException;
 
@@ -17,7 +18,13 @@ class ImportService
         private ImportedRecordRepository $records,
         private XlsxReader $xlsxReader = new XlsxReader(),
         private ExcelColumnDetector $detector = new ExcelColumnDetector(),
+        private MatchingService $matchingService = null,
     ) {
+        $this->matchingService ??= new MatchingService(
+            new \App\Repositories\SupplierRepository(),
+            new \App\Repositories\SupplierAlternativeNameRepository(),
+            new \App\Repositories\BankRepository(),
+        );
     }
 
     /**
@@ -63,7 +70,11 @@ class ImportService
                 guaranteeNumber: $guarantee ?: null,
                 expiryDate: $expiry ?: null,
                 issueDate: $issue ?: null,
-                matchStatus: 'needs_review',
+                matchStatus: $match['match_status'],
+                supplierId: $match['supplier_id'] ?? null,
+                bankId: $bankMatch['bank_id'] ?? null,
+                normalizedSupplier: $match['normalized'] ?? null,
+                normalizedBank: $bankMatch['normalized'] ?? null,
             );
             $this->records->create($record);
             $this->sessions->incrementRecordCount($session->id ?? 0);
