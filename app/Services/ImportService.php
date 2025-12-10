@@ -7,6 +7,8 @@ use App\Models\ImportedRecord;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\ImportedRecordRepository;
 use App\Services\ExcelColumnDetector;
+use App\Services\CandidateService;
+use App\Services\AutoAcceptService;
 use App\Services\MatchingService;
 use App\Support\XlsxReader;
 use RuntimeException;
@@ -19,12 +21,19 @@ class ImportService
         private XlsxReader $xlsxReader = new XlsxReader(),
         private ExcelColumnDetector $detector = new ExcelColumnDetector(),
         private MatchingService $matchingService = null,
+        private CandidateService $candidateService = null,
+        private AutoAcceptService $autoAcceptService = null,
     ) {
         $this->matchingService ??= new MatchingService(
             new \App\Repositories\SupplierRepository(),
             new \App\Repositories\SupplierAlternativeNameRepository(),
             new \App\Repositories\BankRepository(),
         );
+        $this->candidateService ??= new CandidateService(
+            new \App\Repositories\SupplierRepository(),
+            new \App\Repositories\SupplierAlternativeNameRepository(),
+        );
+        $this->autoAcceptService ??= new AutoAcceptService($this->records);
     }
 
     /**
@@ -61,6 +70,10 @@ class ImportService
                 continue;
             }
 
+            $match = $this->matchingService->matchSupplier($supplier);
+            $bankMatch = $this->matchingService->matchBank($bank);
+            $candidates = $this->candidateService->supplierCandidates($supplier)['candidates'] ?? [];
+
             $record = new ImportedRecord(
                 id: null,
                 sessionId: $session->id ?? 0,
@@ -78,6 +91,7 @@ class ImportService
             );
             $this->records->create($record);
             $this->sessions->incrementRecordCount($session->id ?? 0);
+            $this->autoAcceptService->tryAutoAccept($record->id ?? 0, $candidates);
             $count++;
         }
 

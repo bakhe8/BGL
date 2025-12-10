@@ -35,11 +35,14 @@ class CandidateService
         foreach ($this->suppliers->findAllByNormalized($normalized) as $supplier) {
             $candNorm = $this->normalizer->normalizeName($supplier['normalized_name'] ?? $supplier['official_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
+            $scoreRaw = $this->maxScore($sim);
+            $scoreWeighted = $scoreRaw * \App\Support\Config::WEIGHT_OFFICIAL;
             $candidates[] = [
                 'source' => 'official',
                 'supplier_id' => $supplier['id'],
                 'name' => $supplier['official_name'],
-                'score' => $this->maxScore($sim),
+                'score' => $scoreWeighted,
+                'score_raw' => $scoreRaw,
             ];
         }
 
@@ -47,11 +50,14 @@ class CandidateService
         foreach ($this->supplierAlts->findAllByNormalized($normalized) as $alt) {
             $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
+            $scoreRaw = $this->maxScore($sim);
+            $scoreWeighted = $scoreRaw * \App\Support\Config::WEIGHT_ALT_CONFIRMED;
             $candidates[] = [
                 'source' => 'alternative',
                 'supplier_id' => $alt['supplier_id'],
                 'name' => $alt['raw_name'],
-                'score' => $this->maxScore($sim),
+                'score' => $scoreWeighted,
+                'score_raw' => $scoreRaw,
             ];
         }
 
@@ -59,13 +65,15 @@ class CandidateService
         foreach ($this->suppliers->allNormalized() as $supplier) {
             $candNorm = $this->normalizer->normalizeName($supplier['normalized_name'] ?? $supplier['official_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
-            $score = $this->maxScore($sim) * \App\Support\Config::WEIGHT_FUZZY;
+            $scoreRaw = $this->maxScore($sim);
+            $score = $scoreRaw * \App\Support\Config::WEIGHT_FUZZY;
             if ($score >= \App\Support\Config::MATCH_REVIEW_THRESHOLD) {
                 $candidates[] = [
                     'source' => 'fuzzy_official',
                     'supplier_id' => $supplier['id'],
                     'name' => $supplier['official_name'],
                     'score' => $score,
+                    'score_raw' => $scoreRaw,
                 ];
             }
         }
@@ -74,13 +82,15 @@ class CandidateService
         foreach ($this->supplierAlts->allNormalized() as $alt) {
             $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
-            $score = $this->maxScore($sim) * \App\Support\Config::WEIGHT_FUZZY;
+            $scoreRaw = $this->maxScore($sim);
+            $score = $scoreRaw * \App\Support\Config::WEIGHT_FUZZY;
             if ($score >= \App\Support\Config::MATCH_REVIEW_THRESHOLD) {
                 $candidates[] = [
                     'source' => 'fuzzy_alternative',
                     'supplier_id' => $alt['supplier_id'],
                     'name' => $alt['raw_name'],
                     'score' => $score,
+                    'score_raw' => $scoreRaw,
                 ];
             }
         }
