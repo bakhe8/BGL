@@ -35,6 +35,8 @@
         <h2 class="text-lg font-semibold">تفاصيل السجل</h2>
         <div id="detailMeta" class="text-sm text-slate-500"></div>
       </div>
+      <div id="conflicts" class="mb-4 text-sm text-red-700"></div>
+
       <div class="grid md:grid-cols-2 gap-4 text-sm">
         <div>
           <label class="text-slate-600">المورد</label>
@@ -83,6 +85,19 @@
         <div>
           <label class="text-slate-600">بنك مقترح</label>
           <div id="dBankSuggested" class="text-slate-600">—</div>
+        </div>
+      </div>
+
+      <hr class="my-4 border-slate-200">
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="font-semibold mb-2">اقتراحات المورد</h3>
+          <div id="supplierSuggestions" class="space-y-2 text-sm text-slate-700"></div>
+        </div>
+        <div>
+          <h3 class="font-semibold mb-2">اقتراحات البنك</h3>
+          <div id="bankSuggestions" class="space-y-2 text-sm text-slate-700"></div>
         </div>
       </div>
 
@@ -212,6 +227,7 @@
       selected = r;
       detailSection.classList.remove('hidden');
       detailMeta.textContent = `ID: ${r.id} | Session: ${r.sessionId ?? ''}`;
+      renderConflicts(r);
       setText('dSupplier', r.rawSupplierName);
       setText('dBank', r.rawBankName);
       setText('dSupplierNorm', r.normalizedSupplier);
@@ -233,6 +249,7 @@
       document.getElementById('fExpiry').value = r.expiryDate || '';
       document.getElementById('fStatus').value = r.matchStatus || 'needs_review';
       msg.textContent = '';
+      renderSuggestions(r);
     }
 
     function setText(id, val) {
@@ -268,6 +285,62 @@
       msg.textContent = 'تم الحفظ';
       msg.className = 'text-sm text-green-700';
       await loadRecords();
+    }
+
+    function renderSuggestions(r) {
+      const supplierSuggestions = document.getElementById('supplierSuggestions');
+      const bankSuggestions = document.getElementById('bankSuggestions');
+
+      const supplierCandidates = [];
+      if (r.supplierId) supplierCandidates.push({label: `مورد معرف (ID ${r.supplierId})`, value: r.rawSupplierName, score: 0.9});
+      supplierCandidates.push({label: 'الاسم الخام', value: r.rawSupplierName, score: 0.5});
+
+      const bankCandidates = [];
+      if (r.bankId) bankCandidates.push({label: `بنك معرف (ID ${r.bankId})`, value: r.rawBankName, score: 0.9});
+      bankCandidates.push({label: 'الاسم الخام', value: r.rawBankName, score: 0.5});
+
+      supplierSuggestions.innerHTML = supplierCandidates.map((c, idx) => `
+        <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
+          <input type="radio" name="supplierCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
+          <div>
+            <div class="font-medium">${c.label}</div>
+            <div class="text-slate-600 text-xs">${c.value || '—'}</div>
+            <div class="text-xs text-slate-500">Score: ${c.score}</div>
+          </div>
+        </label>
+      `).join('');
+
+      bankSuggestions.innerHTML = bankCandidates.map((c, idx) => `
+        <label class="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 hover:bg-slate-50">
+          <input type="radio" name="bankCandidate" value="${idx}" ${idx===0 ? 'checked' : ''} />
+          <div>
+            <div class="font-medium">${c.label}</div>
+            <div class="text-slate-600 text-xs">${c.value || '—'}</div>
+            <div class="text-xs text-slate-500">Score: ${c.score}</div>
+          </div>
+        </label>
+      `).join('');
+
+      // ربط اختيار المرشح مع الحقول
+      supplierSuggestions.querySelectorAll('input[name="supplierCandidate"]').forEach((input, idx) => {
+        input.addEventListener('change', () => {
+          document.getElementById('fSupplier').value = supplierCandidates[idx].value || '';
+        });
+      });
+      bankSuggestions.querySelectorAll('input[name="bankCandidate"]').forEach((input, idx) => {
+        input.addEventListener('change', () => {
+          document.getElementById('fBank').value = bankCandidates[idx].value || '';
+        });
+      });
+    }
+
+    function renderConflicts(r) {
+      const conf = [];
+      if (!r.rawSupplierName) conf.push('⚠️ لا يوجد اسم مورد خام.');
+      if (!r.rawBankName) conf.push('⚠️ لا يوجد اسم بنك خام.');
+      if (!r.supplierId) conf.push('⚠️ لم يتم التعرف على مورد، يحتاج مراجعة.');
+      const el = document.getElementById('conflicts');
+      el.innerHTML = conf.length ? conf.map(c => `<div>${c}</div>`).join('') : '';
     }
 
     document.getElementById('saveDecision').addEventListener('click', saveDecision);
