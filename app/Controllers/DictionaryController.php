@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Repositories\BankRepository;
 use App\Repositories\SupplierRepository;
 use App\Support\Normalizer;
+use App\Repositories\SupplierAlternativeNameRepository;
 
 class DictionaryController
 {
@@ -14,6 +15,7 @@ class DictionaryController
     public function __construct(
         private SupplierRepository $suppliers = new SupplierRepository(),
         private BankRepository $banks = new BankRepository(),
+        private SupplierAlternativeNameRepository $altNames = new SupplierAlternativeNameRepository(),
     ) {
         $this->normalizer = new Normalizer();
     }
@@ -30,12 +32,18 @@ class DictionaryController
         header('Content-Type: application/json; charset=utf-8');
         $name = trim((string)($payload['official_name'] ?? ''));
         $display = trim((string)($payload['display_name'] ?? ''));
+        $normalized = $this->normalizer->normalizeName($name);
+        // منع التكرار
+        if ($this->suppliers->findByNormalizedName($normalized)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'مورد بنفس الاسم المطبع موجود مسبقاً']);
+            return;
+        }
         if ($name === '') {
             http_response_code(422);
             echo json_encode(['success' => false, 'message' => 'الاسم الرسمي مطلوب']);
             return;
         }
-        $normalized = $this->normalizer->normalizeName($name);
         $supplier = $this->suppliers->create([
             'official_name' => $name,
             'display_name' => $display ?: null,
@@ -83,12 +91,17 @@ class DictionaryController
         header('Content-Type: application/json; charset=utf-8');
         $name = trim((string)($payload['official_name'] ?? ''));
         $display = trim((string)($payload['display_name'] ?? ''));
+        $normalized = $this->normalizer->normalizeName($name);
+        if ($this->banks->findByNormalizedName($normalized)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'بنك بنفس الاسم المطبع موجود مسبقاً']);
+            return;
+        }
         if ($name === '') {
             http_response_code(422);
             echo json_encode(['success' => false, 'message' => 'الاسم الرسمي مطلوب']);
             return;
         }
-        $normalized = $this->normalizer->normalizeName($name);
         $bank = $this->banks->create([
             'official_name' => $name,
             'display_name' => $display ?: null,
@@ -121,6 +134,35 @@ class DictionaryController
     {
         header('Content-Type: application/json; charset=utf-8');
         $this->banks->delete($id);
+        echo json_encode(['success' => true]);
+    }
+
+    // الأسماء البديلة
+    public function listAlternativeNames(int $supplierId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $data = $this->altNames->listBySupplier($supplierId);
+        echo json_encode(['success' => true, 'data' => $data]);
+    }
+
+    public function createAlternativeName(int $supplierId, array $payload): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $raw = trim((string)($payload['raw_name'] ?? ''));
+        if ($raw === '') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'اسم بديل مطلوب']);
+            return;
+        }
+        $normalized = $this->normalizer->normalizeName($raw);
+        $created = $this->altNames->create($supplierId, $raw, $normalized, 'manual');
+        echo json_encode(['success' => true, 'data' => $created]);
+    }
+
+    public function deleteAlternativeName(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->altNames->delete($id);
         echo json_encode(['success' => true]);
     }
 }

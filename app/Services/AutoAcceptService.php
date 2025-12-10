@@ -5,10 +5,18 @@ namespace App\Services;
 
 use App\Repositories\ImportedRecordRepository;
 use App\Support\Config;
+use App\Support\Settings;
+use App\Repositories\LearningLogRepository;
+use App\Support\Normalizer;
 
 class AutoAcceptService
 {
-    public function __construct(private ImportedRecordRepository $records)
+    public function __construct(
+        private ImportedRecordRepository $records,
+        private Settings $settings = new Settings(),
+        private LearningLogRepository $learningLog = new LearningLogRepository(),
+        private Normalizer $normalizer = new Normalizer(),
+    )
     {
     }
 
@@ -26,15 +34,24 @@ class AutoAcceptService
 
         // اعتماد تلقائي فقط إذا المصدر رسمي أو بديل مؤكد (ليس fuzzy) وبفارق كافٍ
         $allowedSources = ['official', 'alternative'];
+        $autoTh = $this->settings->get('MATCH_AUTO_THRESHOLD', Config::MATCH_AUTO_THRESHOLD);
+        $confDelta = $this->settings->get('CONFLICT_DELTA', Config::CONFLICT_DELTA);
         if (
             in_array($best['source'] ?? '', $allowedSources, true) &&
-            ($best['score'] ?? 0) >= Config::MATCH_AUTO_THRESHOLD &&
-            $delta >= Config::CONFLICT_DELTA &&
+            ($best['score'] ?? 0) >= $autoTh &&
+            $delta >= $confDelta &&
             !empty($best['supplier_id'])
         ) {
             $this->records->updateDecision($recordId, [
                 'supplier_id' => $best['supplier_id'] ?? null,
                 'match_status' => 'ready',
+            ]);
+            // تسجيل في learning_log
+            $this->learningLog->create([
+                'raw_input' => $best['name'] ?? '',
+                'normalized_input' => $this->normalizer->normalizeName($best['name'] ?? ''),
+                'suggested_supplier_id' => $best['supplier_id'] ?? null,
+                'decision_result' => 'auto',
             ]);
         }
     }

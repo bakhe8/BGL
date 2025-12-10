@@ -42,6 +42,51 @@ class SupplierAlternativeNameRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+    * @return array<int, array{id:int, supplier_id:int, raw_name:string, normalized_raw_name:string}>
+    */
+    public function listBySupplier(int $supplierId): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id, supplier_id, raw_name, normalized_raw_name FROM supplier_alternative_names WHERE supplier_id = :sid');
+        $stmt->execute(['sid' => $supplierId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function create(int $supplierId, string $rawName, string $normalizedRawName, string $source = 'manual'): array
+    {
+        $pdo = Database::connection();
+        // منع التكرار
+        $existing = $this->findAllByNormalized($normalizedRawName);
+        foreach ($existing as $ex) {
+            if ((int)$ex['supplier_id'] === $supplierId) {
+                return $ex;
+            }
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO supplier_alternative_names (supplier_id, raw_name, normalized_raw_name, source) VALUES (:sid, :r, :n, :src)');
+        $stmt->execute([
+            'sid' => $supplierId,
+            'r' => $rawName,
+            'n' => $normalizedRawName,
+            'src' => $source,
+        ]);
+        $id = (int)$pdo->lastInsertId();
+        return [
+            'id' => $id,
+            'supplier_id' => $supplierId,
+            'raw_name' => $rawName,
+            'normalized_raw_name' => $normalizedRawName,
+        ];
+    }
+
+    public function delete(int $id): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('DELETE FROM supplier_alternative_names WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
     private function map(array $row): SupplierAlternativeName
     {
         return new SupplierAlternativeName(

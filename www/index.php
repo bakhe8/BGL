@@ -116,6 +116,22 @@ if ($method === 'DELETE' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri,
     exit;
 }
 
+if ($method === 'GET' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
+    $dictionaryController->listAlternativeNames((int)$m[1]);
+    exit;
+}
+
+if ($method === 'POST' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
+    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+    $dictionaryController->createAlternativeName((int)$m[1], $payload);
+    exit;
+}
+
+if ($method === 'DELETE' && preg_match('#^/api/dictionary/alternatives/(\\d+)$#', $uri, $m)) {
+    $dictionaryController->deleteAlternativeName((int)$m[1]);
+    exit;
+}
+
 if ($method === 'GET' && $uri === '/api/settings') {
     header('Content-Type: application/json; charset=utf-8');
     $settings = (new \App\Support\Settings())->all();

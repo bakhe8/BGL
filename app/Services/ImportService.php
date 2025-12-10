@@ -32,6 +32,7 @@ class ImportService
         $this->candidateService ??= new CandidateService(
             new \App\Repositories\SupplierRepository(),
             new \App\Repositories\SupplierAlternativeNameRepository(),
+            new \App\Repositories\BankRepository(),
         );
         $this->autoAcceptService ??= new AutoAcceptService($this->records);
     }

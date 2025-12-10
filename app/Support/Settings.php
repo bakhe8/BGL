@@ -36,4 +36,10 @@ class Settings
         file_put_contents($this->path, json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         return $merged;
     }
+
+    public function get(string $key, mixed $default = null): mixed
+    {
+        $all = $this->all();
+        return $all[$key] ?? $default;
+    }
 }

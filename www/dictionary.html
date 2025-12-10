@@ -210,6 +210,62 @@
       loadBanks();
     };
 
+    // الأسماء البديلة
+    const altDiv = document.createElement('div');
+    altDiv.className = 'bg-white p-6 rounded-xl shadow-sm border border-slate-200';
+    altDiv.innerHTML = `
+      <h1 class="text-xl font-semibold mb-4">الأسماء البديلة</h1>
+      <div class="flex gap-3 mb-3 text-sm">
+        <input type="number" id="altSupplierId" placeholder="Supplier ID" class="border border-slate-300 rounded-md px-3 py-2 w-32">
+        <input type="text" id="altRaw" placeholder="اسم بديل" class="border border-slate-300 rounded-md px-3 py-2 flex-1">
+        <button id="altAdd" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">إضافة</button>
+      </div>
+      <div id="altMsg" class="text-sm text-slate-600 mb-3"></div>
+      <div id="altList" class="overflow-x-auto text-sm"></div>
+    `;
+    document.querySelector('main').appendChild(altDiv);
+
+    async function loadAlternatives() {
+      const sid = document.getElementById('altSupplierId').value;
+      if (!sid) { document.getElementById('altList').innerHTML = '<div class="text-slate-500">أدخل Supplier ID للعرض</div>'; return; }
+      const res = await fetch(`/api/dictionary/suppliers/${sid}/alternatives`);
+      const json = await res.json();
+      if (!json.success) { document.getElementById('altList').innerHTML = 'تعذر التحميل'; return; }
+      const rows = json.data || [];
+      document.getElementById('altList').innerHTML = rows.length ? `
+        <table class="min-w-full text-sm divide-y divide-slate-200">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr><th class="px-3 py-2 text-right">#</th><th class="px-3 py-2 text-right">الاسم الخام</th><th class="px-3 py-2 text-right">normalized</th><th class="px-3 py-2 text-right">إجراءات</th></tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            ${rows.map(r => `<tr><td class="px-3 py-2">${r.id}</td><td class="px-3 py-2">${r.raw_name}</td><td class="px-3 py-2 text-slate-500">${r.normalized_raw_name}</td><td class="px-3 py-2"><button class="text-xs text-red-600" onclick="deleteAlt(${r.id})">حذف</button></td></tr>`).join('')}
+          </tbody>
+        </table>
+      ` : '<div class="text-slate-500">لا توجد أسماء بديلة.</div>';
+    }
+
+    document.getElementById('altAdd').addEventListener('click', async () => {
+      const sid = document.getElementById('altSupplierId').value;
+      const raw = document.getElementById('altRaw').value;
+      const msg = document.getElementById('altMsg');
+      if (!sid || !raw) { msg.textContent = 'Supplier ID والاسم البديل مطلوبان'; msg.className='text-sm text-red-600'; return; }
+      const res = await fetch(`/api/dictionary/suppliers/${sid}/alternatives`, {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({raw_name: raw})
+      });
+      const json = await res.json();
+      if (!json.success) { msg.textContent = json.message || 'تعذر الإضافة'; msg.className='text-sm text-red-600'; return; }
+      msg.textContent = 'تمت الإضافة'; msg.className='text-sm text-green-700';
+      document.getElementById('altRaw').value = '';
+      loadAlternatives();
+    });
+
+    window.deleteAlt = async (id) => {
+      await fetch(`/api/dictionary/alternatives/${id}`, { method: 'DELETE' });
+      loadAlternatives();
+    };
+
+    document.getElementById('altSupplierId').addEventListener('change', loadAlternatives);
+
     loadSuppliers();
     loadBanks();
   </script>
