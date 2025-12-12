@@ -70,4 +70,51 @@ class AutoAcceptService
             ]);
         }
     }
+
+    /**
+     * اعتماد تلقائي للبنك عند وجود مرشح واحد قوي وغياب تعارضات.
+     *
+     * @param array<int, array{bank_id:int,name:string,source:string,score:float,score_raw:float}> $bankCandidates
+     */
+    public function tryAutoAcceptBank(ImportedRecord $record, array $bankCandidates, array $conflicts = []): void
+    {
+        if (empty($bankCandidates)) {
+            return;
+        }
+        $best = $bankCandidates[0];
+        $second = $bankCandidates[1] ?? null;
+        $delta = $second ? (($best['score'] ?? 0) - ($second['score'] ?? 0)) : 1;
+
+        if (!empty($conflicts)) {
+            return;
+        }
+
+        $allowedSources = ['official', 'override', 'alternative'];
+        $autoTh = $this->settings->get('MATCH_AUTO_THRESHOLD', Config::MATCH_AUTO_THRESHOLD);
+        $confDelta = $this->settings->get('CONFLICT_DELTA', Config::CONFLICT_DELTA);
+        if (
+            in_array($best['source'] ?? '', $allowedSources, true) &&
+            ($best['score'] ?? 0) >= $autoTh &&
+            $delta >= $confDelta &&
+            !empty($best['bank_id'])
+        ) {
+            $this->records->updateDecision($record->id ?? 0, [
+                'bank_id' => $best['bank_id'] ?? null,
+                'match_status' => 'ready',
+            ]);
+            $this->learningLog->createBank([
+                'raw_input' => $record->rawBankName,
+                'normalized_input' => $this->normalizer->normalizeName($record->rawBankName),
+                'suggested_bank_id' => $best['bank_id'] ?? null,
+                'decision_result' => 'auto',
+                'candidate_source' => $best['source'] ?? '',
+                'score' => $best['score'] ?? null,
+                'score_raw' => $best['score_raw'] ?? null,
+            ]);
+            $this->records->updateDecision($record->id ?? 0, [
+                'decision_result' => 'auto',
+                'match_status' => 'ready',
+            ]);
+        }
+    }
 }

@@ -7,7 +7,6 @@ use App\Support\Settings;
 use App\Repositories\SupplierRepository;
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\BankRepository;
-use App\Repositories\BankAlternativeNameRepository;
 use App\Support\Normalizer;
 
 class SettingsController
@@ -17,7 +16,6 @@ class SettingsController
         private SupplierRepository $suppliers = new SupplierRepository(),
         private SupplierAlternativeNameRepository $supplierAlts = new SupplierAlternativeNameRepository(),
         private BankRepository $banks = new BankRepository(),
-        private BankAlternativeNameRepository $bankAlts = new BankAlternativeNameRepository(),
         private Normalizer $normalizer = new Normalizer(),
     ) {
     }
@@ -81,7 +79,6 @@ class SettingsController
             'suppliers' => $this->suppliers->allNormalized(),
             'supplier_alternatives' => $this->supplierAlts->allNormalized(),
             'banks' => $this->banks->allNormalized(),
-            'bank_alternatives' => $this->bankAlts->allNormalized(),
         ];
         file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         echo json_encode(['success' => true, 'path' => $path]);
@@ -96,7 +93,7 @@ class SettingsController
             echo json_encode(['success' => false, 'message' => 'تنسيق غير صالح للمعجم']);
             return;
         }
-        $stats = ['suppliers' => 0, 'banks' => 0, 'supplier_alternatives' => 0, 'bank_alternatives' => 0];
+        $stats = ['suppliers' => 0, 'banks' => 0, 'supplier_alternatives' => 0];
 
         // Suppliers
         foreach ($dictionary['suppliers'] ?? [] as $sup) {
@@ -123,14 +120,15 @@ class SettingsController
             if ($name === '') {
                 continue;
             }
-            $norm = $this->normalizer->normalizeName($name);
+            $norm = $this->normalizer->normalizeBankName($name);
             if ($this->banks->findByNormalizedName($norm)) {
                 continue;
             }
             $this->banks->create([
                 'official_name' => $name,
-                'display_name' => $bank['display_name'] ?? null,
-                'normalized_name' => $norm,
+                'official_name_en' => $bank['official_name_en'] ?? null,
+                'normalized_key' => $bank['normalized_key'] ?? $norm,
+                'short_code' => $bank['short_code'] ?? null,
                 'is_confirmed' => 1,
             ]);
             $stats['banks']++;
@@ -149,21 +147,6 @@ class SettingsController
             $norm = $this->normalizer->normalizeName($raw);
             $this->supplierAlts->create($sid, $raw, $norm, $alt['source'] ?? 'import');
             $stats['supplier_alternatives']++;
-        }
-
-        // Bank alternatives
-        foreach ($dictionary['bank_alternatives'] ?? [] as $alt) {
-            $bid = (int)($alt['bank_id'] ?? 0);
-            if ($bid <= 0) {
-                continue;
-            }
-            $raw = trim((string)($alt['raw_name'] ?? ''));
-            if ($raw === '') {
-                continue;
-            }
-            $norm = $this->normalizer->normalizeName($raw);
-            $this->bankAlts->create($bid, $raw, $norm, $alt['source'] ?? 'import');
-            $stats['bank_alternatives']++;
         }
 
         echo json_encode(['success' => true, 'stats' => $stats]);

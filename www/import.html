@@ -6,59 +6,86 @@
   <title>استيراد الضمانات</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body>
+<body class="app-shell">
   <header class="app-header">
-    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="font-semibold text-lg">استيراد الضمانات</div>
-      <nav class="nav">
-        <a href="/import" class="active">Import</a>
-        <a href="/records">Records</a>
-        <a href="/review">Review Panel</a>
-        <a href="/dictionary">Dictionary</a>
-        <a href="/settings">Settings</a>
+    <div class="app-header-inner">
+      <div>
+        <span class="app-logo">BL</span>
+        <span class="app-title">نظام إدارة خطابات الضمان</span>
+      </div>
+      <nav class="app-nav">
+        <a href="/records" class="app-nav-link">السجلات</a>
+        <a href="/settings" class="app-nav-link">الإعدادات</a>
       </nav>
     </div>
   </header>
 
-  <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
-    <section class="card">
-      <h1 class="card-title">رفع ملف Excel</h1>
-      <p class="muted text-sm" id="instructions">الملفات المدعومة: XLSX فقط. سيتم اكتشاف الأعمدة تلقائيًا (Supplier, Bank, Amount, Dates...)</p>
-      <form id="uploadForm" class="space-y-4">
-        <div>
-          <label class="label">اختر الملف</label>
-          <input type="file" id="fileInput" accept=".xlsx" class="input" />
+  <main class="app-main">
+    <div class="app-container">
+      <section class="page-header">
+        <div class="page-header-main">
+          <h1 class="page-title">استيراد ملف Excel جديد</h1>
+          <p class="page-subtitle">الملفات المدعومة: XLSX فقط. سيتم اكتشاف الأعمدة تلقائيًا (المورد، البنك، المبلغ، التواريخ).</p>
         </div>
-        <div class="flex gap-3 items-center">
-          <button type="submit" class="btn btn-primary">رفع ومعالجة</button>
-          <span id="uploadMsg" class="text-sm muted"></span>
+        <div class="page-actions">
+          <a href="/records" class="btn btn-secondary">العودة للسجلات</a>
         </div>
-      </form>
-      <div id="detectedCols" class="alert alert-warn" style="display:none;"></div>
-      <div id="uploadError" class="alert alert-error" style="display:none;"></div>
-    </section>
+      </section>
 
-    <section class="card">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="section-title">آخر جلسات الاستيراد (عرض سريع)</h2>
-        <div class="tag">أحدث 10 سجلات</div>
-      </div>
-      <div class="table-wrap">
-        <table class="table" id="sessionsTable">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>المورد</th>
-              <th>البنك</th>
-              <th>الحالة</th>
-            </tr>
-          </thead>
-          <tbody id="sessionsBody">
-            <tr><td colspan="4" class="muted">لا يوجد بيانات.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="card-title">رفع الملف</p>
+            <p class="card-subtitle">اختر ملف XLSX، ثم ابدأ المعالجة.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <form id="uploadForm" class="form-grid" style="grid-template-columns: 1fr;">
+            <div class="form-group">
+              <label class="form-label">اختر الملف</label>
+              <input type="file" id="fileInput" accept=".xlsx" class="form-control" />
+              <div class="form-help">الحجم المقترح: حتى 10MB</div>
+            </div>
+            <div class="flex items-center gap-sm">
+              <button type="submit" class="btn btn-primary">رفع ومعالجة</button>
+              <span id="uploadMsg" class="muted"></span>
+            </div>
+          </form>
+          <div id="detectedCols" class="alert alert-warning" style="display:none;"></div>
+          <div id="uploadError" class="alert alert-danger" style="display:none;"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="card-title">آخر جلسات الاستيراد</p>
+            <p class="card-subtitle">أحدث 10 سجلات</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="data-table" id="sessionsTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>المورد</th>
+                  <th>البنك</th>
+                  <th>المبلغ</th>
+                  <th>رقم الضمان</th>
+                  <th>تاريخ الإصدار</th>
+                  <th>تاريخ الانتهاء</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody id="sessionsBody">
+                <tr><td colspan="8" class="muted">لا يوجد بيانات.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <script>
@@ -116,7 +143,7 @@
       }
       const rows = (json.data || []).slice(0, 10);
       if (!rows.length) {
-        sessionsBody.innerHTML = '<tr><td colspan="4" class="muted">لا يوجد بيانات.</td></tr>';
+        sessionsBody.innerHTML = '<tr><td colspan="8" class="muted">لا يوجد بيانات.</td></tr>';
         return;
       }
       sessionsBody.innerHTML = rows.map(r => `
@@ -124,6 +151,10 @@
           <td>${r.id ?? ''}</td>
           <td>${r.rawSupplierName ?? ''}</td>
           <td>${r.rawBankName ?? ''}</td>
+          <td>${r.amount ?? ''}</td>
+          <td>${r.guaranteeNumber ?? ''}</td>
+          <td>${r.issueDate ?? ''}</td>
+          <td>${r.expiryDate ?? ''}</td>
           <td><span class="status-badge ${r.matchStatus === 'ready' ? 'status-ready' : 'status-review'}">${r.matchStatus || 'needs_review'}</span></td>
         </tr>
       `).join('');

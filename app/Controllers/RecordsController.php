@@ -7,33 +7,99 @@ use App\Repositories\ImportedRecordRepository;
 use App\Services\CandidateService;
 use App\Services\ConflictDetector;
 use App\Support\Normalizer;
+use App\Repositories\BankRepository;
+use App\Repositories\SupplierAlternativeNameRepository;
+use App\Repositories\LearningLogRepository;
+use App\Repositories\BankLearningRepository;
+use App\Repositories\SupplierRepository;
+use App\Repositories\SupplierOverrideRepository;
+use App\Repositories\SupplierLearningRepository;
+use App\Support\Settings;
 
 class RecordsController
 {
     private $candidates;
     private $conflicts;
     private $records;
+    private $banks;
+    private $supplierAlts;
+    private $normalizer;
+    private $learningLog;
+    private $bankLearning;
+    private $supplierLearning;
 
-    public function __construct(ImportedRecordRepository $records, CandidateService $candidates = null, ConflictDetector $conflicts = null)
+    public function __construct(ImportedRecordRepository $records, CandidateService $candidates = null, ConflictDetector $conflicts = null, BankRepository $banks = null, SupplierAlternativeNameRepository $supplierAlts = null, Normalizer $normalizer = null, LearningLogRepository $learningLog = null)
     {
         $this->records = $records;
         $this->candidates = $candidates ?: new CandidateService(
-            new \App\Repositories\SupplierRepository(),
-            new \App\Repositories\SupplierAlternativeNameRepository(),
+            new SupplierRepository(),
+            new SupplierAlternativeNameRepository(),
             new Normalizer(),
-            new \App\Repositories\BankRepository(),
-            new \App\Repositories\BankAlternativeNameRepository(),
-            new \App\Repositories\SupplierOverrideRepository(),
-            new \App\Support\Settings()
+            new BankRepository(),
+            new SupplierOverrideRepository(),
+            new Settings()
         );
         $this->conflicts = $conflicts ?: new ConflictDetector();
+        $this->banks = $banks ?: new BankRepository();
+        $this->supplierAlts = $supplierAlts ?: new SupplierAlternativeNameRepository();
+        $this->normalizer = $normalizer ?: new Normalizer();
+        $this->learningLog = $learningLog ?: new LearningLogRepository();
+        $this->bankLearning = new BankLearningRepository();
+        $this->supplierLearning = new SupplierLearningRepository();
     }
 
     public function index(): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $data = $this->records->all();
-        echo json_encode(array('success' => true, 'data' => $data));
+        $sessionId = isset($_GET['session_id']) ? (int)$_GET['session_id'] : null;
+        $data = $sessionId ? $this->records->allBySession($sessionId) : $this->records->all();
+        $bankMap = [];
+        $bankNormMap = [];
+        $supplierMap = [];
+        foreach ((new SupplierRepository())->allNormalized() as $s) {
+            $supplierMap[$s['id']] = [
+                'official_name' => $s['official_name'] ?? null,
+                'normalized_name' => $s['normalized_name'] ?? null,
+            ];
+        }
+        foreach ($this->banks->allNormalized() as $b) {
+            $bankMap[$b['id']] = [
+                'official_name_ar' => $b['official_name'] ?? null,
+                'official_name_en' => $b['official_name_en'] ?? null,
+                'normalized_key' => $b['normalized_key'] ?? null,
+            ];
+            if (!empty($b['normalized_key'])) {
+                $disp = $b['official_name'] ?? null;
+                if ($disp && !isset($bankNormMap[$b['normalized_key']])) {
+                    $bankNormMap[$b['normalized_key']] = $disp;
+                }
+            }
+        }
+        $enriched = array_map(function ($r) use ($bankMap, $bankNormMap, $supplierMap) {
+            $arr = get_object_vars($r);
+            $b = isset($arr['bankId'], $bankMap[$arr['bankId']]) ? $bankMap[$arr['bankId']] : null;
+            // إذا كان السجل يحمل bankDisplay مجمد من وقت الاستيراد نعرضه أولاً
+            $arr['bankDisplay'] = $arr['bankDisplay'] ?? null;
+            if (!$arr['bankDisplay']) {
+                $arr['bankDisplay'] = $b['official_name_ar'] ?? null;
+            }
+            if (!$arr['bankDisplay']) {
+                $nk = $arr['normalizedBank'] ?? '';
+                if ($nk && isset($bankNormMap[$nk])) {
+                    $arr['bankDisplay'] = $bankNormMap[$nk];
+                }
+            }
+            // supplier display freeze
+            $arr['supplierDisplay'] = $arr['supplierDisplayName'] ?? null;
+            if (!$arr['supplierDisplay'] && isset($arr['supplierId'], $supplierMap[$arr['supplierId']])) {
+                $arr['supplierDisplay'] = $supplierMap[$arr['supplierId']]['official_name'];
+            }
+            if (!$arr['supplierDisplay']) {
+                $arr['supplierDisplay'] = $arr['rawSupplierName'] ?? null;
+            }
+            return $arr;
+        }, $data);
+        echo json_encode(array('success' => true, 'data' => $enriched));
     }
 
     public function saveDecision(int $id, array $payload): void
@@ -58,7 +124,27 @@ class RecordsController
             'match_status' => $status,
         );
 
-        // مدخلات اختيارية للتحديث اليدوي
+        // قرارات المورد/البنك المختارة (IDs)
+        $hasSupplierDecision = isset($payload['supplier_id']) && $payload['supplier_id'];
+        $hasSupplierBlocked = isset($payload['supplier_blocked_id']) && $payload['supplier_blocked_id'];
+        if (!$hasSupplierDecision && !$hasSupplierBlocked) {
+            http_response_code(422);
+            echo json_encode(array('success' => false, 'message' => 'يجب اختيار مورد أو رفض مرشح قبل الحفظ'));
+            return;
+        }
+        if (isset($payload['supplier_id'])) {
+            $update['supplier_id'] = $payload['supplier_id'] ?: null;
+        }
+        if (isset($payload['bank_id'])) {
+            $update['bank_id'] = $payload['bank_id'] ?: null;
+        }
+
+        // إذا توفر كلا المعرّفين نحول الحالة إلى ready تلقائياً
+        if (!empty($update['supplier_id']) && !empty($update['bank_id'])) {
+            $update['match_status'] = 'ready';
+        }
+
+        // مدخلات اختيارية للتحديث اليدوي (مقروءة فقط غالباً)
         $fields = array(
             'raw_supplier_name' => 255,
             'raw_bank_name' => 255,
@@ -82,19 +168,36 @@ class RecordsController
             $update['amount'] = $cleanAmount === '' ? null : $cleanAmount;
         }
 
-        foreach (array('issue_date', 'expiry_date') as $dateField) {
-            if (isset($payload[$dateField])) {
-                $val = trim((string)$payload[$dateField]);
-                if ($val !== '' && strtotime($val) === false) {
-                    http_response_code(422);
-                    echo json_encode(array('success' => false, 'message' => "{$dateField} ليس تاريخاً صالحاً"));
-                    return;
-                }
-                $update[$dateField] = $val === '' ? null : date('Y-m-d', strtotime($val));
+        $this->records->updateDecision($id, $update);
+        if (!empty($update['supplier_id']) && !empty($update['raw_supplier_name'])) {
+            $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
+            // تجميد اسم المورد المعتمد
+            $supplierName = (new SupplierRepository())->find((int)$update['supplier_id'])?->officialName;
+            if ($supplierName) {
+                $this->records->updateDecision($id, ['supplier_display_name' => $supplierName]);
+            }
+            // تسجيل التعلم alias
+            $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_alias', (int)$update['supplier_id'], 'review');
+        } elseif (!empty($payload['supplier_blocked_id']) && !empty($update['raw_supplier_name'])) {
+            // المستخدم رفض مورد مقترح → نسجل blocked مرتبط بمورد محدد
+            $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
+            $blockedId = (int)$payload['supplier_blocked_id'];
+            $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_blocked', $blockedId, 'review');
+        }
+        // تعلم بنكي: إذا تم اختيار بنك، سجّل alias في جدول التعلم الجديد (آخر قرار فقط)
+        if (!empty($update['bank_id']) && !empty($update['raw_bank_name'])) {
+            $normBank = $this->normalizer->normalizeBankName($update['raw_bank_name']);
+            if ($normBank !== '') {
+                $this->bankLearning->upsert($normBank, $update['raw_bank_name'], 'alias', (int)$update['bank_id']);
+            }
+        } elseif (empty($update['bank_id']) && !empty($update['raw_bank_name'])) {
+            // المستخدم رفض التطابق، نسجل blocked عام لهذا الاسم (بدون بنك محدد)
+            $normBank = $this->normalizer->normalizeBankName($update['raw_bank_name']);
+            if ($normBank !== '') {
+                $this->bankLearning->upsert($normBank, $update['raw_bank_name'], 'blocked', null);
             }
         }
 
-        $this->records->updateDecision($id, $update);
         $updated = $this->records->find($id);
 
         echo json_encode(array('success' => true, 'data' => $updated));
@@ -110,13 +213,14 @@ class RecordsController
             return;
         }
 
-        $supplierCandidates = $this->candidates->supplierCandidates($record->rawSupplierName);
+        $rawSupplier = isset($_GET['raw_supplier_name']) ? (string)$_GET['raw_supplier_name'] : $record->rawSupplierName;
+        $supplierCandidates = $this->candidates->supplierCandidates($rawSupplier);
         $bankCandidates = $this->candidates->bankCandidates($record->rawBankName);
 
         $conflicts = $this->conflicts->detect(
             array('supplier' => $supplierCandidates, 'bank' => $bankCandidates),
             array(
-                'raw_supplier_name' => $record->rawSupplierName,
+                'raw_supplier_name' => $rawSupplier,
                 'raw_bank_name' => $record->rawBankName,
             )
         );

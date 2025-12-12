@@ -5,88 +5,269 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>السجلات</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    /* Tags لمرشحي المورد */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border); background: var(--color-surface); cursor: pointer; transition: background-color var(--transition-fast); }
+    .tag:hover { background: var(--color-primary-soft); }
+    .tag .badge { font-size: 11px; }
+    .tag .reject-btn { border: none; background: transparent; color: var(--color-danger); cursor: pointer; font-size: 14px; }
+    .tag-selected { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary-soft); }
+    .tag-strong { background: #e0f2fe; }
+    .tag-weak { background: #fef3c7; }
+    .tag-alt { background: #e5e7eb; }
+    .tag-exact { background: #d1fae5; }
+    .tag-empty { padding: 8px 10px; border-radius: var(--radius-lg); background: #fef9c3; border: 1px dashed var(--color-border); }
+    .tag-new { background: #d1fae5; border-color: #22c55e; color: #065f46; }
+  </style>
 </head>
-<body>
+<body class="app-shell">
   <header class="app-header">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="font-semibold text-lg">إدارة السجلات</div>
-      <nav class="nav">
-        <a href="/import">Import</a>
-        <a href="/records" class="active">Records</a>
-        <a href="/review">Review Panel</a>
-        <a href="/dictionary">Dictionary</a>
-        <a href="/settings">Settings</a>
+    <div class="app-header-inner">
+      <div>
+        <span class="app-logo">BL</span>
+        <span class="app-title">نظام إدارة خطابات الضمان</span>
+      </div>
+      <nav class="app-nav">
+        <a href="/records" class="app-nav-link is-active">السجلات</a>
+        <a href="/settings" class="app-nav-link">الإعدادات</a>
       </nav>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-6 py-8 space-y-6">
-    <section class="card">
-      <div class="flex items-center gap-3 flex-wrap">
-        <div class="flex items-center gap-2">
-          <span class="label">تصفية الحالة</span>
-          <select id="statusFilter" class="input" style="width:160px;">
-            <option value="all">الكل</option>
-            <option value="needs_review">Needs Review</option>
-            <option value="ready">Ready</option>
-          </select>
+  <main class="app-main">
+    <div class="app-container">
+      <section class="page-header">
+        <div class="page-header-main">
+          <h1 class="page-title">السجلات</h1>
+          <p class="page-subtitle">عرض الحالة والحقول الأساسية لكل الضمانات المستوردة.</p>
         </div>
-        <div class="flex gap-2">
-          <button id="refresh" class="btn btn-primary">تحديث</button>
-          <button class="btn btn-ghost" disabled>فرز متقدم (لاحقًا)</button>
+        <div class="page-actions">
+          <button class="btn btn-primary" id="btnToggleImport">استيراد ملف</button>
         </div>
-        <div id="meta" class="muted text-sm"></div>
-      </div>
-    </section>
+      </section>
 
-    <section class="card">
-      <div class="flex items-center justify-between mb-3">
-        <h1 class="card-title">جميع السجلات</h1>
-      </div>
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th data-key="id">#</th>
-              <th data-key="rawSupplierName">supplier_raw</th>
-              <th data-key="rawBankName">bank_raw</th>
-              <th data-key="amount">amount_raw</th>
-              <th data-key="guaranteeNumber">رقم الضمان</th>
-              <th data-key="issueDate">تاريخ الإصدار</th>
-              <th data-key="expiryDate">expiry_raw</th>
-              <th data-key="matchStatus">الحالة</th>
-              <th data-key="sessionId">import_session_id</th>
-              <th data-key="createdAt">created_at</th>
-              <th>إجراءات</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <tr><td colspan="11" class="muted">لا يوجد سجلات بعد.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+      <section class="card" id="importCard" style="display:none;">
+        <div class="card-header">
+          <div>
+            <p class="card-title">استيراد ملف Excel</p>
+            <p class="card-subtitle">الملفات المدعومة: XLSX. اكتشاف الأعمدة تلقائيًا.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <form id="uploadForm" class="form-grid" style="grid-template-columns: 1fr;">
+            <div class="form-group">
+              <label class="form-label">اختر الملف</label>
+              <input type="file" id="fileInput" accept=".xlsx" class="form-control" />
+              <div class="form-help">الحجم المقترح: حتى 10MB</div>
+            </div>
+            <div class="flex items-center gap-sm">
+              <button type="submit" class="btn btn-primary">رفع ومعالجة</button>
+              <span id="uploadMsg" class="muted"></span>
+            </div>
+          </form>
+          <div id="uploadError" class="alert alert-danger" style="display:none;"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="card-title">تصفية وفرز</p>
+            <p class="card-subtitle">اختر الحالة وشاهد الإحصاءات.</p>
+          </div>
+            <div class="card-actions">
+              <div class="form-group" style="min-width:160px;">
+                <label class="form-label">تصفية الحالة</label>
+                <select id="statusFilter" class="select">
+                  <option value="all">الكل</option>
+                  <option value="needs_review">يحتاج مراجعة</option>
+                  <option value="ready">جاهز</option>
+                </select>
+              </div>
+              <div class="form-group" style="min-width:160px;">
+                <label class="form-label">رقم جلسة الاستيراد</label>
+                <input id="sessionFilter" class="input" type="number" min="1" placeholder="مثال: 115">
+              </div>
+              <button id="refresh" class="btn btn-primary">تحديث</button>
+              <button class="btn btn-subtle" disabled>فرز متقدم (لاحقًا)</button>
+            </div>
+          </div>
+        <div class="card-body" id="meta" class="muted"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="card-title">جميع السجلات</p>
+            <p class="card-subtitle">عرض الحالة، الأسماء، والتواريخ الأساسية</p>
+          </div>
+        </div>
+        <div class="table-wrap" style="overflow: visible; max-height: none;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-key="id">#</th>
+                <th data-key="rawSupplierName">المورد</th>
+                <th data-key="rawBankName">البنك</th>
+                <th data-key="amount">المبلغ</th>
+                <th data-key="guaranteeNumber">رقم الضمان</th>
+                <th data-key="contractNumber">رقم العقد/أمر الشراء</th>
+                <th data-key="expiryDate">تاريخ الانتهاء</th>
+                <th data-key="matchStatus">الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr><td colspan="7" class="muted">لا يوجد سجلات بعد.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
   </main>
+
+  <!-- Overlay إدارة القاموس من داخل السجلات -->
+  <div id="dictOverlay" class="overlay-backdrop" style="display:none;">
+    <div class="overlay-card">
+      <div class="overlay-header">
+        <h3 id="dictTitle" class="card-title">إدارة القاموس</h3>
+        <button id="dictClose" class="btn btn-ghost btn-sm">إغلاق</button>
+      </div>
+      <form id="dictForm" class="form-grid" style="grid-template-columns: repeat(2, minmax(0,1fr));">
+        <div class="form-group" id="grpNameAr">
+          <label class="form-label">الاسم العربي الرسمي</label>
+          <input class="input" id="dictNameAr" required>
+        </div>
+        <div class="form-group" id="grpNameEn">
+          <label class="form-label">الاسم الإنجليزي الرسمي</label>
+          <input class="input" id="dictNameEn">
+        </div>
+        <div class="form-group" id="grpNorm">
+          <label class="form-label">normalized_key</label>
+          <input class="input" id="dictNorm">
+        </div>
+        <div class="form-group" id="grpShort">
+          <label class="form-label">short_code</label>
+          <input class="input" id="dictShort">
+        </div>
+        <div class="form-group" id="grpDisplay" style="grid-column: span 2; display:none;">
+          <label class="form-label">اسم عرض (اختياري)</label>
+          <input class="input" id="dictDisplay">
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <button type="submit" class="btn btn-primary" id="dictSaveBtn">حفظ</button>
+          <span id="dictMsg" class="muted" style="margin-right: var(--space-sm);"></span>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script>
     const tableBody = document.getElementById('tableBody');
     const statusFilter = document.getElementById('statusFilter');
     const refreshBtn = document.getElementById('refresh');
     const meta = document.getElementById('meta');
+    const btnToggleImport = document.getElementById('btnToggleImport');
+    const importCard = document.getElementById('importCard');
+    const uploadForm = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const uploadMsg = document.getElementById('uploadMsg');
+    const uploadError = document.getElementById('uploadError');
+    const btnRecalcAll = null; // recalc متوقف حالياً
+    // Overlay dictionary
+    const overlay = document.getElementById('dictOverlay');
+    const overlayForm = document.getElementById('dictForm');
+    const overlayTitle = document.getElementById('dictTitle');
+    const overlayClose = document.getElementById('dictClose');
+    const overlayMsg = document.getElementById('dictMsg');
+    const inpNameAr = document.getElementById('dictNameAr');
+    const inpNameEn = document.getElementById('dictNameEn');
+    const inpNorm = document.getElementById('dictNorm');
+    const inpShort = document.getElementById('dictShort');
+    const inpDisplay = document.getElementById('dictDisplay');
+    const grpDisplay = document.getElementById('grpDisplay');
+    let overlayMode = null; // bank_create, bank_edit, supplier_create, supplier_edit
+    let overlayId = null;
+    let supplierCache = [];
+    let supplierCandidates = [];
+    let supplierInputRaw = '';
+    let supplierInputDebounce = null;
+
     let records = [];
     let sortKey = 'id';
     let sortDir = 'desc';
+    let selectedRecord = null;
+    let panelRowId = 'inline-panel-row';
+    let supplierSuggestions, bankSuggestions, conflictsBox, decisionMsg, panelMeta, bankDisplayBox, btnRejectSupplier, supplierInput;
+    let selectedSupplierName = null;
+    let selectedSupplierId = null;
+    let selectedSupplierBlockedId = null;
+    let selectedBankName = null;
+    let selectedBankId = null;
+    let autoSaved = false;
+
+    let bankMap = {}; // id => {official_name, official_name_en, normalized_key, short_code}
+    let bankNormMap = {}; // normalized_key => best display
+    let createSupplierBtn = null;
+
+    const escapeHtml = (str = '') => String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    function formatEntity(raw, normalized, id, typeLabel, displayOverride = '') {
+      const hasId = !!id;
+      const fromCache = typeLabel === 'bank' && id && bankMap[id]
+        ? (bankMap[id].official_name || '')
+        : '';
+      const normHit = typeLabel === 'bank' && normalized && bankNormMap[normalized]
+        ? bankNormMap[normalized]
+        : '';
+      const preferred = displayOverride || fromCache || normHit;
+      const display = preferred || normalized || raw || '—';
+      const title = raw ? `title="القيمة الأصلية: ${escapeHtml(raw)}"` : '';
+      return `<span ${title}>${escapeHtml(display)}</span>`;
+    }
 
     async function loadRecords() {
-      tableBody.innerHTML = '<tr><td colspan="11" class="muted">جارٍ التحميل...</td></tr>';
-      const res = await fetch('/api/records');
+      tableBody.innerHTML = '<tr><td colspan="8" class="muted">جارٍ التحميل...</td></tr>';
+      const params = new URLSearchParams();
+      const sid = sessionFilter.value ? sessionFilter.value.trim() : '';
+      if (sid) params.set('session_id', sid);
+      const url = params.toString() ? `/api/records?${params.toString()}` : '/api/records';
+      const res = await fetch(url);
       const json = await res.json();
       if (!json.success) {
-        tableBody.innerHTML = '<tr><td colspan="11" class="muted">تعذر تحميل السجلات</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" class="muted">تعذر تحميل السجلات</td></tr>';
         return;
       }
       records = json.data || [];
+      await ensureBanksCache();
       render();
+    }
+
+    async function ensureBanksCache(force = false) {
+      if (!force && Object.keys(bankMap).length) return;
+      try {
+        const res = await fetch('/api/dictionary/banks');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          bankMap = {};
+          bankNormMap = {};
+          json.data.forEach(b => {
+            bankMap[b.id] = b;
+            if (b.normalized_key) {
+              const disp = b.official_name || '';
+              if (disp && !bankNormMap[b.normalized_key]) {
+                bankNormMap[b.normalized_key] = disp;
+              }
+            }
+          });
+        }
+      } catch (_) { /* ignore cache errors */ }
     }
 
     function applyFilter(data) {
@@ -114,24 +295,22 @@
     function render() {
       const filtered = applyFilter(records);
       const data = sortData(filtered);
-      meta.textContent = `الإجمالي: ${records.length} | المعروض: ${data.length}`;
+      const skipped = (window.totalRowsProcessed ?? records.length) - records.length; // fallback بسيط
+      meta.textContent = `الإجمالي: ${records.length} | المعروض: ${data.length} | المتخطى: ${skipped >= 0 ? skipped : 0}`;
       if (!data.length) {
-        tableBody.innerHTML = '<tr><td colspan="11" class="muted">لا يوجد سجلات.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" class="muted">لا يوجد سجلات.</td></tr>';
         return;
       }
       tableBody.innerHTML = data.map(r => `
-        <tr>
-          <td>${r.id ?? ''}</td>
-          <td>${r.rawSupplierName ?? ''}</td>
-          <td>${r.rawBankName ?? ''}</td>
+        <tr class="${selectedRecord && selectedRecord.id === r.id ? 'selected' : ''}" data-id="${r.id}" style="cursor:pointer;">
+      <td>${r.id ?? ''}</td>
+      <td>${formatEntity(r.supplierDisplay || r.rawSupplierName, r.normalizedSupplier, r.supplierId, 'supplier')}</td>
+      <td>${formatEntity('', '', r.bankId, 'bank', r.bankDisplay)}</td>
           <td>${r.amount ?? ''}</td>
           <td>${r.guaranteeNumber ?? ''}</td>
-          <td>${r.issueDate ?? ''}</td>
+          <td>${r.contractNumber ?? ''}</td>
           <td>${r.expiryDate ?? ''}</td>
-          <td><span class="status-badge ${r.matchStatus === 'ready' ? 'status-ready' : 'status-review'}">${r.matchStatus || 'needs_review'}</span></td>
-          <td>${r.sessionId ?? ''}</td>
-          <td>${r.createdAt ?? ''}</td>
-          <td><button class="btn btn-ghost" onclick="viewRecord(${r.id})">Review / مراجعة</button></td>
+          <td><span class="status-badge ${r.matchStatus === 'ready' ? 'status-ready' : 'status-review'}">${r.matchStatus === 'ready' ? 'جاهز' : 'يحتاج مراجعة'}</span></td>
         </tr>
       `).join('');
       document.querySelectorAll('th[data-key]').forEach(th => {
@@ -142,12 +321,532 @@
           render();
         };
       });
+      document.querySelectorAll('tbody tr[data-id]').forEach(row => {
+        row.addEventListener('click', () => openPanel(parseInt(row.dataset.id, 10)));
+      });
     }
 
-    window.viewRecord = function(id) {
-      // Placeholder: يمكن ربطه بفتح Modal أو الانتقال للوحة المراجعة
-      window.location.href = '/review#' + id;
-    };
+    async function openPanel(id) {
+      const rec = records.find(r => r.id === id);
+      if (!rec) return;
+      selectedRecord = rec;
+      selectedSupplierName = null;
+      selectedSupplierId = null;
+      selectedBankName = null;
+      selectedBankId = null;
+      autoSaved = false;
+      render(); // highlight row
+      insertPanelRow(rec);
+      await loadCandidates(rec.id);
+    }
+
+    function fillRaw(rec) {
+      document.getElementById('pSupplier').textContent = rec.rawSupplierName || '—';
+      document.getElementById('pBank').textContent = rec.rawBankName || '—';
+      const pc = document.getElementById('pContract');
+      if (pc) pc.textContent = rec.contractNumber || '—';
+      const pg = document.getElementById('pGuarantee');
+      if (pg) pg.textContent = rec.guaranteeNumber || '—';
+    }
+
+    function renderCandidateList(list, target, groupName, onPick) {
+      const options = [...list];
+      if (!options.length) {
+        target.innerHTML = `<div class="tag-empty">لا توجد مرشحات. يمكنك إنشاء مورد جديد.</div>`;
+        if (createSupplierBtn) createSupplierBtn.style.display = 'inline-flex';
+        return;
+      }
+      if (createSupplierBtn) createSupplierBtn.style.display = 'none';
+      const typeLabel = (c) => {
+        if (c.match_type === 'alternative') return 'بديل';
+        if (c.match_type === 'fuzzy_strong') return 'Fuzzy قوي';
+        if (c.match_type === 'fuzzy_weak') return 'Fuzzy ضعيف';
+        if (c.source === 'override') return 'Override';
+        return 'Exact';
+      };
+      const tagClass = (c) => {
+        if (c.match_type === 'fuzzy_weak') return 'tag tag-weak';
+        if (c.match_type && c.match_type.startsWith('fuzzy')) return 'tag tag-strong';
+        if (c.match_type === 'alternative') return 'tag tag-alt';
+        return 'tag tag-exact';
+      };
+      target.innerHTML = `<div class="tag-list">
+        ${options.map((c, idx) => {
+          const label = typeLabel(c);
+          const warn = c.match_type === 'fuzzy_weak'
+            ? '<div class="muted text-xs">اقتراح تقريبي – يرجى التحقق</div>'
+            : '';
+          const score = c.score_raw !== undefined && c.score_raw !== null
+            ? `<span class="badge badge-soft">${Math.round((c.score_raw||0)*100)}٪</span>`
+            : '';
+          return `
+            <div class="${tagClass(c)}" data-idx="${idx}">
+              <div style="display:flex; flex-direction:column;">
+                <div><strong>${escapeHtml(c.name || '—')}</strong> <span class="badge badge-soft">${label}</span> ${score}</div>
+                ${warn}
+              </div>
+              <button class="reject-btn" title="رفض هذا المرشح" data-reject="${idx}">×</button>
+            </div>
+          `;
+        }).join('')}
+      </div>`;
+      // اختيار افتراضي لأول مرشح
+      const setSelected = (c, el) => {
+        target.querySelectorAll('.tag').forEach(t => t.classList.remove('tag-selected'));
+        if (el) el.classList.add('tag-selected');
+        onPick(c);
+      };
+      target.querySelectorAll('.tag').forEach(el => {
+        const idx = parseInt(el.dataset.idx, 10);
+        el.addEventListener('click', (ev) => {
+          if (ev.target && ev.target.dataset && ev.target.dataset.reject !== undefined) return;
+          setSelected(options[idx], el);
+        });
+      });
+      target.querySelectorAll('.reject-btn').forEach(btn => {
+        btn.addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          const idx = parseInt(btn.dataset.reject, 10);
+          const cand = options[idx];
+          if (!cand || !cand.supplier_id) return;
+          // تسجيل blocked لهذا المرشح فقط
+          selectedSupplierBlockedId = cand.supplier_id;
+          selectedSupplierId = null;
+          await blockCandidate(cand);
+        });
+      });
+      if (options[0]) setSelected(options[0], target.querySelector('.tag'));
+    }
+
+    async function loadCandidates(id, rawOverride = '') {
+      if (!supplierSuggestions || !conflictsBox) return;
+      supplierSuggestions.innerHTML = '<div class="muted">جارٍ تحميل مرشحي المورد...</div>';
+      conflictsBox.style.display = 'none';
+      try {
+        const qs = rawOverride ? `?raw_supplier_name=${encodeURIComponent(rawOverride)}` : '';
+        const res = await fetch(`/api/records/${id}/candidates${qs}`);
+        const json = await res.json();
+        if (!json.success) throw new Error('تعذر تحميل المرشحين');
+        const conflicts = json.data?.conflicts || [];
+        if (Array.isArray(conflicts) && conflicts.length) {
+          conflictsBox.style.display = 'block';
+          conflictsBox.innerHTML = `<strong>تنبيهات:</strong><ul>${conflicts.map(c=>`<li>${c}</li>`).join('')}</ul>`;
+        }
+        const supList = json.data?.supplier?.candidates || [];
+        supplierCandidates = supList;
+        const bankList = json.data?.bank?.candidates || [];
+        selectedSupplierBlockedId = null;
+        selectedSupplierId = null;
+        renderCandidateList(supList, supplierSuggestions, 'supplierCandidate', (c)=>{
+          selectedSupplierName = c ? c.name : null;
+          selectedSupplierId = c ? (c.supplier_id || null) : null;
+          selectedSupplierBlockedId = null;
+          if (supplierInput) {
+            supplierInput.value = rawOverride || selectedSupplierName || (selectedRecord.rawSupplierName || '');
+            supplierInputRaw = supplierInput.value;
+          }
+          if (btnRejectSupplier) {
+            btnRejectSupplier.disabled = !selectedSupplierId;
+          }
+        });
+        if (supplierInput) {
+          supplierInput.value = rawOverride || selectedRecord.rawSupplierName || '';
+          supplierInputRaw = supplierInput.value;
+          supplierInput.oninput = () => {
+            selectedSupplierName = supplierInput.value.trim();
+            supplierInputRaw = selectedSupplierName;
+            selectedSupplierId = null;
+            selectedSupplierBlockedId = null;
+            if (btnRejectSupplier) btnRejectSupplier.disabled = true;
+            if (supplierInputDebounce) clearTimeout(supplierInputDebounce);
+            supplierInputDebounce = setTimeout(() => loadCandidates(selectedRecord.id, supplierInputRaw), 300);
+          };
+        }
+        if (createSupplierBtn) {
+          createSupplierBtn.style.display = supList.length ? 'none' : 'inline-flex';
+        }
+        if (btnRejectSupplier) {
+          btnRejectSupplier.disabled = !selectedSupplierId;
+        }
+        // البنك: عرض الاسم فقط
+        selectedBankName = selectedRecord.bankDisplay || selectedRecord.rawBankName || '';
+        selectedBankId = selectedRecord.bankId || null;
+        if (bankDisplayBox) bankDisplayBox.textContent = selectedBankName || '—';
+      } catch (e) {
+        supplierSuggestions.innerHTML = '<div class="alert alert-error">تعذر تحميل مرشحي المورد</div>';
+        if (bankDisplayBox) bankDisplayBox.textContent = 'تعذر تحميل بيانات البنك';
+      }
+    }
+
+    async function blockCandidate(cand) {
+      if (!selectedRecord || !cand?.supplier_id) return;
+      const payload = {
+        raw_supplier_name: supplierInput?.value || selectedRecord.rawSupplierName,
+        raw_bank_name: selectedBankName || selectedRecord.rawBankName,
+        supplier_blocked_id: cand.supplier_id,
+        match_status: 'needs_review',
+      };
+      await fetch(`/api/records/${selectedRecord.id}/decision`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      await loadCandidates(selectedRecord.id, supplierInput?.value || selectedRecord.rawSupplierName || '');
+    }
+
+    async function blockAllCandidates(rawInput) {
+      // يسجل blocked لكل مرشح ظاهر بدرجة ≥0.80
+      for (const c of supplierCandidates) {
+        const scoreRaw = c.score_raw ?? c.score ?? 0;
+        if (scoreRaw < 0.80 || !c.supplier_id) continue;
+        await blockCandidate(c);
+      }
+    }
+
+    async function createNewSupplier() {
+      if (!selectedRecord) return;
+      const rawInput = (supplierInput?.value || selectedRecord.rawSupplierName || '').trim();
+      if (!rawInput) {
+        decisionMsg.textContent = 'الاسم مطلوب لإنشاء مورد جديد';
+        decisionMsg.className = 'alert alert-warning';
+        return;
+      }
+      decisionMsg.textContent = 'جارٍ إنشاء مورد جديد...';
+      decisionMsg.className = 'muted';
+      try {
+        const res = await fetch('/api/dictionary/suppliers', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ official_name: rawInput }),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'تعذر إنشاء المورد');
+        const newId = json.data?.id ?? json.data?.supplier?.id ?? null;
+        const newName = json.data?.officialName ?? json.data?.official_name ?? rawInput;
+        if (!newId) throw new Error('معرّف المورد غير متوفر بعد الإنشاء');
+        selectedSupplierId = newId;
+        selectedSupplierName = newName;
+        selectedSupplierBlockedId = null;
+        await saveDecision();
+      } catch (e) {
+        decisionMsg.textContent = e.message || 'تعذر إنشاء المورد';
+        decisionMsg.className = 'alert alert-error';
+      }
+    }
+
+    async function saveDecision() {
+      if (!selectedRecord) return;
+      const rawSupplier = (supplierInput?.value || selectedRecord.rawSupplierName || '').trim();
+      // حالة وجود مرشحات بلا اختيار/رفض => رفض جماعي
+      if (!selectedSupplierId && !selectedSupplierBlockedId && supplierCandidates.length) {
+        decisionMsg.textContent = 'جارٍ تسجيل رفض المرشحين...';
+        decisionMsg.className = 'muted';
+        await blockAllCandidates(rawSupplier || selectedRecord.rawSupplierName || '');
+        await loadCandidates(selectedRecord.id, rawSupplier);
+        decisionMsg.textContent = 'تم تسجيل الرفض، اختر مرشحاً أو أنشئ مورداً جديداً';
+        decisionMsg.className = 'alert alert-warning';
+        return;
+      }
+      if (!selectedSupplierId && !selectedSupplierBlockedId && !supplierCandidates.length) {
+        decisionMsg.textContent = 'لا يوجد مرشح؛ استخدم إنشاء مورد جديد أو اختر/ارفض مرشحاً.';
+        decisionMsg.className = 'alert alert-warning';
+        return;
+      }
+      const payload = {
+        raw_supplier_name: rawSupplier || selectedRecord.rawSupplierName,
+        raw_bank_name: selectedBankName || selectedRecord.rawBankName,
+        supplier_id: selectedSupplierId || null,
+        bank_id: selectedBankId || null,
+        match_status: selectedRecord.matchStatus || 'needs_review',
+      };
+      if (selectedSupplierBlockedId) {
+        payload.supplier_blocked_id = selectedSupplierBlockedId;
+        payload.supplier_id = null;
+        payload.match_status = 'needs_review';
+      }
+      decisionMsg.textContent = 'جارٍ الحفظ...';
+      decisionMsg.className = 'muted';
+      try {
+        const res = await fetch(`/api/records/${selectedRecord.id}/decision`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'تعذر الحفظ');
+        decisionMsg.textContent = 'تم الحفظ';
+        decisionMsg.className = 'text-sm text-green-700';
+        await loadRecords();
+      } catch (e) {
+        decisionMsg.textContent = e.message || 'تعذر الحفظ';
+        decisionMsg.className = 'alert alert-error';
+      }
+    }
+
+    // ---------- Overlay dictionary ----------
+    async function openOverlay(mode, id = null, prefill = {}) {
+      await ensureBanksCache(true);
+      overlayMode = mode;
+      overlayId = id;
+      overlayMsg.textContent = '';
+      document.body.classList.add('overlay-open');
+      // reset
+      [inpNameAr, inpNameEn, inpNorm, inpShort, inpDisplay].forEach(el => el.value = '');
+      grpDisplay.style.display = mode.startsWith('supplier') ? 'block' : 'none';
+      if (mode === 'bank_create' || mode === 'bank_edit') {
+        overlayTitle.textContent = mode === 'bank_edit' ? 'تعديل بنك' : 'إضافة بنك جديد';
+        const b = (id && bankMap[id]) ? bankMap[id] : null;
+        if (mode === 'bank_edit' && b) {
+          inpNameAr.value = b.official_name || '';
+          inpNameEn.value = b.official_name_en || '';
+          inpNorm.value = b.normalized_key || '';
+          inpShort.value = b.short_code || '';
+        } else if (prefill.name) {
+          inpNameAr.value = prefill.name;
+          inpNameEn.value = '';
+          inpNorm.value = '';
+          inpShort.value = '';
+        }
+      } else {
+        overlayTitle.textContent = mode === 'supplier_edit' ? 'تعديل مورد' : 'إضافة مورد جديد';
+        if (mode === 'supplier_edit' && id) {
+          const sup = supplierCache.find(s => s.id === id);
+          if (sup) {
+            inpNameAr.value = sup.official_name || '';
+            inpDisplay.value = sup.display_name || '';
+            inpNorm.value = sup.normalized_name || '';
+            inpShort.value = sup.supplier_normalized_key || '';
+          }
+        } else if (prefill.name) {
+          inpNameAr.value = prefill.name;
+          inpDisplay.value = '';
+          inpNorm.value = '';
+          inpShort.value = '';
+        }
+      }
+      overlay.style.display = 'block';
+    }
+
+    function closeOverlay() {
+      overlay.style.display = 'none';
+      overlayMode = null;
+      overlayId = null;
+      document.body.classList.remove('overlay-open');
+    }
+
+    overlayClose?.addEventListener('click', () => closeOverlay());
+
+    overlayForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!overlayMode) return;
+      overlayMsg.textContent = 'جارٍ الحفظ...';
+      let url = '';
+      let payload = {};
+      if (overlayMode === 'bank_create' || overlayMode === 'bank_edit') {
+        url = overlayMode === 'bank_edit' && overlayId ? `/api/dictionary/banks/${overlayId}` : '/api/dictionary/banks';
+        payload = {
+          official_name: inpNameAr.value.trim(),
+          official_name_en: inpNameEn.value.trim(),
+          normalized_key: inpNorm.value.trim(),
+          short_code: inpShort.value.trim(),
+        };
+      } else {
+        url = overlayMode === 'supplier_edit' && overlayId ? `/api/dictionary/suppliers/${overlayId}` : '/api/dictionary/suppliers';
+        payload = {
+          official_name: inpNameAr.value.trim(),
+          display_name: inpDisplay.value.trim(),
+        };
+      }
+      try {
+        const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'تعذر الحفظ');
+        overlayMsg.textContent = 'تم الحفظ';
+        await Promise.all([ensureBanksCache(true), loadSuppliersCache()]);
+        await loadRecords();
+        closeOverlay();
+      } catch (err) {
+        overlayMsg.textContent = err.message || 'تعذر الحفظ';
+        overlayMsg.className = 'alert alert-error';
+      }
+    });
+
+    async function loadSuppliersCache() {
+      try {
+        const res = await fetch('/api/dictionary/suppliers');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          supplierCache = json.data;
+        }
+      } catch (_) {}
+    }
+
+    // استيراد ملف
+    btnToggleImport.addEventListener('click', () => {
+      const isHidden = importCard.style.display === 'none';
+      importCard.style.display = isHidden ? 'block' : 'none';
+    });
+
+    if (uploadForm) {
+      uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        uploadError.style.display = 'none';
+        uploadMsg.textContent = '';
+        if (!fileInput.files.length) {
+          uploadError.textContent = 'اختر ملفًا أولاً';
+          uploadError.style.display = 'block';
+          return;
+        }
+        uploadMsg.textContent = 'جارٍ الرفع...';
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        try {
+          const res = await fetch('/api/import/excel', { method: 'POST', body: formData });
+          const json = await res.json();
+          if (!json.success) throw new Error(json.message || 'فشل الرفع');
+          const rc = json.data?.records_count ?? json.records_count ?? '';
+          const sid = json.data?.session_id ?? json.session_id ?? 'غير معروفة';
+          uploadMsg.textContent = `تم الاستيراد: ${rc} سجل (جلسة ${sid})`;
+          uploadMsg.className = 'text-sm text-green-700';
+          fileInput.value = '';
+          await loadRecords();
+        } catch (err) {
+          uploadError.textContent = err.message || 'تعذر الاتصال بالخادم';
+          uploadError.style.display = 'block';
+        }
+      });
+    }
+
+    // تحميل الموردين مسبقاً لاستخدامهم في Overlay
+    loadSuppliersCache();
+
+    function insertPanelRow(rec) {
+      // إزالة أي لوحة مفتوحة
+      const existing = document.getElementById(panelRowId);
+      if (existing) existing.remove();
+      const rowEl = document.querySelector(`tbody tr[data-id="${rec.id}"]`);
+      if (!rowEl) return;
+      const panelHtml = `
+        <tr id="${panelRowId}">
+          <td colspan="8">
+            <div class="card" style="margin-top: var(--space-sm);">
+            <div class="card-header">
+              <div>
+                  <p class="card-title">مراجعة السجل</p>
+                  <p class="card-subtitle" id="panelMeta">السجل #${rec.id} | الجلسة ${rec.sessionId ?? ''}</p>
+                </div>
+              </div>
+            <div class="card-body">
+              <div class="flex gap-sm" style="margin-bottom: var(--space-sm); flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" id="manageSupplier">إدارة المورد</button>
+                <button class="btn btn-ghost btn-sm" id="manageBank">إدارة البنك</button>
+              </div>
+              <div id="conflictsBox" class="alert alert-warning" style="display:none;"></div>
+              <div class="grid-2" style="margin-top: var(--space-md);">
+                <div>
+                  <h3 class="section-title">المورد</h3>
+                  <div class="form-group" style="margin-bottom: var(--space-sm);">
+                    <label class="form-label">اسم المورد (قابل للكتابة + اختيار)</label>
+                    <input class="input" id="supplierInput" placeholder="اكتب اسم المورد أو اختر من القائمة" />
+                  </div>
+                  <div id="supplierSuggestions"></div>
+                  <div class="flex gap-sm" style="margin-top: var(--space-sm); flex-wrap:wrap;">
+                    <button class="btn btn-secondary btn-sm" id="btnRejectSupplier" disabled>رفض المرشح الحالي</button>
+                    <button class="btn btn-primary btn-sm" id="btnCreateSupplier" style="display:none;">إنشاء مورد جديد</button>
+                  </div>
+              </div>
+              <div id="bankSection">
+                <h3 class="section-title">البنك</h3>
+                <div id="bankDisplayBox" class="form-static" style="margin-bottom: var(--space-xs);"></div>
+            </div>
+          </div>
+          <div class="flex items-center gap-sm" style="margin-top: var(--space-sm); flex-wrap: wrap;">
+            <button id="saveDecision" class="btn btn-primary">حفظ</button>
+            <div id="decisionMsg" class="muted"></div>
+          </div>
+        </div>
+            </div>
+          </td>
+        </tr>`;
+      rowEl.insertAdjacentHTML('afterend', panelHtml);
+      // ربط المراجع
+      supplierSuggestions = document.getElementById('supplierSuggestions');
+      bankSuggestions = null;
+      bankDisplayBox = document.getElementById('bankDisplayBox');
+      conflictsBox = document.getElementById('conflictsBox');
+      decisionMsg = document.getElementById('decisionMsg');
+      panelMeta = document.getElementById('panelMeta');
+      btnRejectSupplier = document.getElementById('btnRejectSupplier');
+      createSupplierBtn = document.getElementById('btnCreateSupplier');
+      supplierInput = document.getElementById('supplierInput');
+      const btnManageSupplier = document.getElementById('manageSupplier');
+      const btnManageBank = document.getElementById('manageBank');
+      panelMeta.textContent = `السجل #${rec.id} | الجلسة ${rec.sessionId ?? ''}`;
+      if (btnManageSupplier) {
+        btnManageSupplier.onclick = () => {
+          const sid = rec.supplierId || null;
+          if (sid) {
+            openOverlay('supplier_edit', sid);
+          } else {
+            openOverlay('supplier_create', null, { name: rec.rawSupplierName || '' });
+          }
+        };
+      }
+      if (btnManageBank) {
+        btnManageBank.onclick = () => {
+          const bid = rec.bankId || null;
+          if (bid) {
+            openOverlay('bank_edit', bid);
+          } else {
+            openOverlay('bank_create', null, { name: rec.rawBankName || '' });
+          }
+        };
+      }
+      if (decisionMsg) decisionMsg.textContent = '';
+      if (btnRejectSupplier) {
+        btnRejectSupplier.onclick = () => {
+          if (!supplierCandidates.length) return;
+          selectedSupplierBlockedId = supplierCandidates[0]?.supplier_id || null;
+          selectedSupplierId = null;
+          decisionMsg.textContent = 'سيتم تسجيل رفض المورد الحالي عند الحفظ.';
+          decisionMsg.className = 'muted';
+        };
+      }
+      if (createSupplierBtn) {
+        createSupplierBtn.onclick = async () => {
+          await createNewSupplier();
+        };
+      }
+      const saveBtn = document.getElementById('saveDecision');
+      if (saveBtn) saveBtn.addEventListener('click', saveDecision);
+      if (btnRecalcAll && !btnRecalcAll.dataset.bound) {
+        btnRecalcAll.dataset.bound = '1';
+        btnRecalcAll.addEventListener('click', async () => {
+          btnRecalcAll.disabled = true;
+          btnRecalcAll.textContent = 'جاري إعادة المطابقة...';
+          try {
+            const res = await fetch('/api/records/recalculate', { method: 'POST' });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || 'فشل إعادة المطابقة');
+            alert(`تمت إعادة المطابقة: ${json.data?.processed || 0} سجل، جاهز: ${json.data?.ready || 0}`);
+            await loadRecords();
+          } catch (e) {
+            alert(e.message || 'تعذر إعادة المطابقة');
+          } finally {
+            btnRecalcAll.disabled = false;
+            btnRecalcAll.textContent = 'إعادة مطابقة الكل';
+          }
+        });
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const row = e.target.closest('tbody tr[data-id]');
+      if (!row) return;
+      // نترك openPanel يشتغل عبر event listeners المضافة في render
+    });
+
+    // زر الحفظ داخل اللوحة يضاف عند إنشاء اللوحة
 
     statusFilter.addEventListener('change', render);
     refreshBtn.addEventListener('click', loadRecords);

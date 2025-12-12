@@ -63,6 +63,20 @@ class SupplierAlternativeNameRepository
                 return $ex;
             }
         }
+        // منع alias يساوي الاسم الرسمي
+        $supplierRepo = new \App\Repositories\SupplierRepository();
+        $supplier = $supplierRepo->find($supplierId);
+        if ($supplier) {
+            $normOfficial = (new \App\Support\Normalizer())->normalizeName($supplier->officialName);
+            if ($normOfficial === $normalizedRawName) {
+                return [
+                    'id' => $existing[0]['id'] ?? null,
+                    'supplier_id' => $supplierId,
+                    'raw_name' => $rawName,
+                    'normalized_raw_name' => $normalizedRawName,
+                ];
+            }
+        }
 
         $stmt = $pdo->prepare('INSERT INTO supplier_alternative_names (supplier_id, raw_name, normalized_raw_name, source) VALUES (:sid, :r, :n, :src)');
         $stmt->execute([

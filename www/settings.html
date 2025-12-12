@@ -6,50 +6,69 @@
   <title>Settings</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
-<body>
+<body class="app-shell">
   <header class="app-header">
-    <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="font-semibold text-lg">Settings</div>
-      <nav class="nav">
-        <a href="/import">Import</a>
-        <a href="/records">Records</a>
-        <a href="/review">Review Panel</a>
-        <a href="/dictionary">Dictionary</a>
-        <a href="/settings" class="active">Settings</a>
+    <div class="app-header-inner">
+      <div>
+        <span class="app-logo">BL</span>
+        <span class="app-title">نظام إدارة خطابات الضمان</span>
+      </div>
+      <nav class="app-nav">
+        <a href="/records" class="app-nav-link">السجلات</a>
+        <a href="/settings" class="app-nav-link is-active">الإعدادات</a>
       </nav>
     </div>
   </header>
 
-  <main class="max-w-4xl mx-auto px-6 py-8 space-y-6">
-    <section class="card">
-      <h1 class="card-title">Thresholds</h1>
-      <form id="settingsForm" class="grid-3">
-        <label class="label">
-          Match Auto Threshold
-          <input type="number" step="0.01" id="autoTh" class="input" />
-        </label>
-        <label class="label">
-          Match Review Threshold
-          <input type="number" step="0.01" id="revTh" class="input" />
-        </label>
-        <label class="label">
-          Conflict Delta
-          <input type="number" step="0.01" id="confDelta" class="input" />
-        </label>
-        <button type="submit" class="btn btn-primary" style="grid-column: 1 / span 3; width:max-content;">حفظ</button>
-        <div id="sMsg" class="muted text-sm" style="grid-column: 1 / span 3;"></div>
-      </form>
-    </section>
+  <main class="app-main">
+    <div class="app-container">
+      <section class="page-header">
+        <div class="page-header-main">
+          <h1 class="page-title">الإعدادات</h1>
+          <p class="page-subtitle">عتبات المطابقة (مورد/بنك) + النسخ الاحتياطي والتصدير للبيانات والإعدادات.</p>
+        </div>
+      </section>
 
-    <section class="card">
-      <h2 class="section-title">النسخ الاحتياطي والتصدير</h2>
-      <div class="grid-3">
-        <button id="btnBackup" class="btn btn-secondary">نسخ احتياطي كامل</button>
-        <button id="btnExportDict" class="btn btn-secondary">تصدير القاموس</button>
-        <button id="btnImportDict" class="btn btn-secondary">استيراد القاموس (JSON)</button>
-      </div>
-      <div id="backupMsg" class="muted text-sm" style="margin-top:10px;"></div>
-    </section>
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="card-title">عتبات المطابقة</p>
+            <p class="card-subtitle">تطبق على أنبوب المطابقة النهائي: التعلم → normalized_key → normalized_name → البدائل → الفزي.</p>
+          </div>
+        </div>
+        <form id="settingsForm" class="grid-3">
+          <div class="form-group">
+            <label class="form-label">Match Auto Threshold</label>
+            <input type="number" step="0.01" id="autoTh" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Match Review Threshold</label>
+            <input type="number" step="0.01" id="revTh" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Conflict Delta</label>
+            <input type="number" step="0.01" id="confDelta" class="form-control" />
+          </div>
+          <button type="submit" class="btn btn-primary" style="grid-column: 1 / span 3; width:max-content;">حفظ</button>
+          <div id="sMsg" class="muted" style="grid-column: 1 / span 3;"></div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <p class="card-title">النسخ الاحتياطي والتصدير</p>
+            <p class="card-subtitle">حفظ قاعدة البيانات + الإعدادات + القاموس الحالي أو تصديره/استيراده JSON.</p>
+          </div>
+        </div>
+        <div class="grid-3" style="margin-bottom: var(--space-md);">
+          <button id="btnBackup" class="btn btn-secondary">نسخ احتياطي كامل</button>
+          <button id="btnExportDict" class="btn btn-secondary">تصدير القاموس</button>
+          <button id="btnImportDict" class="btn btn-secondary">استيراد القاموس (JSON)</button>
+        </div>
+        <div id="backupMsg" class="muted"></div>
+      </section>
+    </div>
   </main>
 
   <script>

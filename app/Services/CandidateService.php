@@ -5,10 +5,10 @@ namespace App\Services;
 
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\SupplierRepository;
-use App\Repositories\BankAlternativeNameRepository;
 use App\Support\Normalizer;
 use App\Support\Settings;
 use App\Support\Config;
+use App\Repositories\SupplierLearningRepository;
 
 class CandidateService
 {
@@ -17,10 +17,13 @@ class CandidateService
         private SupplierAlternativeNameRepository $supplierAlts,
         private Normalizer $normalizer = new Normalizer(),
         private \App\Repositories\BankRepository $banks = new \App\Repositories\BankRepository(),
-        private BankAlternativeNameRepository $bankAlts = new BankAlternativeNameRepository(),
         private \App\Repositories\SupplierOverrideRepository $overrides = new \App\Repositories\SupplierOverrideRepository(),
         private Settings $settings = new Settings(),
+        private ?\App\Repositories\BankLearningRepository $bankLearning = null,
+        private ?SupplierLearningRepository $supplierLearning = null,
     ) {
+        $this->bankLearning = $this->bankLearning ?: new \App\Repositories\BankLearningRepository();
+        $this->supplierLearning = $this->supplierLearning ?: new SupplierLearningRepository();
     }
 
     /**
@@ -31,21 +34,55 @@ class CandidateService
      */
     public function supplierCandidates(string $rawSupplier): array
     {
-        $normalized = $this->normalizer->normalizeName($rawSupplier);
+        $normalized = $this->normalizer->normalizeSupplierName($rawSupplier);
+        // عتبات الفزي الجديدة: قوي 0.90، ضعيف 0.80
+        $strongTh = 0.90;
+        $weakTh = 0.80;
         $reviewThreshold = $this->settings->get('MATCH_REVIEW_THRESHOLD', Config::MATCH_REVIEW_THRESHOLD);
         if ($normalized === '') {
             return ['normalized' => '', 'candidates' => []];
         }
 
         $candidates = [];
+        $blockedId = null;
+
+        // التعلم أولاً: إذا كان alias → تطابق وحيد، إذا blocked → استبعاد المورد المحظور
+        $learned = $this->supplierLearning?->findByNormalized($normalized);
+        if ($learned) {
+            if ($learned['learning_status'] === 'supplier_alias') {
+                return [
+                    'normalized' => $normalized,
+                    'candidates' => [[
+                        'source' => 'learning',
+                        'match_type' => 'exact',
+                        'strength' => 'strong',
+                        'supplier_id' => (int)$learned['linked_supplier_id'],
+                        'name' => $this->suppliers->find($learned['linked_supplier_id'])?->officialName ?? $rawSupplier,
+                        'score' => 1.0,
+                        'score_raw' => 1.0,
+                    ]],
+                ];
+            }
+            if ($learned['learning_status'] === 'supplier_blocked') {
+                $blockedId = (int)$learned['linked_supplier_id'];
+            }
+        }
 
         // Overrides
         foreach ($this->overrides->allNormalized() as $ov) {
-            $candNorm = $this->normalizer->normalizeName($ov['override_name']);
+            $candNorm = $this->normalizer->normalizeSupplierName($ov['override_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
+            if ($scoreRaw < $reviewThreshold) {
+                continue;
+            }
+            if ($blockedId && (int)$ov['supplier_id'] === $blockedId) {
+                continue;
+            }
             $candidates[] = [
                 'source' => 'override',
+                'match_type' => 'exact',
+                'strength' => 'strong',
                 'supplier_id' => $ov['supplier_id'],
                 'name' => $ov['override_name'],
                 'score' => $scoreRaw * Config::WEIGHT_OFFICIAL,
@@ -55,12 +92,20 @@ class CandidateService
 
         // تطابق رسمي
         foreach ($this->suppliers->findAllByNormalized($normalized) as $supplier) {
-            $candNorm = $this->normalizer->normalizeName($supplier['normalized_name'] ?? $supplier['official_name']);
+            $candNorm = $this->normalizer->normalizeSupplierName($supplier['normalized_name'] ?? $supplier['official_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
             $scoreWeighted = $scoreRaw * Config::WEIGHT_OFFICIAL;
+            if ($scoreRaw < $reviewThreshold) {
+                continue;
+            }
+            if ($blockedId && (int)$supplier['id'] === $blockedId) {
+                continue;
+            }
             $candidates[] = [
                 'source' => 'official',
+                'match_type' => 'exact',
+                'strength' => 'strong',
                 'supplier_id' => $supplier['id'],
                 'name' => $supplier['official_name'],
                 'score' => $scoreWeighted,
@@ -70,12 +115,20 @@ class CandidateService
 
         // تطابق أسماء بديلة
         foreach ($this->supplierAlts->findAllByNormalized($normalized) as $alt) {
-            $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
+            $candNorm = $this->normalizer->normalizeSupplierName($alt['normalized_raw_name'] ?? $alt['raw_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
             $scoreWeighted = $scoreRaw * Config::WEIGHT_ALT_CONFIRMED;
+            if ($scoreRaw < $reviewThreshold) {
+                continue;
+            }
+            if ($blockedId && (int)$alt['supplier_id'] === $blockedId) {
+                continue;
+            }
             $candidates[] = [
                 'source' => 'alternative',
+                'match_type' => 'alternative',
+                'strength' => 'strong',
                 'supplier_id' => $alt['supplier_id'],
                 'name' => $alt['raw_name'],
                 'score' => $scoreWeighted,
@@ -85,13 +138,18 @@ class CandidateService
 
         // Fuzzy أساسي (Levenshtein + token) على كل الموردين
         foreach ($this->suppliers->allNormalized() as $supplier) {
-            $candNorm = $this->normalizer->normalizeName($supplier['normalized_name'] ?? $supplier['official_name']);
+            if ($blockedId && (int)$supplier['id'] === $blockedId) {
+                continue;
+            }
+            $candNorm = $this->normalizer->normalizeSupplierName($supplier['normalized_name'] ?? $supplier['official_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
             $score = $scoreRaw * Config::WEIGHT_FUZZY;
-            if ($score >= $reviewThreshold) {
+            if ($scoreRaw >= $weakTh) {
                 $candidates[] = [
                     'source' => 'fuzzy_official',
+                    'match_type' => $scoreRaw >= $strongTh ? 'fuzzy_strong' : 'fuzzy_weak',
+                    'strength' => $scoreRaw >= $strongTh ? 'strong' : 'weak',
                     'supplier_id' => $supplier['id'],
                     'name' => $supplier['official_name'],
                     'score' => $score,
@@ -102,13 +160,18 @@ class CandidateService
 
         // Fuzzy على الأسماء البديلة
         foreach ($this->supplierAlts->allNormalized() as $alt) {
-            $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
+            if ($blockedId && (int)$alt['supplier_id'] === $blockedId) {
+                continue;
+            }
+            $candNorm = $this->normalizer->normalizeSupplierName($alt['normalized_raw_name'] ?? $alt['raw_name']);
             $sim = $this->scoreComponents($normalized, $candNorm);
             $scoreRaw = $this->maxScore($sim);
             $score = $scoreRaw * Config::WEIGHT_FUZZY;
-            if ($score >= $reviewThreshold) {
+            if ($scoreRaw >= $weakTh) {
                 $candidates[] = [
                     'source' => 'fuzzy_alternative',
+                    'match_type' => $scoreRaw >= $strongTh ? 'fuzzy_strong' : 'fuzzy_weak',
+                    'strength' => $scoreRaw >= $strongTh ? 'strong' : 'weak',
                     'supplier_id' => $alt['supplier_id'],
                     'name' => $alt['raw_name'],
                     'score' => $score,
@@ -127,6 +190,8 @@ class CandidateService
         }
 
         $unique = array_values($bestBySupplier);
+        // فلترة نهائية حسب العتبات: رفض ما دون 0.80
+        $unique = array_filter($unique, fn($c) => ($c['score_raw'] ?? $c['score'] ?? 0) >= $weakTh);
         usort($unique, fn($a, $b) => $b['score'] <=> $a['score']);
 
         return ['normalized' => $normalized, 'candidates' => $unique];
@@ -176,55 +241,125 @@ class CandidateService
      */
     public function bankCandidates(string $rawBank): array
     {
-        $normalized = $this->normalizer->normalizeName($rawBank);
+        $normalized = $this->normalizer->normalizeBankName($rawBank);
+        $short = $this->normalizer->normalizeBankShortCode($rawBank);
         $reviewThreshold = $this->settings->get('MATCH_REVIEW_THRESHOLD', Config::MATCH_REVIEW_THRESHOLD);
         if ($normalized === '') {
             return ['normalized' => '', 'candidates' => []];
         }
 
+        $blockedId = null;
+        $blockAll = false;
+        $learning = $this->bankLearning?->findByNormalized($normalized);
+        if ($learning) {
+            if ($learning['status'] === 'alias' && !empty($learning['bank_id'])) {
+                return [
+                    'normalized' => $normalized,
+                    'candidates' => [[
+                        'source' => 'learning_alias',
+                        'bank_id' => (int)$learning['bank_id'],
+                        'name' => $this->banks->find((int)$learning['bank_id'])?->officialName ?? '',
+                        'score' => 1.0,
+                        'score_raw' => 1.0,
+                    ]],
+                ];
+            }
+            if ($learning['status'] === 'blocked' && !empty($learning['bank_id'])) {
+                $blockedId = (int)$learning['bank_id'];
+            } elseif ($learning['status'] === 'blocked') {
+                // محظور بشكل عام (بدون بنك محدد) -> لا اقتراحات
+                return ['normalized' => $normalized, 'candidates' => []];
+            }
+        }
+
         $candidates = [];
-        foreach ($this->banks->findAllByNormalized($normalized) as $bank) {
-            $candNorm = $this->normalizer->normalizeName($bank['normalized_name'] ?? $bank['official_name']);
-            $sim = $this->scoreComponents($normalized, $candNorm);
-            $scoreRaw = $this->maxScore($sim);
-            $candidates[] = [
-                'source' => 'official',
-                'bank_id' => $bank['id'],
-                'name' => $bank['official_name'],
-                'score' => $scoreRaw * Config::WEIGHT_OFFICIAL,
-                'score_raw' => $scoreRaw,
-            ];
+        // Step 1: short code exact
+        if ($short !== '') {
+            foreach ($this->banks->allNormalized() as $row) {
+                $sc = strtoupper(trim((string)($row['short_code'] ?? '')));
+                if ($sc !== '' && $sc === $short && ($blockedId === null || $blockedId !== (int)$row['id'])) {
+                    $candidates[] = [
+                        'source' => 'short_exact',
+                        'bank_id' => (int)$row['id'],
+                        'name' => $row['official_name'] ?? '',
+                        'score' => 1.0,
+                        'score_raw' => 1.0,
+                    ];
+                }
+            }
         }
 
-        // أسماء بديلة للبنوك
-        foreach ($this->bankAlts->findAllByNormalized($normalized) as $alt) {
-            $candNorm = $this->normalizer->normalizeName($alt['normalized_raw_name'] ?? $alt['raw_name']);
-            $sim = $this->scoreComponents($normalized, $candNorm);
-            $scoreRaw = $this->maxScore($sim);
-            $candidates[] = [
-                'source' => 'alternative',
-                'bank_id' => $alt['bank_id'],
-                'name' => $alt['raw_name'],
-                'score' => $scoreRaw * Config::WEIGHT_ALT_CONFIRMED,
-                'score_raw' => $scoreRaw,
-            ];
-        }
-
-        foreach ($this->banks->allNormalized() as $bank) {
-            $candNorm = $this->normalizer->normalizeName($bank['normalized_name'] ?? $bank['official_name']);
-            $sim = $this->scoreComponents($normalized, $candNorm);
-            $scoreRaw = $this->maxScore($sim);
-            $score = $scoreRaw * Config::WEIGHT_FUZZY;
-            if ($score >= $reviewThreshold) {
+        // Step 2: short code fuzzy (>=0.9) إذا لم يوجد تطابق دقيق
+        if (empty($candidates) && $short !== '') {
+            $best = null;
+            $bestScore = 0.0;
+            $thresholdShort = 0.9;
+            foreach ($this->banks->allNormalized() as $row) {
+                $sc = strtoupper(trim((string)($row['short_code'] ?? '')));
+                if ($sc === '' || ($blockedId !== null && $blockedId === (int)$row['id'])) {
+                    continue;
+                }
+                $score = $this->levenshteinRatio($short, $sc);
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $best = $row;
+                }
+            }
+            if ($best && $bestScore >= $thresholdShort) {
                 $candidates[] = [
-                    'source' => 'fuzzy_official',
-                    'bank_id' => $bank['id'],
-                    'name' => $bank['official_name'],
-                    'score' => $score,
-                    'score_raw' => $scoreRaw,
+                    'source' => 'short_fuzzy',
+                    'bank_id' => (int)$best['id'],
+                    'name' => $best['official_name'] ?? '',
+                    'score' => $bestScore,
+                    'score_raw' => $bestScore,
                 ];
             }
         }
+
+        // Step 3: full name exact via normalized_key
+        if (empty($candidates)) {
+            $bank = $this->banks->findByNormalizedKey($normalized);
+            if ($bank && ($blockedId === null || $blockedId !== $bank->id)) {
+                $candidates[] = [
+                    'source' => 'official',
+                    'bank_id' => $bank->id,
+                    'name' => $bank->officialName ?? '',
+                    'score' => 1.0,
+                    'score_raw' => 1.0,
+                ];
+            }
+        }
+
+        // Step 4: full name fuzzy on normalized_key (>=0.95) إذا لم يوجد تطابق
+        if (empty($candidates)) {
+            $best = null;
+            $bestScore = 0.0;
+            $threshold = 0.95;
+            foreach ($this->banks->allNormalized() as $row) {
+                $key = $row['normalized_key'] ?? '';
+                if ($key === '' || ($blockedId !== null && $blockedId === (int)$row['id'])) {
+                    continue;
+                }
+                $score = $this->levenshteinRatio($normalized, $key);
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $best = $row;
+                }
+            }
+            if ($best && $bestScore >= $threshold) {
+                $displayName = $best['official_name'] ?? '';
+                $candidates[] = [
+                    'source' => 'fuzzy_official',
+                    'bank_id' => (int)$best['id'],
+                    'name' => $displayName,
+                    'score' => $bestScore,
+                    'score_raw' => $bestScore,
+                ];
+            }
+        }
+
+        // تصفية حسب العتبة
+        $candidates = array_filter($candidates, fn($c) => ($c['score'] ?? 0) >= $reviewThreshold);
 
         // أفضل لكل بنك
         $best = [];
@@ -240,4 +375,5 @@ class CandidateService
 
         return ['normalized' => $normalized, 'candidates' => $unique];
     }
+
 }

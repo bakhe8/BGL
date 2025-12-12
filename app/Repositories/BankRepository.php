@@ -12,7 +12,7 @@ class BankRepository
     public function findByNormalizedName(string $normalizedName): ?Bank
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT * FROM banks WHERE normalized_name = :n LIMIT 1');
+        $stmt = $pdo->prepare('SELECT * FROM banks WHERE normalized_key = :n LIMIT 1');
         $stmt->execute(['n' => $normalizedName]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
@@ -21,46 +21,52 @@ class BankRepository
         return $this->map($row);
     }
 
+    public function findByNormalizedKey(string $key): ?Bank
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM banks WHERE normalized_key = :k LIMIT 1');
+        $stmt->execute(['k' => $key]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->map($row) : null;
+    }
+
+    public function find(int $id): ?Bank
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM banks WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->map($row) : null;
+    }
+
     private function map(array $row): Bank
     {
         return new Bank(
             (int)$row['id'],
             $row['official_name'],
-            $row['display_name'] ?? null,
-            $row['normalized_name'],
+            $row['official_name_en'] ?? null,
+            $row['official_name'] ?? null,
+            $row['normalized_key'] ?? null,
+            $row['short_code'] ?? null,
             (int)($row['is_confirmed'] ?? 0),
             $row['created_at'] ?? null,
         );
     }
 
-    /**
-     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
-     */
+    /** @return array<int, array{id:int, official_name:string, official_name_en:?string, normalized_key:?string, short_code:?string, is_confirmed:int, created_at:?string, updated_at:?string}> */
     public function allNormalized(): array
     {
         $pdo = Database::connection();
-        $stmt = $pdo->query('SELECT id, official_name, normalized_name FROM banks');
+        $stmt = $pdo->query('SELECT id, official_name, official_name_en, normalized_key, short_code, is_confirmed, created_at, updated_at FROM banks');
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
-     */
-    public function findAllByNormalized(string $normalizedName): array
-    {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT id, official_name, normalized_name FROM banks WHERE normalized_name = :n');
-        $stmt->execute(['n' => $normalizedName]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
-     * @return array<int, array{id:int, official_name:string, normalized_name:string}>
-     */
+    /** @return array<int, array{id:int, official_name:string, official_name_en:?string, normalized_key:?string, short_code:?string, is_confirmed:int, created_at:?string, updated_at:?string}> */
+    /** @return array<int, array{id:int, official_name:string, official_name_en:?string, normalized_key:?string, short_code:?string, is_confirmed:int, created_at:?string, updated_at:?string}> */
     public function search(string $normalizedLike): array
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT id, official_name, normalized_name FROM banks WHERE normalized_name LIKE :q');
+        $stmt = $pdo->prepare('SELECT id, official_name, official_name_en, normalized_key, short_code, is_confirmed, created_at, updated_at FROM banks WHERE normalized_key LIKE :q OR official_name LIKE :q');
         $stmt->execute(['q' => "%{$normalizedLike}%"]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -68,25 +74,27 @@ class BankRepository
     public function create(array $data): Bank
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('INSERT INTO banks (official_name, display_name, normalized_name, is_confirmed) VALUES (:o, :d, :n, :c)');
+        $stmt = $pdo->prepare('INSERT INTO banks (official_name, official_name_en, normalized_key, short_code, is_confirmed) VALUES (:o, :oe, :nk, :sc, :c)');
         $stmt->execute([
             'o' => $data['official_name'],
-            'd' => $data['display_name'] ?? null,
-            'n' => $data['normalized_name'],
+            'oe' => $data['official_name_en'] ?? null,
+            'nk' => $data['normalized_key'] ?? null,
+            'sc' => $data['short_code'] ?? null,
             'c' => $data['is_confirmed'] ?? 0,
         ]);
         $id = (int)$pdo->lastInsertId();
-        return new Bank($id, $data['official_name'], $data['display_name'] ?? null, $data['normalized_name'], (int)($data['is_confirmed'] ?? 0), date('c'));
+        return new Bank($id, $data['official_name'], $data['official_name_en'] ?? null, $data['official_name'], $data['normalized_key'] ?? null, $data['short_code'] ?? null, (int)($data['is_confirmed'] ?? 0), date('c'));
     }
 
     public function update(int $id, array $data): void
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE banks SET official_name=:o, display_name=:d, normalized_name=:n WHERE id=:id');
+        $stmt = $pdo->prepare('UPDATE banks SET official_name=:o, official_name_en=:oe, normalized_key=:nk, short_code=:sc WHERE id=:id');
         $stmt->execute([
             'o' => $data['official_name'],
-            'd' => $data['display_name'] ?? null,
-            'n' => $data['normalized_name'],
+            'oe' => $data['official_name_en'] ?? null,
+            'nk' => $data['normalized_key'] ?? null,
+            'sc' => $data['short_code'] ?? null,
             'id' => $id,
         ]);
     }
