@@ -15,6 +15,9 @@ use App\Services\CandidateService;
 
 class MatchingService
 {
+    private ?array $cachedSuppliers = null;
+    private ?array $cachedBanks = null;
+
     public function __construct(
         private SupplierRepository $suppliers,
         private SupplierAlternativeNameRepository $supplierAlts,
@@ -80,24 +83,47 @@ class MatchingService
             }
         }
 
+        // Load Cache if needed
+        if ($this->cachedSuppliers === null) {
+            $this->cachedSuppliers = $this->suppliers->allNormalized();
+        }
+
         // official by normalized_key (بدون مسافات)
-        $supplierKey = $this->suppliers->findByNormalizedKey($this->normalizer->makeSupplierKey($rawSupplier));
-        if ($supplierKey && (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== $supplierKey->id)) {
-            $result['supplier_id'] = $supplierKey->id;
+        $supplierKey = null;
+        $normKey = $this->normalizer->makeSupplierKey($rawSupplier);
+        foreach ($this->cachedSuppliers as $s) {
+            if (($s['supplier_normalized_key'] ?? '') === $normKey) {
+                $supplierKey = $s;
+                break;
+            }
+        }
+
+        if ($supplierKey && (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int)$supplierKey['id'])) {
+            $result['supplier_id'] = (int)$supplierKey['id'];
             $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
             return $result;
         }
 
-        $supplier = $this->suppliers->findByNormalizedName($normalized);
-        if ($supplier) {
-            if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== $supplier->id) {
-                $result['supplier_id'] = $supplier->id;
+        // exact normalized match
+        $supplierExact = null;
+        foreach ($this->cachedSuppliers as $s) {
+            if ($s['normalized_name'] === $normalized) {
+                $supplierExact = $s;
+                break;
+            }
+        }
+
+        if ($supplierExact) {
+            if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int)$supplierExact['id']) {
+                $result['supplier_id'] = (int)$supplierExact['id'];
                 $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
                 return $result;
             }
         }
 
         // alternative names
+        // Note: Keeping alts separate for now to avoid huge memory spike if aliases > official.
+        // Can be optimized later if needed.
         $alt = $this->supplierAlts->findByNormalized($normalized);
         if ($alt) {
             if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== $alt->supplierId) {
@@ -111,7 +137,7 @@ class MatchingService
         // Fuzzy قوي فقط
         $best = null;
         $bestScore = 0.0;
-        foreach ($this->suppliers->allNormalized() as $row) {
+        foreach ($this->cachedSuppliers as $row) {
             $candNorm = $this->normalizer->normalizeSupplierName($row['normalized_name'] ?? $row['official_name']);
             if ($candNorm === '') {
                 continue;
@@ -161,9 +187,14 @@ class MatchingService
             }
         }
 
+        // Load Cache
+        if ($this->cachedBanks === null) {
+            $this->cachedBanks = $this->banks->allNormalized();
+        }
+
         // Step 1: short code exact
         if ($short !== '') {
-            foreach ($this->banks->allNormalized() as $row) {
+            foreach ($this->cachedBanks as $row) {
                 $sc = strtoupper(trim((string)($row['short_code'] ?? '')));
                 if ($sc !== '' && $sc === $short) {
                     if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int)$row['id']) {
@@ -181,7 +212,7 @@ class MatchingService
             $best = null;
             $bestScore = 0.0;
             $threshold = 0.9;
-            foreach ($this->banks->allNormalized() as $row) {
+            foreach ($this->cachedBanks as $row) {
                 $sc = strtoupper(trim((string)($row['short_code'] ?? '')));
                 if ($sc === '') {
                     continue;
@@ -207,11 +238,18 @@ class MatchingService
         }
 
         // Step 3: full name exact via normalized_key
-        $bank = $this->banks->findByNormalizedKey($normalized);
-        if ($bank) {
-            if (!isset($result['_blocked_bank_id']) || $result['_blocked_bank_id'] !== $bank->id) {
-                $result['bank_id'] = $bank->id;
-                $result['final_name'] = $bank->officialNameAr ?? $bank->officialName ?? null;
+        $bankKey = null;
+        foreach ($this->cachedBanks as $b) {
+            if (($b['normalized_key'] ?? '') === $normalized) {
+                $bankKey = $b;
+                break;
+            }
+        }
+
+        if ($bankKey) {
+            if (!isset($result['_blocked_bank_id']) || $result['_blocked_bank_id'] !== (int)$bankKey['id']) {
+                $result['bank_id'] = (int)$bankKey['id'];
+                $result['final_name'] = $bankKey['officialNameAr'] ?? $bankKey['officialName'] ?? null;
                 return $result;
             }
         }
@@ -220,7 +258,7 @@ class MatchingService
         $best = null;
         $bestScore = 0.0;
         $threshold = 0.95; // تطابق قوي فقط
-        foreach ($this->banks->allNormalized() as $row) {
+        foreach ($this->cachedBanks as $row) {
             $key = $row['normalized_key'] ?? '';
             if ($key === '') {
                 continue;

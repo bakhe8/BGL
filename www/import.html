@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>استيراد الضمانات</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
+
 <body class="app-shell">
   <header class="app-header">
     <div class="app-header-inner">
@@ -25,7 +27,8 @@
       <section class="page-header">
         <div class="page-header-main">
           <h1 class="page-title">استيراد ملف Excel جديد</h1>
-          <p class="page-subtitle">الملفات المدعومة: XLSX فقط. سيتم اكتشاف الأعمدة تلقائيًا (المورد، البنك، المبلغ، التواريخ).</p>
+          <p class="page-subtitle">الملفات المدعومة: XLSX فقط. سيتم اكتشاف الأعمدة تلقائيًا (المورد، البنك، المبلغ،
+            التواريخ).</p>
         </div>
         <div class="page-actions">
           <a href="/records" class="btn btn-secondary">العودة للسجلات</a>
@@ -79,7 +82,9 @@
                 </tr>
               </thead>
               <tbody id="sessionsBody">
-                <tr><td colspan="8" class="muted">لا يوجد بيانات.</td></tr>
+                <tr>
+                  <td colspan="8" class="muted">لا يوجد بيانات.</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -113,11 +118,29 @@
           showError(json.message || 'فشل الرفع');
           return;
         }
-        uploadMsg.textContent = `تم الاستيراد: ${json.records_count || ''} سجل (جلسة ${json.session_id || ''})`;
-        uploadMsg.className = 'text-sm text-green-700';
+
+        let msg = `تم استيراد: ${json.records_count} سجل بنجاح (جلسة ${json.session_id}).`;
+        let className = 'text-sm text-green-700';
+
+        if (json.skipped && json.skipped.length > 0) {
+          msg += `<br><strong>تم تخطي ${json.skipped.length} سجل:</strong><br>`;
+          msg += `<ul style="font-size:0.85em; margin-top:5px; color:#c0392b;">` +
+            json.skipped.map(s => `<li>${s}</li>`).slice(0, 5).join('') +
+            (json.skipped.length > 5 ? `<li>... و ${json.skipped.length - 5} آخرين</li>` : '') +
+            `</ul>`;
+
+          if (json.records_count === 0) {
+            className = 'text-sm text-red-700';
+          }
+        }
+
+        uploadMsg.innerHTML = msg;
+        uploadMsg.className = className;
+
         fileInput.value = '';
         loadSessions();
       } catch (err) {
+        console.error(err);
         showError('تعذر الاتصال بالخادم');
       }
     });
@@ -162,4 +185,5 @@
     loadSessions();
   </script>
 </body>
+
 </html>

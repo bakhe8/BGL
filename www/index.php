@@ -36,152 +36,175 @@ if ($uri !== '/' && file_exists($staticPath) && !is_dir($staticPath)) {
     exit;
 }
 
-// حاوية بسيطة لإنشاء التبعيات
-$importSessionRepo = new ImportSessionRepository();
-$importedRecordRepo = new ImportedRecordRepository();
-$importService = new ImportService($importSessionRepo, $importedRecordRepo);
-$importController = new ImportController($importService);
-$recordsController = new RecordsController($importedRecordRepo);
-$dictionaryController = new DictionaryController();
-$settingsController = new SettingsController();
+// Global Error Handler for API
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        return;
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
 
-// صفحات HTML
-if ($method === 'GET' && ($uri === '/' || $uri === '/import')) {
-    echo file_get_contents(__DIR__ . '/import.html');
+try {
+    // حاوية بسيطة لإنشاء التبعيات
+    $importSessionRepo = new ImportSessionRepository();
+    $importedRecordRepo = new ImportedRecordRepository();
+    $importService = new ImportService($importSessionRepo, $importedRecordRepo);
+    $importController = new ImportController($importService);
+    $recordsController = new RecordsController($importedRecordRepo);
+    $dictionaryController = new DictionaryController();
+    $settingsController = new SettingsController();
+
+    // صفحات HTML
+    if ($method === 'GET' && ($uri === '/' || $uri === '/import')) {
+        echo file_get_contents(__DIR__ . '/import.html');
+        exit;
+    }
+
+    if ($method === 'GET' && $uri === '/records') {
+        echo file_get_contents(__DIR__ . '/records.html');
+        exit;
+    }
+
+    if ($method === 'GET' && ($uri === '/dictionary' || $uri === '/dictionary/suppliers' || $uri === '/dictionary/banks')) {
+        echo file_get_contents(__DIR__ . '/dictionary.html');
+        exit;
+    }
+
+    if ($method === 'GET' && $uri === '/settings') {
+        echo file_get_contents(__DIR__ . '/settings.html');
+        exit;
+    }
+
+    // API
+    if ($method === 'POST' && $uri === '/api/import/excel') {
+        $importController->upload();
+        exit;
+    }
+
+    if ($method === 'GET' && $uri === '/api/records') {
+        $recordsController->index();
+        exit;
+    }
+
+    if ($method === 'POST' && preg_match('#^/api/records/(\\d+)/decision$#', $uri, $m)) {
+        $id = (int) $m[1];
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $recordsController->saveDecision($id, $payload);
+        exit;
+    }
+
+    if ($method === 'GET' && preg_match('#^/api/records/(\\d+)/candidates$#', $uri, $m)) {
+        $id = (int) $m[1];
+        $recordsController->candidates($id);
+        exit;
+    }
+
+    if ($method === 'GET' && $uri === '/api/dictionary/suppliers') {
+        $dictionaryController->listSuppliers();
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/dictionary/suppliers') {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $dictionaryController->createSupplier($payload);
+        exit;
+    }
+
+    if ($method === 'POST' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $dictionaryController->updateSupplier((int) $m[1], $payload);
+        exit;
+    }
+
+    if ($method === 'DELETE' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
+        $dictionaryController->deleteSupplier((int) $m[1]);
+        exit;
+    }
+
+    if ($method === 'GET' && $uri === '/api/dictionary/banks') {
+        $dictionaryController->listBanks();
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/dictionary/banks') {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $dictionaryController->createBank($payload);
+        exit;
+    }
+
+    if ($method === 'POST' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $dictionaryController->updateBank((int) $m[1], $payload);
+        exit;
+    }
+
+    if ($method === 'DELETE' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
+        $dictionaryController->deleteBank((int) $m[1]);
+        exit;
+    }
+
+    if ($method === 'GET' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
+        $dictionaryController->listAlternativeNames((int) $m[1]);
+        exit;
+    }
+
+    if ($method === 'POST' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $dictionaryController->createAlternativeName((int) $m[1], $payload);
+        exit;
+    }
+
+    if ($method === 'DELETE' && preg_match('#^/api/dictionary/alternatives/(\\d+)$#', $uri, $m)) {
+        $dictionaryController->deleteAlternativeName((int) $m[1]);
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/dictionary/suggest-alias') {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $dictionaryController->suggestAlias($payload);
+        exit;
+    }
+
+    if ($method === 'GET' && $uri === '/api/settings') {
+        $settingsController->all();
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/settings') {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $settingsController->save($payload);
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/settings/backup') {
+        $settingsController->backup();
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/settings/export-dictionary') {
+        $settingsController->exportDictionary();
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/settings/import-dictionary') {
+        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+        $settingsController->importDictionary($payload);
+        exit;
+    }
+
+    http_response_code(404);
+    echo 'Not Found';
+
+} catch (Throwable $e) {
+    // Catch-all for API errors to ensure JSON is returned
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => false,
+        'message' => 'Internal Server Error',
+        'error' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ]);
     exit;
 }
-
-if ($method === 'GET' && $uri === '/records') {
-    echo file_get_contents(__DIR__ . '/records.html');
-    exit;
-}
-
-if ($method === 'GET' && ($uri === '/dictionary' || $uri === '/dictionary/suppliers' || $uri === '/dictionary/banks')) {
-    echo file_get_contents(__DIR__ . '/dictionary.html');
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/settings') {
-    echo file_get_contents(__DIR__ . '/settings.html');
-    exit;
-}
-
-// API
-if ($method === 'POST' && $uri === '/api/import/excel') {
-    $importController->upload();
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/api/records') {
-    $recordsController->index();
-    exit;
-}
-
-if ($method === 'POST' && preg_match('#^/api/records/(\\d+)/decision$#', $uri, $m)) {
-    $id = (int)$m[1];
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $recordsController->saveDecision($id, $payload);
-    exit;
-}
-
-if ($method === 'GET' && preg_match('#^/api/records/(\\d+)/candidates$#', $uri, $m)) {
-    $id = (int)$m[1];
-    $recordsController->candidates($id);
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/api/dictionary/suppliers') {
-    $dictionaryController->listSuppliers();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/api/dictionary/suppliers') {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $dictionaryController->createSupplier($payload);
-    exit;
-}
-
-if ($method === 'POST' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $dictionaryController->updateSupplier((int)$m[1], $payload);
-    exit;
-}
-
-if ($method === 'DELETE' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
-    $dictionaryController->deleteSupplier((int)$m[1]);
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/api/dictionary/banks') {
-    $dictionaryController->listBanks();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/api/dictionary/banks') {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $dictionaryController->createBank($payload);
-    exit;
-}
-
-if ($method === 'POST' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $dictionaryController->updateBank((int)$m[1], $payload);
-    exit;
-}
-
-if ($method === 'DELETE' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
-    $dictionaryController->deleteBank((int)$m[1]);
-    exit;
-}
-
-if ($method === 'GET' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
-    $dictionaryController->listAlternativeNames((int)$m[1]);
-    exit;
-}
-
-if ($method === 'POST' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $dictionaryController->createAlternativeName((int)$m[1], $payload);
-    exit;
-}
-
-if ($method === 'DELETE' && preg_match('#^/api/dictionary/alternatives/(\\d+)$#', $uri, $m)) {
-    $dictionaryController->deleteAlternativeName((int)$m[1]);
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/api/dictionary/suggest-alias') {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $dictionaryController->suggestAlias($payload);
-    exit;
-}
-
-if ($method === 'GET' && $uri === '/api/settings') {
-    $settingsController->all();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/api/settings') {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $settingsController->save($payload);
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/api/settings/backup') {
-    $settingsController->backup();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/api/settings/export-dictionary') {
-    $settingsController->exportDictionary();
-    exit;
-}
-
-if ($method === 'POST' && $uri === '/api/settings/import-dictionary') {
-    $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    $settingsController->importDictionary($payload);
-    exit;
-}
-
-http_response_code(404);
-echo 'Not Found';

@@ -61,6 +61,18 @@ class SupplierRepository
         $stmt->execute(['id' => $id]);
     }
 
+    public function find(int $id): ?Supplier
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM suppliers WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        return $this->map($row);
+    }
+
     public function findByNormalizedName(string $normalizedName): ?Supplier
     {
         $pdo = Database::connection();
@@ -84,8 +96,8 @@ class SupplierRepository
             'k' => $data['supplier_normalized_key'] ?? null,
             'c' => $data['is_confirmed'] ?? 0,
         ]);
-        $id = (int)$pdo->lastInsertId();
-        return new Supplier($id, $data['official_name'], $data['display_name'] ?? null, $data['normalized_name'], $data['supplier_normalized_key'] ?? null, (int)($data['is_confirmed'] ?? 0), date('c'));
+        $id = (int) $pdo->lastInsertId();
+        return new Supplier($id, $data['official_name'], $data['display_name'] ?? null, $data['normalized_name'], $data['supplier_normalized_key'] ?? null, (int) ($data['is_confirmed'] ?? 0), date('c'));
     }
 
     public function findByNormalizedKey(string $key): ?Supplier
@@ -100,12 +112,12 @@ class SupplierRepository
     private function map(array $row): Supplier
     {
         return new Supplier(
-            (int)$row['id'],
+            (int) $row['id'],
             $row['official_name'],
             $row['display_name'] ?? null,
             $row['normalized_name'],
             $row['supplier_normalized_key'] ?? null,
-            (int)$row['is_confirmed'],
+            (int) $row['is_confirmed'],
             $row['created_at'] ?? null,
         );
     }

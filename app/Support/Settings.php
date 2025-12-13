@@ -7,9 +7,15 @@ class Settings
 {
     private string $path;
     private array $defaults = [
-        'MATCH_AUTO_THRESHOLD' => Config::MATCH_AUTO_THRESHOLD,
-        'MATCH_REVIEW_THRESHOLD' => Config::MATCH_REVIEW_THRESHOLD,
-        'CONFLICT_DELTA' => Config::CONFLICT_DELTA,
+        'MATCH_AUTO_THRESHOLD' => Config::MATCH_AUTO_THRESHOLD, // 0.90
+        'MATCH_REVIEW_THRESHOLD' => Config::MATCH_REVIEW_THRESHOLD, // 0.70
+        'MATCH_WEAK_THRESHOLD' => 0.70, // Synced with Review Threshold to avoid hiding results
+        'CONFLICT_DELTA' => Config::CONFLICT_DELTA, // 0.1
+        'WEIGHT_OFFICIAL' => 1.0,
+        'WEIGHT_ALT_CONFIRMED' => 0.95, // Increased confidence for manual aliases
+        'WEIGHT_ALT_LEARNING' => 0.75,
+        'WEIGHT_FUZZY' => 0.80, // Increased to not penalize typos too harshly
+        'CANDIDATES_LIMIT' => 20,
     ];
 
     public function __construct(string $path = '')
@@ -22,7 +28,7 @@ class Settings
         if (!file_exists($this->path)) {
             return $this->defaults;
         }
-        $data = json_decode((string)file_get_contents($this->path), true);
+        $data = json_decode((string) file_get_contents($this->path), true);
         if (!is_array($data)) {
             return $this->defaults;
         }

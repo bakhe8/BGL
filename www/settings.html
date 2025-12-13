@@ -1,11 +1,37 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings</title>
+  <title>الإعدادات - نظام خطابات الضمان</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .help-text {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-color);
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+  </style>
 </head>
+
 <body class="app-shell">
   <header class="app-header">
     <div class="app-header-inner">
@@ -25,49 +51,119 @@
       <section class="page-header">
         <div class="page-header-main">
           <h1 class="page-title">الإعدادات</h1>
-          <p class="page-subtitle">عتبات المطابقة (مورد/بنك) + النسخ الاحتياطي والتصدير للبيانات والإعدادات.</p>
+          <p class="page-subtitle">تهيئة قواعد المطابقة والتحكم في النظام.</p>
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-header">
-          <div>
-            <p class="card-title">عتبات المطابقة</p>
-            <p class="card-subtitle">تطبق على أنبوب المطابقة النهائي: التعلم → normalized_key → normalized_name → البدائل → الفزي.</p>
+      <form id="settingsForm">
+
+        <!-- Section 1: Matching Rules -->
+        <section class="card" style="margin-bottom: 2rem;">
+          <div class="card-header">
+            <h2 class="card-title">التحكم في المطابقة الآلية</h2>
           </div>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label class="form-label">نسبة التطابق التلقائي/القوي</label>
+              <input type="number" step="0.01" id="autoTh" class="form-control" />
+              <span class="help-text">الحد الأدنى (0.0 - 1.0) لاعتبار النتيجة "مطابقة قوية". النتائج فوق هذه النسبة
+                عالية الموثوقية. (الإفتراضي: 0.90)</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">حد المراجعة الأدنى</label>
+              <input type="number" step="0.01" id="revTh" class="form-control" />
+              <span class="help-text">الحد الأدنى للدرجة (0.0 - 1.0) لكي يظهر الاقتراح في القائمة. النتائج أقل من هذا
+                الرقم سيتم تجاهلها. (الإفتراضي: 0.70)</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 2: Scoring Weights -->
+        <section class="card" style="margin-bottom: 2rem;">
+          <div class="card-header">
+            <h2 class="card-title">نظام النقاط والأوزان</h2>
+            <p class="card-subtitle">تحدد هذه الأوزان أهمية كل معيار في حساب النتيجة النهائية (1.0 = مهم جداً، 0.0 = غير
+              مهم).</p>
+          </div>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label class="form-label">وزن الاسم الرسمي</label>
+              <input type="number" step="0.05" id="wOfficial" class="form-control" />
+              <span class="help-text">أهمية تطابق الاسم المدخل مع الاسم الرسمي للمورد/البنك في قاعدة البيانات.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">وزن الأسماء البديلة (المؤكدة)</label>
+              <input type="number" step="0.05" id="wAltConf" class="form-control" />
+              <span class="help-text">أهمية التطابق مع اسم بديل تم إدخاله يدوياً ومراجعته.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">وزن الأسماء البديلة (التعلم الآلي)</label>
+              <input type="number" step="0.05" id="wAltLearn" class="form-control" />
+              <span class="help-text">أهمية التطابق مع اسم بديل اكتشفه النظام تلقائياً من خلال سلوك المستخدم.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">وزن المطابقة التقريبية (Fuzzy)</label>
+              <input type="number" step="0.05" id="wFuzzy" class="form-control" />
+              <span class="help-text">مدى تأثير التشابه الجزئي (مثلاً اختلاف حرف واحد) على الدرجة النهائية. تقليل هذا
+                الرقم يجعل النظام أكثر صرامة.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: Advanced -->
+        <section class="card" style="margin-bottom: 2rem;">
+          <div class="card-header">
+            <h2 class="card-title">إعدادات متقدمة</h2>
+          </div>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label class="form-label">حد المطابقة الضعيفة</label>
+              <input type="number" step="0.01" id="weakTh" class="form-control" />
+              <span class="help-text">الدرجة التي يعتبر عندها النظام المطابقة "ضعيفة" وتحتاج انتباه خاص، حتى لو تجاوزت
+                حد المراجعة.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">عدد الاقتراحات في القائمة</label>
+              <input type="number" step="1" id="candLimit" class="form-control" />
+              <span class="help-text">الحد الأقصى لعدد النتائج المعروضة في القائمة المنسدلة (لتحسين الأداء).</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">هامش التعارض (Conflict Delta)</label>
+              <input type="number" step="0.01" id="confDelta" class="form-control" />
+              <span class="help-text">الفرق المطلوب بين أفضل نتيجة والنتيجة التي تليها. إذا كان الفرق أقل من هذا الرقم،
+                يعتبر النظام النتيجة "متعارضة" (غير حاسمة).</span>
+            </div>
+          </div>
+        </section>
+
+        <div
+          style="position: sticky; bottom: 0; background: var(--bg-color); padding: 1rem 0; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 1rem;">
+          <button type="submit" class="btn btn-primary" style="font-weight: bold; padding: 0.75rem 2rem;">حفظ كافة
+            الإعدادات</button>
+          <div id="sMsg" class="muted"></div>
         </div>
-        <form id="settingsForm" class="grid-3">
-          <div class="form-group">
-            <label class="form-label">Match Auto Threshold</label>
-            <input type="number" step="0.01" id="autoTh" class="form-control" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Match Review Threshold</label>
-            <input type="number" step="0.01" id="revTh" class="form-control" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Conflict Delta</label>
-            <input type="number" step="0.01" id="confDelta" class="form-control" />
-          </div>
-          <button type="submit" class="btn btn-primary" style="grid-column: 1 / span 3; width:max-content;">حفظ</button>
-          <div id="sMsg" class="muted" style="grid-column: 1 / span 3;"></div>
-        </form>
+
+      </form>
+
+      <!-- Backup Section -->
+      <section class="card" style="margin-top: 3rem; border: 1px dashed var(--border-color);">
+        <div class="card-header">
+          <h2 class="card-title">النسخ الاحتياطي والبيانات</h2>
+        </div>
+        <div class="grid-3">
+          <button id="btnBackup" class="btn btn-secondary">نسخ احتياطي (Full Backup)</button>
+          <button id="btnExportDict" class="btn btn-secondary">تصدير القاموس (Export)</button>
+          <button id="btnImportDict" class="btn btn-secondary">استيراد قاموس (Import)</button>
+        </div>
+        <div id="backupMsg" class="muted" style="margin-top: 1rem;"></div>
       </section>
 
-      <section class="card">
-        <div class="card-header">
-          <div>
-            <p class="card-title">النسخ الاحتياطي والتصدير</p>
-            <p class="card-subtitle">حفظ قاعدة البيانات + الإعدادات + القاموس الحالي أو تصديره/استيراده JSON.</p>
-          </div>
-        </div>
-        <div class="grid-3" style="margin-bottom: var(--space-md);">
-          <button id="btnBackup" class="btn btn-secondary">نسخ احتياطي كامل</button>
-          <button id="btnExportDict" class="btn btn-secondary">تصدير القاموس</button>
-          <button id="btnImportDict" class="btn btn-secondary">استيراد القاموس (JSON)</button>
-        </div>
-        <div id="backupMsg" class="muted"></div>
-      </section>
     </div>
   </main>
 
@@ -76,37 +172,63 @@
       const res = await fetch('/api/settings');
       const json = await res.json();
       if (!json.success) return;
-      document.getElementById('autoTh').value = json.data.MATCH_AUTO_THRESHOLD;
-      document.getElementById('revTh').value = json.data.MATCH_REVIEW_THRESHOLD;
-      document.getElementById('confDelta').value = json.data.CONFLICT_DELTA;
+      const d = json.data;
+
+      const setVal = (id, val, def) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val !== undefined && val !== null ? val : def;
+      };
+
+      setVal('autoTh', d.MATCH_AUTO_THRESHOLD, 0.90);
+      setVal('revTh', d.MATCH_REVIEW_THRESHOLD, 0.70);
+      setVal('confDelta', d.CONFLICT_DELTA, 0.1);
+
+      setVal('weakTh', d.MATCH_WEAK_THRESHOLD, 0.80);
+      setVal('candLimit', d.CANDIDATES_LIMIT, 20);
+      setVal('wOfficial', d.WEIGHT_OFFICIAL, 1.0);
+      setVal('wAltConf', d.WEIGHT_ALT_CONFIRMED, 0.85);
+      setVal('wAltLearn', d.WEIGHT_ALT_LEARNING, 0.75);
+      setVal('wFuzzy', d.WEIGHT_FUZZY, 0.60);
     }
+
     document.getElementById('settingsForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
         MATCH_AUTO_THRESHOLD: parseFloat(document.getElementById('autoTh').value),
         MATCH_REVIEW_THRESHOLD: parseFloat(document.getElementById('revTh').value),
         CONFLICT_DELTA: parseFloat(document.getElementById('confDelta').value),
+
+        MATCH_WEAK_THRESHOLD: parseFloat(document.getElementById('weakTh').value),
+        CANDIDATES_LIMIT: parseInt(document.getElementById('candLimit').value),
+        WEIGHT_OFFICIAL: parseFloat(document.getElementById('wOfficial').value),
+        WEIGHT_ALT_CONFIRMED: parseFloat(document.getElementById('wAltConf').value),
+        WEIGHT_ALT_LEARNING: parseFloat(document.getElementById('wAltLearn').value),
+        WEIGHT_FUZZY: parseFloat(document.getElementById('wFuzzy').value),
       };
+
       const res = await fetch('/api/settings', {
-        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const json = await res.json();
       const msg = document.getElementById('sMsg');
-      if (!json.success) { msg.textContent = json.message || 'تعذر الحفظ'; msg.className='alert alert-error'; return; }
-      msg.textContent = 'تم الحفظ';
-      msg.className='alert alert-success';
-    });
-    loadSettings();
+      if (!json.success) { msg.textContent = json.message || 'تعذر الحفظ'; msg.className = 'alert alert-error'; return; }
+      msg.textContent = 'تم حفظ الإعدادات بنجاح';
+      msg.className = 'alert alert-success';
 
+      // Auto-hide message
+      setTimeout(() => msg.textContent = '', 3000);
+    });
+
+    // Backup & Export Handlers
     async function doBackup() {
-      const res = await fetch('/api/settings/backup', {method:'POST'});
+      const res = await fetch('/api/settings/backup', { method: 'POST' });
       const json = await res.json();
       const el = document.getElementById('backupMsg');
       el.textContent = json.success ? `تم إنشاء النسخة الاحتياطية: ${json.path}` : 'تعذر إنشاء النسخة الاحتياطية';
       el.className = json.success ? 'alert alert-success' : 'alert alert-error';
     }
     async function exportDict() {
-      const res = await fetch('/api/settings/export-dictionary', {method:'POST'});
+      const res = await fetch('/api/settings/export-dictionary', { method: 'POST' });
       const json = await res.json();
       const el = document.getElementById('backupMsg');
       el.textContent = json.success ? `تم تصدير القاموس إلى: ${json.path}` : 'تعذر التصدير';
@@ -118,9 +240,9 @@
       try {
         const content = await (await fetch(path)).json();
         const res = await fetch('/api/settings/import-dictionary', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({dictionary: content})
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dictionary: content })
         });
         const json = await res.json();
         const el = document.getElementById('backupMsg');
@@ -135,6 +257,9 @@
     document.getElementById('btnBackup').addEventListener('click', doBackup);
     document.getElementById('btnExportDict').addEventListener('click', exportDict);
     document.getElementById('btnImportDict').addEventListener('click', importDict);
+
+    loadSettings();
   </script>
 </body>
+
 </html>

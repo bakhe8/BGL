@@ -42,8 +42,18 @@ class ImportedRecordRepository
             'created_at' => $record->createdAt ?? date('Y-m-d H:i:s'),
         ]);
 
-        $record->id = (int)$pdo->lastInsertId();
+        $record->id = (int) $pdo->lastInsertId();
         return $record;
+    }
+
+    public function existsByGuarantee(string $guaranteeNumber, string $bankName): bool
+    {
+        $pdo = Database::connection();
+        // Check for exact guarantee number match AND same bank (raw name)
+        // efficient enough for now.
+        $stmt = $pdo->prepare('SELECT 1 FROM imported_records WHERE guarantee_number = :g AND raw_bank_name = :b LIMIT 1');
+        $stmt->execute(['g' => $guaranteeNumber, 'b' => $bankName]);
+        return (bool) $stmt->fetchColumn();
     }
 
     public function updateDecision(int $id, array $data): void
@@ -98,8 +108,8 @@ class ImportedRecordRepository
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map(fn(array $row) => new ImportedRecord(
-            (int)$row['id'],
-            (int)$row['session_id'],
+            (int) $row['id'],
+            (int) $row['session_id'],
             $row['raw_supplier_name'],
             $row['raw_bank_name'],
             $row['amount'] ?? null,
@@ -113,8 +123,8 @@ class ImportedRecordRepository
             $row['normalized_supplier'] ?? null,
             $row['normalized_bank'] ?? null,
             $row['match_status'] ?? null,
-            $row['supplier_id'] ? (int)$row['supplier_id'] : null,
-            $row['bank_id'] ? (int)$row['bank_id'] : null,
+            $row['supplier_id'] ? (int) $row['supplier_id'] : null,
+            $row['bank_id'] ? (int) $row['bank_id'] : null,
             $row['bank_display'] ?? null,
             $row['supplier_display_name'] ?? null,
             $row['created_at'] ?? null,
@@ -132,8 +142,8 @@ class ImportedRecordRepository
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map(fn(array $row) => new ImportedRecord(
-            (int)$row['id'],
-            (int)$row['session_id'],
+            (int) $row['id'],
+            (int) $row['session_id'],
             $row['raw_supplier_name'],
             $row['raw_bank_name'],
             $row['amount'] ?? null,
@@ -147,8 +157,8 @@ class ImportedRecordRepository
             $row['normalized_supplier'] ?? null,
             $row['normalized_bank'] ?? null,
             $row['match_status'] ?? null,
-            $row['supplier_id'] ? (int)$row['supplier_id'] : null,
-            $row['bank_id'] ? (int)$row['bank_id'] : null,
+            $row['supplier_id'] ? (int) $row['supplier_id'] : null,
+            $row['bank_id'] ? (int) $row['bank_id'] : null,
             $row['bank_display'] ?? null,
             $row['supplier_display_name'] ?? null,
             $row['created_at'] ?? null,
@@ -165,8 +175,8 @@ class ImportedRecordRepository
             return null;
         }
         return new ImportedRecord(
-            (int)$row['id'],
-            (int)$row['session_id'],
+            (int) $row['id'],
+            (int) $row['session_id'],
             $row['raw_supplier_name'],
             $row['raw_bank_name'],
             $row['amount'] ?? null,
@@ -180,12 +190,29 @@ class ImportedRecordRepository
             $row['normalized_supplier'] ?? null,
             $row['normalized_bank'] ?? null,
             $row['match_status'] ?? null,
-            $row['supplier_id'] ? (int)$row['supplier_id'] : null,
-            $row['bank_id'] ? (int)$row['bank_id'] : null,
+            $row['supplier_id'] ? (int) $row['supplier_id'] : null,
+            $row['bank_id'] ? (int) $row['bank_id'] : null,
             $row['bank_display'] ?? null,
             $row['supplier_display_name'] ?? null,
             $row['created_at'] ?? null,
         );
+    }
+
+    public function getIdsBySessionAndRawSupplier(int $sessionId, string $rawName, int $excludeId): array
+    {
+        $pdo = Database::connection();
+        // Ignore records that are currently being saved (excludeId)
+        $stmt = $pdo->prepare('SELECT id FROM imported_records WHERE session_id = :sid AND raw_supplier_name = :r AND id != :ex');
+        $stmt->execute(['sid' => $sessionId, 'r' => $rawName, 'ex' => $excludeId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    public function getIdsBySessionAndRawBank(int $sessionId, string $rawName, int $excludeId): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id FROM imported_records WHERE session_id = :sid AND raw_bank_name = :r AND id != :ex');
+        $stmt->execute(['sid' => $sessionId, 'r' => $rawName, 'ex' => $excludeId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
     private function ensureDecisionColumns(): void

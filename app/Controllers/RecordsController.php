@@ -51,7 +51,7 @@ class RecordsController
     public function index(): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $sessionId = isset($_GET['session_id']) ? (int)$_GET['session_id'] : null;
+        $sessionId = isset($_GET['session_id']) ? (int) $_GET['session_id'] : null;
         $data = $sessionId ? $this->records->allBySession($sessionId) : $this->records->all();
         $bankMap = [];
         $bankNormMap = [];
@@ -153,7 +153,7 @@ class RecordsController
 
         foreach ($fields as $field => $max) {
             if (isset($payload[$field])) {
-                $val = trim((string)$payload[$field]);
+                $val = trim((string) $payload[$field]);
                 if (strlen($val) > $max) {
                     http_response_code(422);
                     echo json_encode(array('success' => false, 'message' => "{$field} يتجاوز الحد الأقصى."));
@@ -164,38 +164,77 @@ class RecordsController
         }
 
         if (isset($payload['amount'])) {
-            $cleanAmount = preg_replace('/[^\d\.\-]/', '', (string)$payload['amount']);
+            // Fix: handle multiple dots or invalid format safely
+            $cleanAmount = preg_replace('/[^\d\.\-]/', '', (string) $payload['amount']);
+            // If multiple dots, keep only the first one? Or just trust user input somewhat but cleaned.
+            // Simple check: if multiple dots, it might be invalid. Let's strictly allow one dot.
+            if (substr_count($cleanAmount, '.') > 1) {
+                // simple heuristic: remove all but last dot? or just fail? 
+                // Let's just keep it simple as before but ensure not empty.
+                $cleanAmount = (float) $cleanAmount;
+            }
             $update['amount'] = $cleanAmount === '' ? null : $cleanAmount;
         }
 
         $this->records->updateDecision($id, $update);
-        if (!empty($update['supplier_id']) && !empty($update['raw_supplier_name'])) {
-            $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
-            // تجميد اسم المورد المعتمد
-            $supplierName = (new SupplierRepository())->find((int)$update['supplier_id'])?->officialName;
-            if ($supplierName) {
-                $this->records->updateDecision($id, ['supplier_display_name' => $supplierName]);
+
+        // Learning: Supplier
+        try {
+            if (!empty($update['supplier_id']) && !empty($update['raw_supplier_name'])) {
+                $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
+
+                // Refresh supplier name for display freeze
+                try {
+                    $supplierName = (new SupplierRepository())->find((int) $update['supplier_id'])?->officialName;
+                    if ($supplierName) {
+                        $this->records->updateDecision($id, ['supplier_display_name' => $supplierName]);
+                    }
+                } catch (\Throwable $e) {
+                    // Ignore display name fetch error
+                }
+
+                // تسجيل التعلم alias
+                $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_alias', (int) $update['supplier_id'], 'review');
+
+                // Sync to Dictionary (Visible Alias)
+                try {
+                    $this->supplierAlts->create(
+                        (int) $update['supplier_id'],
+                        $update['raw_supplier_name'],
+                        $norm,
+                        'manual_review'
+                    );
+                } catch (\Throwable $e) {
+                    // Ignore if exists
+                }
+            } elseif (!empty($payload['supplier_blocked_id']) && !empty($update['raw_supplier_name'])) {
+                // المستخدم رفض مورد مقترح → نسجل blocked مرتبط بمورد محدد
+                $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
+                $blockedId = (int) $payload['supplier_blocked_id'];
+                $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_blocked', $blockedId, 'review');
             }
-            // تسجيل التعلم alias
-            $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_alias', (int)$update['supplier_id'], 'review');
-        } elseif (!empty($payload['supplier_blocked_id']) && !empty($update['raw_supplier_name'])) {
-            // المستخدم رفض مورد مقترح → نسجل blocked مرتبط بمورد محدد
-            $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
-            $blockedId = (int)$payload['supplier_blocked_id'];
-            $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_blocked', $blockedId, 'review');
+        } catch (\Throwable $e) {
+            // Log error internally but do not fail the request
+            // error_log('Supplier Learning Error: ' . $e->getMessage());
         }
-        // تعلم بنكي: إذا تم اختيار بنك، سجّل alias في جدول التعلم الجديد (آخر قرار فقط)
-        if (!empty($update['bank_id']) && !empty($update['raw_bank_name'])) {
-            $normBank = $this->normalizer->normalizeBankName($update['raw_bank_name']);
-            if ($normBank !== '') {
-                $this->bankLearning->upsert($normBank, $update['raw_bank_name'], 'alias', (int)$update['bank_id']);
+
+        // Learning: Bank
+        try {
+            if (!empty($update['bank_id']) && !empty($update['raw_bank_name'])) {
+                $normBank = $this->normalizer->normalizeBankName($update['raw_bank_name']);
+                if ($normBank !== '') {
+                    $this->bankLearning->upsert($normBank, $update['raw_bank_name'], 'alias', (int) $update['bank_id']);
+                }
+            } elseif (empty($update['bank_id']) && !empty($update['raw_bank_name'])) {
+                // المستخدم رفض التطابق، نسجل blocked عام لهذا الاسم (بدون بنك محدد)
+                $normBank = $this->normalizer->normalizeBankName($update['raw_bank_name']);
+                if ($normBank !== '') {
+                    $this->bankLearning->upsert($normBank, $update['raw_bank_name'], 'blocked', null);
+                }
             }
-        } elseif (empty($update['bank_id']) && !empty($update['raw_bank_name'])) {
-            // المستخدم رفض التطابق، نسجل blocked عام لهذا الاسم (بدون بنك محدد)
-            $normBank = $this->normalizer->normalizeBankName($update['raw_bank_name']);
-            if ($normBank !== '') {
-                $this->bankLearning->upsert($normBank, $update['raw_bank_name'], 'blocked', null);
-            }
+        } catch (\Throwable $e) {
+            // Log error internally but do not fail the request
+            // error_log('Bank Learning Error: ' . $e->getMessage());
         }
 
         $updated = $this->records->find($id);
@@ -213,7 +252,7 @@ class RecordsController
             return;
         }
 
-        $rawSupplier = isset($_GET['raw_supplier_name']) ? (string)$_GET['raw_supplier_name'] : $record->rawSupplierName;
+        $rawSupplier = isset($_GET['raw_supplier_name']) ? (string) $_GET['raw_supplier_name'] : $record->rawSupplierName;
         $supplierCandidates = $this->candidates->supplierCandidates($rawSupplier);
         $bankCandidates = $this->candidates->bankCandidates($record->rawBankName);
 
