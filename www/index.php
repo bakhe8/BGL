@@ -82,6 +82,12 @@ try {
         exit;
     }
 
+    // New: Decision page (single-record view)
+    if ($method === 'GET' && $uri === '/decision') {
+        echo file_get_contents(__DIR__ . '/decision.html');
+        exit;
+    }
+
     // API
     if ($method === 'POST' && $uri === '/api/import/excel') {
         $importController->upload();

@@ -13,6 +13,7 @@ class ImportController
 
     public function upload(): void
     {
+        ini_set('memory_limit', '-1');
         header('Content-Type: application/json; charset=utf-8');
 
         if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
@@ -21,20 +22,17 @@ class ImportController
             return;
         }
 
-        // File Type Validation (Security Fix)
-        $allowedMimeTypes = [
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-excel',
-        ];
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mimeType = finfo_file($finfo, $_FILES['file']['tmp_name']);
-        finfo_close($finfo);
 
-        if (!in_array($mimeType, $allowedMimeTypes, true)) {
+        // File Type Validation - Basic check
+        $fileName = $_FILES['file']['name'];
+        $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+        if (!in_array($ext, ['xlsx', 'xls'], true)) {
             http_response_code(415);
             echo json_encode(['success' => false, 'message' => 'نوع الملف غير مسموح. يجب أن يكون ملف Excel (.xlsx)']);
             return;
         }
+
 
         try {
             $tmpPath = $_FILES['file']['tmp_name'];

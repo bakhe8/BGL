@@ -215,6 +215,45 @@ class ImportedRecordRepository
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
+    /**
+     * تحديث جماعي لجميع السجلات بنفس اسم المورد الخام في نفس الجلسة
+     * يُستخدم لنشر القرار فورياً على السجلات المتشابهة
+     * 
+     * @return int عدد السجلات المُحدّثة
+     */
+    public function bulkUpdateSupplierByRawName(
+        int $sessionId,
+        string $rawSupplierName,
+        int $excludeId,
+        int $supplierId,
+        ?string $supplierDisplayName = null
+    ): int {
+        $pdo = Database::connection();
+
+        // تحديث فقط السجلات التي لم يتم تحديد مورد لها بعد (supplier_id IS NULL)
+        $sql = 'UPDATE imported_records 
+                SET supplier_id = :sid, 
+                    supplier_display_name = :sdn,
+                    match_status = :status
+                WHERE session_id = :sess 
+                  AND raw_supplier_name = :raw 
+                  AND id != :ex 
+                  AND (supplier_id IS NULL OR supplier_id = 0)';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'sid' => $supplierId,
+            'sdn' => $supplierDisplayName,
+            'status' => 'ready',
+            'sess' => $sessionId,
+            'raw' => $rawSupplierName,
+            'ex' => $excludeId,
+        ]);
+
+        return $stmt->rowCount();
+    }
+
+
     private function ensureDecisionColumns(): void
     {
         static $checked = false;

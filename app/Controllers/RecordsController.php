@@ -109,6 +109,30 @@ class RecordsController
         echo json_encode(array('success' => true, 'data' => $enriched));
     }
 
+    /**
+     * حفظ قرار المورد/البنك لسجل معين
+     * 
+     * هذه الدالة تقوم بـ:
+     * 1. التحقق من صلاحية البيانات المُرسلة
+     * 2. تحديث السجل بالمورد والبنك المختارين
+     * 3. تسجيل التعلم (alias) للاستخدام المستقبلي
+     * 4. نشر القرار فوراً على السجلات المتشابهة في نفس الجلسة
+     * 
+     * @param int $id معرّف السجل
+     * @param array $payload البيانات المُرسلة:
+     *   - match_status: 'ready' أو 'needs_review' (مطلوب)
+     *   - supplier_id: معرّف المورد المختار
+     *   - bank_id: معرّف البنك المختار
+     *   - raw_supplier_name: اسم المورد الخام (للتعلم)
+     *   - raw_bank_name: اسم البنك الخام (للتعلم)
+     * 
+     * @return void يُرجع JSON يحتوي:
+     *   - success: true/false
+     *   - data: بيانات السجل المُحدّث
+     *   - propagated_count: عدد السجلات الأخرى التي تم تحديثها
+     * 
+     * @see docs/06-Decision-Page.md للتوثيق الكامل
+     */
     public function saveDecision(int $id, array $payload): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -120,11 +144,16 @@ class RecordsController
             return;
         }
 
-        $status = $payload['match_status'] ?? null;
-        if (!in_array($status, array('ready', 'needs_review'), true)) {
+        // Hybrid support: accept both snake_case and camelCase
+        $status = $payload['match_status'] ?? $payload['matchStatus'] ?? null;
+        if (!in_array($status, array('ready', 'needs_review', 'approved'), true)) {
             http_response_code(422);
             echo json_encode(array('success' => false, 'message' => 'حالة غير صالحة'));
             return;
+        }
+        // Normalize 'approved' to 'ready' for consistency
+        if ($status === 'approved') {
+            $status = 'ready';
         }
 
         $update = array(
@@ -262,9 +291,47 @@ class RecordsController
             ]);
         }
 
+        // نشر القرار فوراً على السجلات الأخرى بنفس اسم المورد في نفس الجلسة
+        $propagatedCount = 0;
+        try {
+            if (!empty($update['supplier_id']) && !empty($record->rawSupplierName)) {
+                $supplierDisplayName = null;
+                try {
+                    $supplierDisplayName = (new SupplierRepository())->find((int) $update['supplier_id'])?->officialName;
+                } catch (\Throwable $e) {
+                    // Ignore
+                }
+
+                $propagatedCount = $this->records->bulkUpdateSupplierByRawName(
+                    $record->sessionId,
+                    $record->rawSupplierName,
+                    $id,
+                    (int) $update['supplier_id'],
+                    $supplierDisplayName
+                );
+
+                if ($propagatedCount > 0) {
+                    \App\Support\Logger::info('Decision propagated', [
+                        'record_id' => $id,
+                        'supplier_id' => $update['supplier_id'],
+                        'propagated_count' => $propagatedCount,
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            \App\Support\Logger::error('Propagation failed', [
+                'message' => $e->getMessage(),
+                'record_id' => $id,
+            ]);
+        }
+
         $updated = $this->records->find($id);
 
-        echo json_encode(array('success' => true, 'data' => $updated));
+        echo json_encode(array(
+            'success' => true,
+            'data' => $updated,
+            'propagated_count' => $propagatedCount,
+        ));
     }
 
     public function candidates(int $id): void

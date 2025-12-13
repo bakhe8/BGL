@@ -15,8 +15,12 @@ status: active
 
 | الوثيقة | الأهمية | الوصف |
 |---------|---------|-------|
-| [matching-system-guide.md](matching-system-guide.md) | ⭐⭐⭐ إلزامي | دليل شامل لنظام المطابقة والاقتراحات |
-| [api-response-structure.md](api-response-structure.md) | ⭐⭐⭐ إلزامي | بنية استجابات API وكيفية قراءتها |
+| [01-System-Overview.md](01-System-Overview.md) | ⭐⭐⭐ | نظرة عامة على النظام |
+| [02-User-Guide.md](02-User-Guide.md) | ⭐⭐ | دليل المستخدم |
+| [03-Matching-Engine.md](03-Matching-Engine.md) | ⭐⭐⭐ | محرك المطابقة |
+| [04-Technical-Reference.md](04-Technical-Reference.md) | ⭐⭐ | المرجع التقني |
+| [05-Deployment.md](05-Deployment.md) | ⭐ | دليل النشر |
+| [06-Decision-Page.md](06-Decision-Page.md) | ⭐⭐⭐ جديد | صفحة اتخاذ القرار |
 
 ---
 

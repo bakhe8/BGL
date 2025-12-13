@@ -56,23 +56,38 @@ class ImportService
             throw new RuntimeException('لم يتم العثور على صفوف صالحة في الملف.');
         }
 
-        // السطر الأول رؤوس
-        $headers = array_shift($rows);
-        $map = $this->detector->detect($headers);
+        // Smart Header Detection: جرب أول 5 صفوف حتى نجد الرؤوس الصحيحة
+        $headerRowIndex = 0;
+        $map = [];
+        $maxAttempts = min(5, count($rows));
+
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            $testMap = $this->detector->detect($rows[$i]);
+
+            // إذا وجدنا supplier و bank → هذه هي الرؤوس!
+            if (isset($testMap['supplier']) && isset($testMap['bank'])) {
+                $headerRowIndex = $i;
+                $map = $testMap;
+                break;
+            }
+        }
 
         // التحقق من الأعمدة الأساسية
         if (!isset($map['supplier']) || !isset($map['bank'])) {
             throw new RuntimeException('⚠️ لم نستطع التعرف على عمود اسم المورد أو عمود البنك. يرجى التأكد من أن ملف Excel يحتوي على الأعمدة المطلوبة بصيغة معروفة.');
         }
 
+        // البيانات تبدأ من بعد صف الرؤوس
+        $dataRows = array_slice($rows, $headerRowIndex + 1);
+
         // تسريع عمليات SQLite: تجميع الإدخالات في معاملة واحدة
         $pdo = \App\Support\Database::connection();
         $pdo->beginTransaction();
         $count = 0;
         $skipped = [];
-        $rowIndex = 1; // Start from 2 because header is shifted
+        $rowIndex = $headerRowIndex + 1; // Start counting from header position + 1
 
-        foreach ($rows as $row) {
+        foreach ($dataRows as $row) {
             $rowIndex++;
             $supplier = $this->colValue($row, $map['supplier'] ?? null);
             $bank = $this->colValue($row, $map['bank'] ?? null);

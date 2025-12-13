@@ -111,5 +111,24 @@ status: active
 - `storage/`: البيانات المتغيرة (DB, Uploads, Logs).
 - `www/`: الواجهة الأمامية (Public).
 
+## 5. واجهة المستخدم (Frontend Architecture)
+
+يعتمد النظام الآن على **Single Interface Architecture** (واجهة القرار الموحدة).
+
+### الملف الرئيسي: `decision.js`
+هو المتحكم الرئيسي في الواجهة (`assets/js/decision/decision.js`) ويعمل ضمن الـ Namespace `BGL.Decision`.
+
+**المسؤوليات:**
+1. **إدارة الحالة (State):** يحتفظ بالسجلات، المؤشر الحالي، والقوائم المساعدة.
+2. **الاستيراد (Import):** يرسل الملفات إلى `/api/import/excel`.
+3. **التحديث (Refresh):** يعيد تحميل البيانات وتصفية "آخر جلسة" (`latestSessionId`).
+4. **المطابقة (Matching):**
+   - يجلب الاقتراحات من `/api/records/{id}/candidates`.
+   - يدمجها مع القاموس المحلي (`localStorage`/Memory).
+5. **التعلم والحفظ**:
+   - يرسل القرار إلى `/api/records/{id}/decision`.
+   - يدعم **Hybrid Case** (يقبل الـ Backend الآن `match_status` و `matchStatus`).
+   - يرسل الأسماء الخام (`raw_name`) لتمكين التعلم.
+
 ---
 
