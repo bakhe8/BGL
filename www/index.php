@@ -55,10 +55,17 @@ try {
     $settingsController = new SettingsController();
 
     // صفحات HTML
+    if ($method === 'GET' && ($uri === '/' || $uri === '/records')) {
+        echo file_get_contents(__DIR__ . '/records.html');
+        exit;
+    }
+
+    /* Deprecated import.html route
     if ($method === 'GET' && ($uri === '/' || $uri === '/import')) {
         echo file_get_contents(__DIR__ . '/import.html');
         exit;
     }
+    */
 
     if ($method === 'GET' && $uri === '/records') {
         echo file_get_contents(__DIR__ . '/records.html');

@@ -11,7 +11,32 @@ use App\Repositories\SupplierLearningRepository;
 use App\Support\Config;
 use App\Support\Normalizer;
 use App\Support\Settings;
+use App\Support\SimilarityCalculator;
 use App\Services\CandidateService;
+
+/**
+ * =============================================================================
+ * MatchingService - خدمة المطابقة أثناء الاستيراد
+ * =============================================================================
+ * 
+ * استخدام SimilarityCalculator في هذا الملف:
+ * ----------------------------------------
+ * يستخدم هذا الملف SimilarityCalculator::fastLevenshteinRatio() لأن:
+ * 
+ * 1. السياق: الاستيراد (Import) - النصوص تأتي من Excel
+ * 2. ضمان الطول: ملفات Excel محدودة الطول (< 255 حرف لكل خلية)
+ * 3. الأداء: عمليات كثيرة أثناء الاستيراد تحتاج سرعة
+ * 4. الأمان: النصوص مضمونة ومُتحقق منها قبل الوصول لهنا
+ * 
+ * ⚠️ ملاحظة هامة:
+ * لا تستخدم fastLevenshteinRatio() في:
+ * - الواجهات الأمامية (استخدم safeLevenshteinRatio)
+ * - البحث اليدوي من المستخدم
+ * - أي مكان قد يدخل فيه المستخدم نصوص طويلة
+ * 
+ * راجع: app/Support/SimilarityCalculator.php للتفاصيل
+ * =============================================================================
+ */
 
 class MatchingService
 {
@@ -61,13 +86,13 @@ class MatchingService
         $learned = $this->supplierLearning->findByNormalized($normalized);
         if ($learned) {
             if ($learned['learning_status'] === 'supplier_alias') {
-                $result['supplier_id'] = (int)$learned['linked_supplier_id'];
+                $result['supplier_id'] = (int) $learned['linked_supplier_id'];
                 $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
                 return $result;
             }
-            if ($learned['learning_status'] === 'supplier_blocked' && (int)$learned['linked_supplier_id'] > 0) {
+            if ($learned['learning_status'] === 'supplier_blocked' && (int) $learned['linked_supplier_id'] > 0) {
                 // تجاهل المورد المحظور لهذا الاسم
-                $result['_blocked_supplier_id'] = (int)$learned['linked_supplier_id'];
+                $result['_blocked_supplier_id'] = (int) $learned['linked_supplier_id'];
             }
         }
 
@@ -75,7 +100,7 @@ class MatchingService
         foreach ($this->overrides->allNormalized() as $ov) {
             $ovNorm = $this->normalizer->normalizeSupplierName($ov['override_name']);
             if ($ovNorm === $normalized) {
-                if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int)$ov['supplier_id']) {
+                if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int) $ov['supplier_id']) {
                     $result['supplier_id'] = $ov['supplier_id'];
                     $result['match_status'] = 'ready';
                     return $result;
@@ -98,8 +123,8 @@ class MatchingService
             }
         }
 
-        if ($supplierKey && (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int)$supplierKey['id'])) {
-            $result['supplier_id'] = (int)$supplierKey['id'];
+        if ($supplierKey && (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int) $supplierKey['id'])) {
+            $result['supplier_id'] = (int) $supplierKey['id'];
             $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
             return $result;
         }
@@ -114,8 +139,8 @@ class MatchingService
         }
 
         if ($supplierExact) {
-            if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int)$supplierExact['id']) {
-                $result['supplier_id'] = (int)$supplierExact['id'];
+            if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int) $supplierExact['id']) {
+                $result['supplier_id'] = (int) $supplierExact['id'];
                 $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
                 return $result;
             }
@@ -142,17 +167,18 @@ class MatchingService
             if ($candNorm === '') {
                 continue;
             }
-            if (isset($result['_blocked_supplier_id']) && $result['_blocked_supplier_id'] === (int)$row['id']) {
+            if (isset($result['_blocked_supplier_id']) && $result['_blocked_supplier_id'] === (int) $row['id']) {
                 continue;
             }
-            $score = $this->levenshteinRatio($normalized, $candNorm);
+            // استخدام النسخة السريعة - آمن لأن النصوص من Excel (< 255 بايت)
+            $score = SimilarityCalculator::fastLevenshteinRatio($normalized, $candNorm);
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $row;
             }
         }
         if ($best && $bestScore >= 0.9) {
-            $result['supplier_id'] = (int)$best['id'];
+            $result['supplier_id'] = (int) $best['id'];
             $result['match_status'] = 'needs_review'; // fuzzy → مراجعة
         }
 
@@ -174,12 +200,12 @@ class MatchingService
         $learned = $this->bankLearning?->findByNormalized($normalized);
         if ($learned) {
             if ($learned['status'] === 'alias' && !empty($learned['bank_id'])) {
-                $result['bank_id'] = (int)$learned['bank_id'];
+                $result['bank_id'] = (int) $learned['bank_id'];
                 return $result;
             }
             if ($learned['status'] === 'blocked') {
                 if (!empty($learned['bank_id'])) {
-                    $result['_blocked_bank_id'] = (int)$learned['bank_id'];
+                    $result['_blocked_bank_id'] = (int) $learned['bank_id'];
                 } else {
                     // محظور بشكل عام لهذا الاسم → لا تطابق
                     return $result;
@@ -195,12 +221,12 @@ class MatchingService
         // Step 1: short code exact
         if ($short !== '') {
             foreach ($this->cachedBanks as $row) {
-                $sc = strtoupper(trim((string)($row['short_code'] ?? '')));
+                $sc = strtoupper(trim((string) ($row['short_code'] ?? '')));
                 if ($sc !== '' && $sc === $short) {
-                    if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int)$row['id']) {
+                    if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int) $row['id']) {
                         continue;
                     }
-                    $result['bank_id'] = (int)$row['id'];
+                    $result['bank_id'] = (int) $row['id'];
                     $result['final_name'] = $row['official_name'] ?? null;
                     return $result;
                 }
@@ -213,21 +239,22 @@ class MatchingService
             $bestScore = 0.0;
             $threshold = 0.9;
             foreach ($this->cachedBanks as $row) {
-                $sc = strtoupper(trim((string)($row['short_code'] ?? '')));
+                $sc = strtoupper(trim((string) ($row['short_code'] ?? '')));
                 if ($sc === '') {
                     continue;
                 }
-                if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int)$row['id']) {
+                if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int) $row['id']) {
                     continue;
                 }
-                $score = $this->levenshteinRatio($short, $sc);
+                // استخدام النسخة السريعة - الرموز المختصرة دائماً قصيرة
+                $score = SimilarityCalculator::fastLevenshteinRatio($short, $sc);
                 if ($score > $bestScore) {
                     $bestScore = $score;
                     $best = $row;
                 }
             }
             if ($best && $bestScore >= $threshold) {
-                $result['bank_id'] = (int)$best['id'];
+                $result['bank_id'] = (int) $best['id'];
                 $result['final_name'] = $best['official_name'] ?? null;
                 return $result;
             }
@@ -247,8 +274,8 @@ class MatchingService
         }
 
         if ($bankKey) {
-            if (!isset($result['_blocked_bank_id']) || $result['_blocked_bank_id'] !== (int)$bankKey['id']) {
-                $result['bank_id'] = (int)$bankKey['id'];
+            if (!isset($result['_blocked_bank_id']) || $result['_blocked_bank_id'] !== (int) $bankKey['id']) {
+                $result['bank_id'] = (int) $bankKey['id'];
                 $result['final_name'] = $bankKey['officialNameAr'] ?? $bankKey['officialName'] ?? null;
                 return $result;
             }
@@ -263,29 +290,23 @@ class MatchingService
             if ($key === '') {
                 continue;
             }
-            if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int)$row['id']) {
+            if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int) $row['id']) {
                 continue; // محظور لهذا البنك
             }
-            $score = $this->levenshteinRatio($normalized, $key);
+            // استخدام النسخة السريعة - normalized_key مضمون القصر
+            $score = SimilarityCalculator::fastLevenshteinRatio($normalized, $key);
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $row;
             }
         }
         if ($best && $bestScore >= $threshold) {
-            $result['bank_id'] = (int)$best['id'];
+            $result['bank_id'] = (int) $best['id'];
             $result['final_name'] = $best['official_name'] ?? null;
         }
         return $result;
     }
 
-    private function levenshteinRatio(string $a, string $b): float
-    {
-        $len = max(mb_strlen($a), mb_strlen($b));
-        if ($len === 0) {
-            return 0.0;
-        }
-        $dist = levenshtein($a, $b);
-        return max(0.0, 1.0 - ($dist / $len));
-    }
+    // ملاحظة: تم نقل دوال حساب التشابه إلى SimilarityCalculator
+    // راجع: app/Support/SimilarityCalculator.php
 }

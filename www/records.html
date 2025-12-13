@@ -6,6 +6,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>السجلات</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif'],
+            mono: ['Inter', 'monospace'],
+          },
+          colors: {
+            primary: '#2563eb',
+            'primary-soft': '#dbeafe',
+          }
+        }
+      }
+    }
+  </script>
   <style>
     /* Compact Layout */
     tr.inline-panel-row td {
@@ -203,7 +225,7 @@
         <span class="app-title">نظام إدارة خطابات الضمان</span>
       </div>
       <nav class="app-nav">
-        <a href="/records" class="app-nav-link is-active">السجلات</a>
+        <a href="/" class="app-nav-link is-active">الرئيسية</a>
         <a href="/settings" class="app-nav-link">الإعدادات</a>
       </nav>
     </div>
@@ -213,7 +235,7 @@
     <div class="app-container">
       <section class="page-header">
         <div class="page-header-main">
-          <h1 class="page-title">السجلات</h1>
+          <h1 class="page-title">لوحة التحكم بالسجلات</h1>
           <p class="page-subtitle">عرض الحالة والحقول الأساسية لكل الضمانات المستوردة.</p>
         </div>
         <div class="page-actions">
@@ -241,6 +263,7 @@
             </div>
           </form>
           <div id="uploadError" class="alert alert-danger" style="display:none;"></div>
+          <div id="detectedCols" class="alert alert-warning" style="display:none; margin-top:10px;"></div>
         </div>
       </section>
 
@@ -250,24 +273,25 @@
             <p class="card-title">تصفية وفرز</p>
             <p class="card-subtitle">اختر الحالة وشاهد الإحصاءات.</p>
           </div>
-          <div class="card-actions">
+          <div class="card-actions items-end">
             <div class="form-group" style="min-width:160px;">
               <label class="form-label">تصفية الحالة</label>
               <select id="statusFilter" class="select">
                 <option value="all">الكل</option>
                 <option value="needs_review">يحتاج مراجعة</option>
                 <option value="ready">جاهز</option>
+                <option value="completed">مكتمل (معتمد/مرفوض)</option>
               </select>
             </div>
             <div class="form-group" style="min-width:160px;">
               <label class="form-label">رقم جلسة الاستيراد</label>
               <input id="sessionFilter" class="input" type="number" min="1" placeholder="مثال: 115">
             </div>
-            <button id="refresh" class="btn btn-primary">تحديث</button>
-            <button class="btn btn-subtle" disabled>فرز متقدم (لاحقًا)</button>
+            <button id="refreshBtn" class="btn btn-primary">تحديث</button>
+            <button id="btnRecalcAll" class="btn btn-subtle">إعادة مطابقة الكل</button>
           </div>
         </div>
-        <div class="card-body" id="meta" class="muted"></div>
+        <div class="card-body" id="paginationInfo" class="text-sm text-gray-500"></div>
       </section>
 
       <section class="card">
@@ -281,19 +305,18 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th data-key="id">#</th>
-                <th data-key="rawSupplierName">المورد</th>
-                <th data-key="rawBankName">البنك</th>
-                <th data-key="amount">المبلغ</th>
-                <th data-key="guaranteeNumber">رقم الضمان</th>
-                <th data-key="contractNumber">رقم العقد/أمر الشراء</th>
-                <th data-key="expiryDate">تاريخ الانتهاء</th>
-                <th data-key="matchStatus">الحالة</th>
+                <th data-sort="id" class="cursor-pointer hover:bg-gray-50 rounded-tr-lg">#</th>
+                <th data-sort="rawSupplierName" class="cursor-pointer hover:bg-gray-50">المورد</th>
+                <th data-sort="rawBankName" class="cursor-pointer hover:bg-gray-50">البنك</th>
+                <th data-sort="guaranteeNumber" class="cursor-pointer hover:bg-gray-50">رقم الضمان</th>
+                <th data-sort="date" class="cursor-pointer hover:bg-gray-50">التاريخ</th>
+                <th data-sort="maxScore" class="cursor-pointer hover:bg-gray-50">المطابقة</th>
+                <th class="rounded-tl-lg">الحالة</th>
               </tr>
             </thead>
             <tbody id="tableBody">
               <tr>
-                <td colspan="7" class="muted">لا يوجد سجلات بعد.</td>
+                <td colspan="8" class="muted">لا يوجد سجلات بعد.</td>
               </tr>
             </tbody>
           </table>
@@ -303,891 +326,14 @@
     </div>
   </main>
 
-  <!-- Overlay إدارة القاموس من داخل السجلات -->
-  <div id="dictOverlay" class="overlay-backdrop" style="display:none;">
-    <div class="overlay-card">
-      <div class="overlay-header">
-        <h3 id="dictTitle" class="card-title">إدارة القاموس</h3>
-        <button id="dictClose" class="btn btn-ghost btn-sm">إغلاق</button>
-      </div>
-      <form id="dictForm" class="form-grid" style="grid-template-columns: repeat(2, minmax(0,1fr));">
-        <div class="form-group" id="grpNameAr">
-          <label class="form-label">الاسم العربي الرسمي</label>
-          <input class="input" id="dictNameAr" required>
-        </div>
-        <div class="form-group" id="grpNameEn">
-          <label class="form-label">الاسم الإنجليزي الرسمي</label>
-          <input class="input" id="dictNameEn">
-        </div>
-        <div class="form-group" id="grpNorm">
-          <label class="form-label">normalized_key</label>
-          <input class="input" id="dictNorm">
-        </div>
-        <div class="form-group" id="grpShort">
-          <label class="form-label">short_code</label>
-          <input class="input" id="dictShort">
-        </div>
-        <div class="form-group" id="grpDisplay" style="grid-column: span 2; display:none;">
-          <label class="form-label">اسم عرض (اختياري)</label>
-          <input class="input" id="dictDisplay">
-        </div>
-        <div class="form-group" style="grid-column: span 2;">
-          <button type="submit" class="btn btn-primary" id="dictSaveBtn">حفظ</button>
-          <span id="dictMsg" class="muted" style="margin-right: var(--space-sm);"></span>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script>
-    const tableBody = document.getElementById('tableBody');
-    const statusFilter = document.getElementById('statusFilter');
-    const refreshBtn = document.getElementById('refresh');
-    const meta = document.getElementById('meta');
-    const btnToggleImport = document.getElementById('btnToggleImport');
-    const importCard = document.getElementById('importCard');
-    const uploadForm = document.getElementById('uploadForm');
-    const fileInput = document.getElementById('fileInput');
-    const uploadMsg = document.getElementById('uploadMsg');
-    const uploadError = document.getElementById('uploadError');
-    const btnRecalcAll = null; // recalc متوقف حالياً
-    // Overlay dictionary
-    const overlay = document.getElementById('dictOverlay');
-    const overlayForm = document.getElementById('dictForm');
-    const overlayTitle = document.getElementById('dictTitle');
-    const overlayClose = document.getElementById('dictClose');
-    const overlayMsg = document.getElementById('dictMsg');
-    const inpNameAr = document.getElementById('dictNameAr');
-    const inpNameEn = document.getElementById('dictNameEn');
-    const inpNorm = document.getElementById('dictNorm');
-    const inpShort = document.getElementById('dictShort');
-    const inpDisplay = document.getElementById('dictDisplay');
-    const grpDisplay = document.getElementById('grpDisplay');
-    let overlayMode = null; // bank_create, bank_edit, supplier_create, supplier_edit
-    let overlayId = null;
-    let supplierCache = [];
-    let supplierCandidates = [];
-    let supplierInputRaw = '';
-    let supplierInputDebounce = null;
-
-    let records = [];
-    let sortKey = 'id';
-    let sortDir = 'desc';
-    let selectedRecord = null;
-    let panelRowId = 'inline-panel-row';
-    let supplierSuggestions, bankSuggestions, conflictsBox, decisionMsg, panelMeta, bankDisplayBox, btnRejectSupplier, supplierInput;
-    let selectedSupplierName = null;
-    let selectedSupplierId = null;
-    let selectedSupplierBlockedId = null;
-    let selectedBankName = null;
-    let selectedBankId = null;
-    let autoSaved = false;
-
-    let bankMap = {}; // id => {official_name, official_name_en, normalized_key, short_code}
-    let bankNormMap = {}; // normalized_key => best display
-    let supplierMap = {}; // id => {official_name, ...}
-    let createSupplierBtn = null;
-
-    const escapeHtml = (str = '') => String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-
-    function formatEntity(raw, normalized, id, typeLabel, displayOverride = '') {
-      const hasId = !!id;
-      let fromCache = '';
-      if (hasId) {
-        if (typeLabel === 'bank' && bankMap[id]) {
-          fromCache = bankMap[id].official_name || '';
-        } else if (typeLabel === 'supplier' && supplierMap[id]) {
-          fromCache = supplierMap[id].official_name || '';
-        }
-      }
-
-      const normHit = typeLabel === 'bank' && normalized && bankNormMap[normalized]
-        ? bankNormMap[normalized]
-        : '';
-
-      const preferred = displayOverride || fromCache || normHit;
-      const display = preferred || normalized || raw || '—';
-      const title = raw ? `title="القيمة الأصلية: ${escapeHtml(raw)}"` : '';
-
-      // Visual cue for resolved vs raw
-      const style = hasId ? 'font-weight:600; color:#1f2937;' : 'color:#4b5563;';
-      return `<span ${title} style="${style}">${escapeHtml(display)}</span>`;
-    }
-
-    async function loadRecords() {
-      tableBody.innerHTML = '<tr><td colspan="8" class="muted">جارٍ التحميل...</td></tr>';
-      const params = new URLSearchParams();
-      const sid = sessionFilter.value ? sessionFilter.value.trim() : '';
-      if (sid) params.set('session_id', sid);
-      const url = params.toString() ? `/api/records?${params.toString()}` : '/api/records';
-      const res = await fetch(url);
-      const json = await res.json();
-      if (!json.success) {
-        tableBody.innerHTML = '<tr><td colspan="8" class="muted">تعذر تحميل السجلات</td></tr>';
-        return;
-      }
-      records = json.data || [];
-      await ensureBanksCache();
-      render();
-    }
-
-    async function ensureBanksCache(force = false) {
-      if (!force && Object.keys(bankMap).length) return;
-      try {
-        const res = await fetch('/api/dictionary/banks');
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          bankMap = {};
-          bankNormMap = {};
-          json.data.forEach(b => {
-            bankMap[b.id] = b;
-            if (b.normalized_key) {
-              const disp = b.official_name || '';
-              if (disp && !bankNormMap[b.normalized_key]) {
-                bankNormMap[b.normalized_key] = disp;
-              }
-            }
-          });
-        }
-      } catch (_) { /* ignore cache errors */ }
-    }
-
-    function applyFilter(data) {
-      const f = statusFilter.value;
-      if (f === 'all') return data;
-      return data.filter(r => (r.matchStatus || '') === f);
-    }
-
-    function sortData(data) {
-      return data.slice().sort((a, b) => {
-        const va = a[sortKey];
-        const vb = b[sortKey];
-        if (va == null && vb == null) return 0;
-        if (va == null) return sortDir === 'asc' ? -1 : 1;
-        if (vb == null) return sortDir === 'asc' ? 1 : -1;
-        if (!isNaN(va) && !isNaN(vb)) {
-          return sortDir === 'asc' ? va - vb : vb - va;
-        }
-        return sortDir === 'asc'
-          ? String(va).localeCompare(String(vb))
-          : String(vb).localeCompare(String(va));
-      });
-    }
-
-    function render() {
-      const filtered = applyFilter(records);
-      const data = sortData(filtered);
-      const skipped = (window.totalRowsProcessed ?? records.length) - records.length; // fallback بسيط
-      meta.textContent = `الإجمالي: ${records.length} | المعروض: ${data.length} | المتخطى: ${skipped >= 0 ? skipped : 0}`;
-      if (!data.length) {
-        tableBody.innerHTML = '<tr><td colspan="8" class="muted">لا يوجد سجلات.</td></tr>';
-        return;
-      }
-      tableBody.innerHTML = data.map(r => `
-        <tr class="${selectedRecord && selectedRecord.id === r.id ? 'selected' : ''}" data-id="${r.id}" style="cursor:pointer;">
-      <td>${r.id ?? ''}</td>
-      <td>${formatEntity(r.supplierDisplay || r.rawSupplierName, r.normalizedSupplier, r.supplierId, 'supplier')}</td>
-      <td>${formatEntity(r.rawBankName, r.normalizedBank, r.bankId, 'bank', r.bankDisplay)}</td>
-          <td>${r.amount ?? ''}</td>
-          <td>${r.guaranteeNumber ?? ''}</td>
-          <td>${r.contractNumber ?? ''}</td>
-          <td>${r.expiryDate ?? ''}</td>
-          <td><span class="status-badge ${r.matchStatus === 'ready' ? 'status-ready' : 'status-review'}">${r.matchStatus === 'ready' ? 'جاهز' : 'يحتاج مراجعة'}</span></td>
-        </tr>
-      `).join('');
-      document.querySelectorAll('th[data-key]').forEach(th => {
-        th.onclick = () => {
-          const key = th.getAttribute('data-key');
-          if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-          else { sortKey = key; sortDir = 'asc'; }
-          render();
-        };
-      });
-      document.querySelectorAll('tbody tr[data-id]').forEach(row => {
-        row.addEventListener('click', () => openPanel(parseInt(row.dataset.id, 10)));
-      });
-    }
-
-    async function openPanel(id) {
-      const rec = records.find(r => r.id === id);
-      if (!rec) return;
-      selectedRecord = rec;
-      selectedSupplierName = null;
-      selectedSupplierId = null;
-      selectedBankName = null;
-      selectedBankId = null;
-      autoSaved = false;
-      render(); // highlight row
-      insertPanelRow(rec);
-      await loadCandidates(rec.id);
-    }
-
-    function fillRaw(rec) {
-      document.getElementById('pSupplier').textContent = rec.rawSupplierName || '—';
-      document.getElementById('pBank').textContent = rec.rawBankName || '—';
-      const pc = document.getElementById('pContract');
-      if (pc) pc.textContent = rec.contractNumber || '—';
-      const pg = document.getElementById('pGuarantee');
-      if (pg) pg.textContent = rec.guaranteeNumber || '—';
-    }
-
-
-
-    // ---------- Overlay dictionary ----------
-    async function openOverlay(mode, id = null, prefill = {}) {
-      await ensureBanksCache(true);
-      overlayMode = mode;
-      overlayId = id;
-      overlayMsg.textContent = '';
-      document.body.classList.add('overlay-open');
-      // reset
-      [inpNameAr, inpNameEn, inpNorm, inpShort, inpDisplay].forEach(el => el.value = '');
-      grpDisplay.style.display = mode.startsWith('supplier') ? 'block' : 'none';
-      if (mode === 'bank_create' || mode === 'bank_edit') {
-        overlayTitle.textContent = mode === 'bank_edit' ? 'تعديل بنك' : 'إضافة بنك جديد';
-        const b = (id && bankMap[id]) ? bankMap[id] : null;
-        if (mode === 'bank_edit' && b) {
-          inpNameAr.value = b.official_name || '';
-          inpNameEn.value = b.official_name_en || '';
-          inpNorm.value = b.normalized_key || '';
-          inpShort.value = b.short_code || '';
-        } else if (prefill.name) {
-          inpNameAr.value = prefill.name;
-          inpNameEn.value = '';
-          inpNorm.value = '';
-          inpShort.value = '';
-        }
-      } else {
-        overlayTitle.textContent = mode === 'supplier_edit' ? 'تعديل مورد' : 'إضافة مورد جديد';
-        if (mode === 'supplier_edit' && id) {
-          const sup = supplierCache.find(s => s.id === id);
-          if (sup) {
-            inpNameAr.value = sup.official_name || '';
-            inpDisplay.value = sup.display_name || '';
-            inpNorm.value = sup.normalized_name || '';
-            inpShort.value = sup.supplier_normalized_key || '';
-          }
-        } else if (prefill.name) {
-          inpNameAr.value = prefill.name;
-          inpDisplay.value = '';
-          inpNorm.value = '';
-          inpShort.value = '';
-        }
-      }
-      overlay.style.display = 'block';
-    }
-
-    function closeOverlay() {
-      overlay.style.display = 'none';
-      overlayMode = null;
-      overlayId = null;
-      document.body.classList.remove('overlay-open');
-    }
-
-    overlayClose?.addEventListener('click', () => closeOverlay());
-
-    overlayForm?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!overlayMode) return;
-      overlayMsg.textContent = 'جارٍ الحفظ...';
-      let url = '';
-      let payload = {};
-      if (overlayMode === 'bank_create' || overlayMode === 'bank_edit') {
-        url = overlayMode === 'bank_edit' && overlayId ? `/api/dictionary/banks/${overlayId}` : '/api/dictionary/banks';
-        payload = {
-          official_name: inpNameAr.value.trim(),
-          official_name_en: inpNameEn.value.trim(),
-          normalized_key: inpNorm.value.trim(),
-          short_code: inpShort.value.trim(),
-        };
-      } else {
-        url = overlayMode === 'supplier_edit' && overlayId ? `/api/dictionary/suppliers/${overlayId}` : '/api/dictionary/suppliers';
-        payload = {
-          official_name: inpNameAr.value.trim(),
-          display_name: inpDisplay.value.trim(),
-        };
-      }
-      try {
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        const json = await res.json();
-        if (!json.success) throw new Error(json.message || 'تعذر الحفظ');
-        overlayMsg.textContent = 'تم الحفظ';
-        await Promise.all([ensureBanksCache(true), loadSuppliersCache()]);
-        await loadRecords();
-        closeOverlay();
-      } catch (err) {
-        overlayMsg.textContent = err.message || 'تعذر الحفظ';
-        overlayMsg.className = 'alert alert-error';
-      }
-    });
-    async function loadSuppliersCache() {
-      try {
-        const res = await fetch('/api/dictionary/suppliers');
-        const json = await res.json();
-        if (json.success) {
-          supplierCache = json.data || [];
-          supplierMap = {};
-          supplierCache.forEach(s => {
-            supplierMap[s.id] = s;
-          });
-        }
-      } catch (e) {
-        console.error('Failed to load suppliers', e);
-      }
-    }
-
-    // استيراد ملف
-    btnToggleImport.addEventListener('click', () => {
-      const isHidden = importCard.style.display === 'none';
-      importCard.style.display = isHidden ? 'block' : 'none';
-    });
-
-    if (uploadForm) {
-      uploadForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        uploadError.style.display = 'none';
-        uploadMsg.textContent = '';
-        if (!fileInput.files.length) {
-          uploadError.textContent = 'اختر ملفًا أولاً';
-          uploadError.style.display = 'block';
-          return;
-        }
-        uploadMsg.textContent = 'جارٍ الرفع...';
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        try {
-          const res = await fetch('/api/import/excel', { method: 'POST', body: formData });
-          const json = await res.json();
-          if (!json.success) throw new Error(json.message || 'فشل الرفع');
-          const rc = json.data?.records_count ?? json.records_count ?? '';
-          const sid = json.data?.session_id ?? json.session_id ?? 'غير معروفة';
-          uploadMsg.textContent = `تم الاستيراد: ${rc} سجل (جلسة ${sid})`;
-          uploadMsg.className = 'text-sm text-green-700';
-          fileInput.value = '';
-          await loadRecords();
-        } catch (err) {
-          uploadError.textContent = err.message || 'تعذر الاتصال بالخادم';
-          uploadError.style.display = 'block';
-        }
-      });
-    }
-
-    // تحميل الموردين مسبقاً لاستخدامهم في Overlay
-    loadSuppliersCache();
-
-    // --- Global Variables ---
-    let comboCandidates = [];
-    let bankComboCandidates = [];
-    let activeComboIndex = -1;
-    let bankInput = null; // New variable
-    // Other variables (selectedRecord, supplierInput, etc.) are declared at the top of the file
-
-    // --- Panel Management ---
-    function insertPanelRow(rec) {
-      selectedRecord = rec;
-      selectedSupplierName = rec.supplierDisplay || ''; // Use display if available
-      selectedSupplierId = rec.supplierId || null;
-      selectedBankName = rec.bankDisplay || '';
-      selectedBankId = rec.bankId || null;
-
-      // Close existing
-      const existing = document.getElementById(panelRowId);
-      if (existing) existing.remove();
-
-      const rowEl = document.querySelector(`tbody tr[data-id="${rec.id}"]`);
-      if (!rowEl) return;
-
-      const panelHtml = `
-        <tr id="${panelRowId}" class="inline-panel-row">
-          <td colspan="8">
-            <div class="review-panel-compact">
-              <!-- Top Bar: Info -->
-              <div class="panel-header">
-                <span class="badge-lg">${rec.guaranteeNumber || 'N/A'}</span>
-                <span class="badge-lg money">${rec.amount ?? 'N/A'}</span>
-                <span class="badged-meta">جلسة #${rec.sessionId ?? ''} | السجل #${rec.id}</span>
-                <div style="margin-right:auto; display:flex; gap:8px;">
-                     <button class="btn btn-ghost btn-sm" onclick="openOverlay('supplier_create', null, { name: '${escapeHtml(rec.rawSupplierName || '')}' })">قاموس الموردين</button>
-                     <button class="btn btn-ghost btn-sm" onclick="openOverlay('bank_create', null, { name: '${escapeHtml(rec.rawBankName || '')}' })">قاموس البنوك</button>
-                </div>
-              </div>
-              
-              <div class="review-grid">
-                <!-- Col 1: Source -->
-                <div class="col-source">
-                  <div class="val-group">
-                    <label>البيانات الأصلية (للمقارنة)</label>
-                    <div class="val-box">${escapeHtml(rec.rawSupplierName || '—')}</div>
-                    <div class="val-box" style="margin-top:4px;">${escapeHtml(rec.rawBankName || '—')}</div>
-                  </div>
-                   <div id="conflictsBox" class="alert alert-warning" style="display:none; font-size:0.85em;"></div>
-                </div>
-
-                <!-- Col 2: Decision -->
-                <div class="col-decision">
-                  <div>
-                    <label class="val-label">تحديد المورد</label>
-                    <div class="autocomplete-wrapper">
-                      <input type="text" id="supplierInput" class="autocomplete-input" placeholder="اكتب للبحث أو اختر من القائمة..." autocomplete="off">
-                      <div id="supplierDropdown" class="autocomplete-list"></div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                     <label class="val-label">البنك المعتمد</label>
-                     <div class="autocomplete-wrapper">
-                       <input type="text" id="bankInput" class="autocomplete-input" placeholder="ابحث عن البنك..." autocomplete="off">
-                       <div id="bankDropdown" class="autocomplete-list"></div>
-                     </div>
-                  </div>
-                  
-                </div>
-              </div>
-
-              <div class="panel-footer">
-                <div id="decisionMsg" class="decision-msg muted"></div>
-                <button id="btnSaveDecision" class="btn btn-primary">حفظ واعتماد (Enter)</button>
-              </div>
-            </div>
-          </td>
-        </tr>`;
-
-      rowEl.insertAdjacentHTML('afterend', panelHtml);
-
-      // Bind Elements
-      supplierInput = document.getElementById('supplierInput');
-      const supplierDropdown = document.getElementById('supplierDropdown');
-      bankInput = document.getElementById('bankInput');
-      const bankDropdown = document.getElementById('bankDropdown');
-      conflictsBox = document.getElementById('conflictsBox');
-      decisionMsg = document.getElementById('decisionMsg');
-
-      const btnSave = document.getElementById('btnSaveDecision');
-      if (btnSave) btnSave.onclick = saveDecision;
-
-      // Setup Combos
-      setupCombobox(supplierInput, supplierDropdown, 'supplier');
-      setupCombobox(bankInput, bankDropdown, 'bank');
-
-      // Load Data
-      loadCandidates(rec.id, rec.rawSupplierName);
-    }
-
-    // --- Combobox Logic ---
-    function setupCombobox(input, listEl, type) {
-      if (!input || !listEl) return;
-
-      input.addEventListener('focus', () => {
-        const list = type === 'supplier' ? comboCandidates : bankComboCandidates;
-        renderDropdown(listEl, list, type, input.value.trim()); // Pass current value
-        listEl.classList.add('open');
-      });
-
-      // Delay blur to allow click
-      input.addEventListener('blur', () => {
-        setTimeout(() => listEl.classList.remove('open'), 200);
-      });
-
-      input.addEventListener('input', (e) => {
-        const val = e.target.value.toLowerCase().trim();
-        // Reset IDs on manual type
-        if (type === 'supplier') {
-          selectedSupplierId = null;
-        } else {
-          selectedBankId = null;
-        }
-
-        // 1. Filter Smart Suggestions
-        const sourceList = type === 'supplier' ? comboCandidates : bankComboCandidates;
-        const smart = sourceList.filter(c => (c.name || '').toLowerCase().includes(val));
-
-        // 2. Search Full Dictionary
-        let dict = [];
-        if (type === 'supplier') {
-          dict = supplierCache
-            .filter(s => (s.official_name || '').toLowerCase().includes(val))
-            .map(s => ({ name: s.official_name, supplier_id: s.id, match_type: 'search', score_raw: 0 }));
-        } else {
-          dict = Object.values(bankMap)
-            .filter(b => (b.official_name || '').toLowerCase().includes(val))
-            .map(b => ({ name: b.official_name, bank_id: b.id, match_type: 'search', score_raw: 0 }));
-        }
-
-        // 3. Merge (Deduplicate)
-        const seen = new Set(smart.map(c => c.name));
-        const merged = [...smart];
-        dict.forEach(d => {
-          if (!seen.has(d.name)) {
-            merged.push(d);
-            seen.add(d.name);
-          }
-        });
-
-        renderDropdown(listEl, merged.slice(0, 100), type, val); // Pass val
-        listEl.classList.add('open');
-      });
-
-      input.addEventListener('keydown', (e) => {
-        const items = listEl.querySelectorAll('.suggestion-item');
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          activeComboIndex = Math.min(activeComboIndex + 1, items.length - 1);
-          highlightItem(items);
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          activeComboIndex = Math.max(activeComboIndex - 1, -1);
-          highlightItem(items);
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (activeComboIndex >= 0 && items[activeComboIndex]) {
-            // Select from list
-            // trigger click logic
-            const idx = parseInt(items[activeComboIndex].dataset.idx);
-            const sourceList = type === 'supplier' ? comboCandidates : bankComboCandidates; // Note: if filtered? 
-            // We need to match filtered list. 
-            // Better: selectCandidate(filtered[idx])? 
-            // Current renderDropdown uses original index? 
-            // Let's rely on click handler logic which uses dataset.idx.
-            // Wait, dataset.idx points to... index in the RENDERED list or SOURCE list?
-            // In renderDropdown below, we should use index in array passed.
-            // So we need access to 'filtered' here.
-            // Simplified: Just use click on element.
-            items[activeComboIndex].dispatchEvent(new Event('mousedown')); // mousedown is bound
-          } else {
-            // Submit form
-            saveDecision();
-          }
-        }
-      });
-    }
-
-    function highlightItem(items) {
-      items.forEach((item, i) => {
-        if (i === activeComboIndex) {
-          item.classList.add('active');
-          item.scrollIntoView({ block: 'nearest' });
-        } else {
-          item.classList.remove('active');
-        }
-      });
-    }
-
-    function renderDropdown(el, list, type, query = '') {
-      el.innerHTML = '';
-      if (!list.length) {
-        if (!query) {
-          el.innerHTML = '<div class="p-2 text-gray-500 text-sm">اكتب للبحث في القاموس...</div>';
-        } else {
-          el.innerHTML = '<div class="p-2 text-gray-500 text-sm">لا توجد نتائج (سيتم الحفظ كجديد)</div>';
-        }
-        return;
-      }
-      list.forEach((c, i) => {
-        const div = document.createElement('div');
-        div.className = 'suggestion-item';
-        div.dataset.idx = i; // Index in the PASSED list
-
-        let meta = '';
-        let scoreClass = 'badge-gray';
-        if (c.score_raw >= 0.9) scoreClass = 'badge-green';
-        else if (c.score_raw >= 0.8) scoreClass = 'badge-yellow';
-
-        const scoreTxt = Math.round((c.score_raw || 0) * 100) + '%';
-        meta = `<span class="score-badge ${scoreClass}">${scoreTxt}</span>`;
-        if (c.match_type === 'fuzzy_strong') meta += ' <span class="text-xs text-green-600">(قوي)</span>';
-
-        div.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span class="font-medium">${escapeHtml(c.name)}</span>
-            ${meta}
-          </div>
-        `;
-
-        div.addEventListener('mousedown', (e) => {
-          e.preventDefault(); // Prevent blur
-          selectCandidate(c, type);
-        });
-
-        el.appendChild(div);
-      });
-    }
-
-    function selectCandidate(c, type) {
-      if (type === 'supplier') {
-        selectedSupplierName = c.name;
-        selectedSupplierId = c.supplier_id;
-        selectedSupplierBlockedId = null;
-        if (supplierInput) supplierInput.value = c.name;
-        const dd = document.getElementById('supplierDropdown');
-        if (dd) dd.classList.remove('open');
-      } else {
-        selectedBankName = c.name;
-        selectedBankId = c.bank_id || c.id;
-        if (bankInput) bankInput.value = c.name;
-        const dd = document.getElementById('bankDropdown');
-        if (dd) dd.classList.remove('open');
-      }
-      activeComboIndex = -1;
-    }
-
-    // --- Loading & Saving ---
-    async function loadCandidates(id, rawOverride = '') {
-      if (!supplierInput) return;
-      conflictsBox.style.display = 'none';
-
-      try {
-        const qs = rawOverride ? `?raw_supplier_name=${encodeURIComponent(rawOverride)}` : '';
-        const res = await fetch(`/api/records/${id}/candidates${qs}`);
-        const json = await res.json(); // Assuming this works if API is fine
-
-        const conflicts = json.data?.conflicts || [];
-        if (conflicts.length) {
-          conflictsBox.style.display = 'block';
-          conflictsBox.textContent = 'تنبيه: ' + conflicts.join(', ');
-        }
-
-        // Initialize with API candidates
-        comboCandidates = json.data?.supplier?.candidates || [];
-        bankComboCandidates = json.data?.bank?.candidates || [];
-
-        // ENHANCEMENT: Check Local Cache for Exact Match and Inject
-        // This ensures that if we just created "Company X", it appears here even if backend index lags slightly.
-        if (rawOverride || selectedRecord.rawSupplierName) {
-          const raw = (rawOverride || selectedRecord.rawSupplierName || '').toLowerCase().trim();
-          const exactCache = supplierCache.find(s => (s.official_name || '').toLowerCase() === raw);
-
-          if (exactCache) {
-            // Check if already in candidates
-            const exists = comboCandidates.find(c => c.supplier_id === exactCache.id);
-            if (!exists) {
-              // Add to top
-              comboCandidates.unshift({
-                name: exactCache.official_name,
-                supplier_id: exactCache.id,
-                match_type: 'exact', // treated as exact local match
-                score_raw: 1.0,
-                source: 'local_cache'
-              });
-            }
-            // Also Auto-Select ID if not set
-            if (!selectedSupplierId) {
-              selectedSupplierId = exactCache.id;
-            }
-          }
-        }
-
-        // Set Initial Values
-        if (supplierInput && !supplierInput.value) {
-          supplierInput.value = rawOverride || selectedRecord.rawSupplierDisplay || selectedRecord.rawSupplierName || '';
-        }
-
-        selectedBankName = selectedRecord.bankDisplay || selectedRecord.rawBankName || '';
-        selectedBankId = selectedRecord.bankId || null;
-        if (bankInput) bankInput.value = selectedBankName || '';
-
-        supplierInput.focus();
-
-      } catch (e) {
-        console.error('Error loading candidates:', e);
-      }
-    }
-
-    async function saveDecision() {
-      if (!selectedRecord) return;
-      if (!decisionMsg) decisionMsg = document.getElementById('decisionMsg');
-
-      const rawSupplier = supplierInput.value.trim();
-      if (!rawSupplier) {
-        decisionMsg.textContent = 'الرجاء إدخال اسم المورد';
-        decisionMsg.className = 'decision-msg text-red-600';
-        return;
-      }
-
-      // Auto-Resolve Supplier ID if missing but name matches
-      if (!selectedSupplierId && rawSupplier) {
-        const lower = rawSupplier.toLowerCase();
-        // Check Combo Choices (candidates)
-        const match = comboCandidates.find(c => (c.name || '').toLowerCase() === lower);
-        if (match && match.supplier_id) {
-          selectedSupplierId = match.supplier_id;
-        } else {
-          // Check Cache just in case
-          const matchCache = supplierCache.find(s => (s.official_name || '').toLowerCase() === lower);
-          if (matchCache) selectedSupplierId = matchCache.id;
-        }
-      }
-
-      // AUTO-CREATE SUPPLIER Logic
-      if (!selectedSupplierId && rawSupplier) {
-        decisionMsg.textContent = 'جارٍ إنشاء المورد الجديد...';
-        decisionMsg.className = 'decision-msg text-blue-600';
-        try {
-          const res = await fetch('/api/dictionary/suppliers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ official_name: rawSupplier })
-          });
-          const json = await res.json();
-          if (!json.success) {
-            // If it fails (e.g. duplicate similar name), stop and show error
-            throw new Error(json.message || 'تعذر إنشاء المورد');
-          }
-          selectedSupplierId = json.data.id;
-          // Refresh cache silently
-          loadSuppliersCache();
-        } catch (e) {
-          decisionMsg.textContent = 'خطأ: ' + e.message;
-          decisionMsg.className = 'decision-msg text-red-600';
-          return; // Stop save
-        }
-      }
-
-      const rawBank = bankInput.value.trim();
-      // Auto-Resolve Bank ID if missing
-      if (!selectedBankId && rawBank) {
-        const lower = rawBank.toLowerCase();
-        // Check Combo
-        const match = bankComboCandidates.find(c => (c.name || '').toLowerCase() === lower);
-        if (match && match.bank_id) {
-          selectedBankId = match.bank_id;
-        } else if (match && match.id) {
-          selectedBankId = match.id;
-        }
-      }
-
-      // AUTO-CREATE BANK Logic
-      if (!selectedBankId && rawBank) {
-        decisionMsg.textContent = 'جارٍ إنشاء البنك الجديد...';
-        decisionMsg.className = 'decision-msg text-blue-600';
-        try {
-          const res = await fetch('/api/dictionary/banks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ official_name: rawBank, normalized_key: '' }) // Key generated backend if empty
-          });
-          const json = await res.json();
-          if (!json.success) {
-            throw new Error(json.message || 'تعذر إنشاء البنك');
-          }
-          selectedBankId = json.data.id;
-          await ensureBanksCache(true);
-        } catch (e) {
-          decisionMsg.textContent = 'خطأ: ' + e.message;
-          decisionMsg.className = 'decision-msg text-red-600';
-          return; // Stop save
-        }
-      }
-
-      const payload = {
-        raw_supplier_name: rawSupplier,
-        raw_bank_name: rawBank,
-        supplier_id: selectedSupplierId || null,
-        bank_id: selectedBankId || null,
-        match_status: 'ready'
-      };
-
-      decisionMsg.textContent = 'جارٍ الحفظ والاعتماد...';
-      try {
-        const res = await fetch(`/api/records/${selectedRecord.id}/decision`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        if (!json.success) throw new Error(json.message);
-
-        decisionMsg.textContent = 'تم الحفظ!';
-        decisionMsg.className = 'decision-msg text-green-600';
-
-        // Update Row UI
-        const row = document.querySelector(`tr[data-id="${selectedRecord.id}"]`);
-        if (row) row.style.background = '#f0fdf4';
-
-        // Refresh Logic (delayed)
-        setTimeout(async () => {
-          await loadRecords();
-        }, 500);
-
-      } catch (e) {
-        decisionMsg.textContent = e.message || 'فشل الحفظ';
-        decisionMsg.className = 'decision-msg text-red-600';
-      }
-    }
-
-    // --- Global Recalc Button ---
-    if (btnRecalcAll) {
-      btnRecalcAll.addEventListener('click', async () => {
-        btnRecalcAll.disabled = true;
-        btnRecalcAll.textContent = 'جاري إعادة المطابقة...';
-        try {
-          const res = await fetch('/api/records/recalculate', { method: 'POST' });
-          const json = await res.json(); // Potential failure point if server error
-          if (!json.success) throw new Error(json.message || 'فشل إعادة المطابقة');
-          alert(`تمت إعادة المطابقة: ${json.data?.processed || 0} سجل، جاهز: ${json.data?.ready || 0}`);
-          await loadRecords();
-        } catch (e) {
-          alert(e.message || 'تعذر إعادة المطابقة');
-        } finally {
-          btnRecalcAll.disabled = false;
-          btnRecalcAll.textContent = 'إعادة مطابقة الكل';
-        }
-      });
-    }
-
-    // --- Main Loader ---
-    async function loadRecords() {
-      try {
-        // Handle Session ID if present in URL
-        const search = location.search; // passes ?session_id=...
-
-        const res = await fetch('/api/records' + (search || ''));
-        const text = await res.text(); // Read text first!
-
-        let json;
-        try {
-          json = JSON.parse(text);
-        } catch (parseErr) {
-          console.error("Critical API Error (Not JSON):", text);
-          // Show error to user
-          document.querySelector('.table-empty').innerHTML = `<div class="text-red-600 p-4">خطأ في النظام: ${text.substring(0, 200)}... (راجع الكونسول)</div>`;
-          return;
-        }
-
-        if (!json.success) throw new Error(json.message || 'فشل تحميل السجلات');
-
-        records = json.data;
-        render(); // Calls render() which relies on allRecords and global state
-      } catch (e) {
-        console.error(e);
-        // Do not alert constantly if just refresh
-      }
-    }
-
-    // --- Initialization ---
-    document.addEventListener('click', (e) => {
-      const row = e.target.closest('tbody tr[data-id]');
-      if (!row) return;
-      // Do NOT toggle if clicking inside the panel itself or buttons
-      if (e.target.closest('.inline-panel-row')) return;
-      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-
-      // Find record
-      const id = parseInt(row.dataset.id);
-      const rec = records.find(r => r.id === id);
-      if (rec) insertPanelRow(rec);
-    });
-
-    statusFilter.addEventListener('change', render);
-    refreshBtn.addEventListener('click', loadRecords);
-
-    // Start
-    loadRecords();
-  </script>
+  <!-- Module Scripts (Order Matters) -->
+  <script src="assets/js/shared/api.js?v=180"></script>
+  <script src="assets/js/records/state.js?v=180"></script>
+  <script src="assets/js/records/table.js?v=180"></script>
+  <script src="assets/js/records/autocomplete.js?v=180"></script>
+  <script src="assets/js/records/panel.js?v=180"></script>
+  <script src="assets/js/records/overlay.js?v=180"></script>
+  <script src="assets/js/records/init.js?v=180"></script>
 </body>
 
 </html>
-```

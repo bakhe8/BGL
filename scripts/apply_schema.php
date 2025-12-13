@@ -5,7 +5,7 @@ require __DIR__ . '/../app/Support/autoload.php';
 
 use App\Support\Database;
 
-$schemaPath = __DIR__ . '/../docs/04-Database/schema.sql';
+$schemaPath = __DIR__ . '/../storage/database/schema.sql';
 if (!file_exists($schemaPath)) {
     fwrite(STDERR, "Schema file not found: {$schemaPath}\n");
     exit(1);

@@ -8,6 +8,25 @@ use App\Repositories\BankRepository;
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Support\Normalizer;
 use App\Support\Config;
+use App\Support\SimilarityCalculator;
+
+/**
+ * =============================================================================
+ * استخدام SimilarityCalculator في DictionaryController
+ * =============================================================================
+ * 
+ * هذا الملف يستخدم SimilarityCalculator::fastLevenshteinRatio() لأن:
+ * 
+ * 1. السياق: التحقق من التكرارات في القواميس
+ * 2. ضمان الطول: أسماء الموردين المطبعة عادة قصيرة (< 255 حرف)
+ * 3. الأداء: التحقق السريع مطلوب عند الإضافة/التحديث
+ * 4. الأمان: البيانات مُدخلة من واجهة منضبطة
+ * 
+ * ملاحظة: إذا أضاف المستخدم نصوص طويلة جدًا يدويًا، يجب التحويل لـ safeLevenshteinRatio
+ * 
+ * راجع: app/Support/SimilarityCalculator.php للتفاصيل
+ * =============================================================================
+ */
 
 class DictionaryController
 {
@@ -192,7 +211,8 @@ class DictionaryController
                 continue;
             }
             $candNorm = $this->normalizer->normalizeSupplierName($s['normalized_name'] ?? $s['official_name']);
-            $score = $this->levenshteinRatio($normalized, $candNorm);
+            // استخدام النسخة السريعة - أسماء الموردين عادة قصيرة
+            $score = SimilarityCalculator::fastLevenshteinRatio($normalized, $candNorm);
             if ($score >= 0.90) {
                 return $s['official_name'];
             }
@@ -200,15 +220,8 @@ class DictionaryController
         return null;
     }
 
-    private function levenshteinRatio(string $a, string $b): float
-    {
-        $len = max(mb_strlen($a), mb_strlen($b));
-        if ($len === 0) {
-            return 0.0;
-        }
-        $dist = levenshtein($a, $b);
-        return max(0.0, 1.0 - ($dist / $len));
-    }
+    // ملاحظة: تم نقل دوال حساب التشابه إلى SimilarityCalculator
+    // راجع: app/Support/SimilarityCalculator.php
 
     // ---------- Suggestions (لا تحفظ في DB) ----------
     public function suggestAlias(array $payload): void

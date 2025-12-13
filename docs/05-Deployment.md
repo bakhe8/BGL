@@ -1,3 +1,9 @@
+---
+last_updated: 2025-12-13
+version: 1.1
+status: active
+---
+
 # 05 - النشر والتشغيل (Deployment)
 
 ## المتطلبات (Requirements)

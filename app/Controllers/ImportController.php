@@ -21,13 +21,30 @@ class ImportController
             return;
         }
 
+        // File Type Validation (Security Fix)
+        $allowedMimeTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+        ];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $_FILES['file']['tmp_name']);
+        finfo_close($finfo);
+
+        if (!in_array($mimeType, $allowedMimeTypes, true)) {
+            http_response_code(415);
+            echo json_encode(['success' => false, 'message' => 'نوع الملف غير مسموح. يجب أن يكون ملف Excel (.xlsx)']);
+            return;
+        }
+
         try {
             $tmpPath = $_FILES['file']['tmp_name'];
 
             // حفظ نسخة من الملف في uploads
             $uploadDir = storage_path('uploads');
             if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
+                if (!mkdir($uploadDir, 0755, true)) {
+                    throw new \RuntimeException('فشل إنشاء مجلد الرفع');
+                }
             }
             $destPath = $uploadDir . '/upload_' . date('Ymd_His') . '.xlsx';
             move_uploaded_file($tmpPath, $destPath);

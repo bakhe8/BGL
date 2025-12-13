@@ -1,4 +1,49 @@
 <?php
+/**
+ * =============================================================================
+ * CandidateService - Supplier & Bank Matching Engine
+ * =============================================================================
+ * 
+ * 📚 DOCUMENTATION: docs/matching-system-guide.md
+ * 
+ * PURPOSE:
+ * --------
+ * This service finds potential matches (candidates) for raw supplier/bank names
+ * imported from Excel files. It uses fuzzy matching algorithms to suggest
+ * the most likely official supplier/bank from the database.
+ * 
+ * KEY BUSINESS RULES:
+ * -------------------
+ * 1. EMPTY CANDIDATES IS VALID: If no supplier/bank scores >= 70%, the array
+ *    is intentionally empty. This is NOT a bug.
+ * 
+ * 2. THRESHOLDS:
+ *    - MATCH_AUTO_THRESHOLD (90%): Auto-accept without user review
+ *    - MATCH_REVIEW_THRESHOLD (70%): Minimum score to appear in suggestions
+ *    - Scores below 70% are REJECTED to avoid misleading suggestions
+ * 
+ * 3. SCORING ALGORITHMS (max score wins):
+ *    - Exact match: 1.0
+ *    - Starts with: 0.85
+ *    - Contains: 0.75
+ *    - Levenshtein ratio: 1 - (distance / max_length)
+ *    - Token Jaccard: intersection / union of words
+ * 
+ * 4. DATA SOURCES (checked in order):
+ *    - Learning table (cached user decisions)
+ *    - Overrides table (manual mappings)
+ *    - Official suppliers/banks
+ *    - Alternative names
+ * 
+ * DEBUGGING:
+ * ----------
+ * Run: php debug_supplier_match.php
+ * This shows all suppliers and their similarity scores to help diagnose
+ * why a particular name returns no candidates.
+ * 
+ * @see docs/matching-system-guide.md for full documentation
+ * =============================================================================
+ */
 declare(strict_types=1);
 
 namespace App\Services;
@@ -8,7 +53,28 @@ use App\Repositories\SupplierRepository;
 use App\Support\Normalizer;
 use App\Support\Settings;
 use App\Support\Config;
+use App\Support\SimilarityCalculator;
 use App\Repositories\SupplierLearningRepository;
+
+/**
+ * =============================================================================
+ * استخدام SimilarityCalculator في CandidateService
+ * =============================================================================
+ * 
+ * هذا الملف يستخدم SimilarityCalculator::safeLevenshteinRatio() لأن:
+ * 
+ * 1. السياق: الواجهة الأمامية - المستخدم قد يدخل نصوص يدوياً
+ * 2. عدم ضمان الطول: النصوص قد تتجاوز 255 بايت
+ * 3. الأمان: الحماية من أخطاء PHP levenshtein مع النصوص الطويلة
+ * 4. Fallback: يتحول تلقائياً إلى Jaccard للنصوص الطويلة
+ * 
+ * ⚠️ لا تستخدم fastLevenshteinRatio() هنا:
+ * - قد يفشل مع نصوص > 255 بايت
+ * - غير آمن مع مدخلات المستخدم
+ * 
+ * راجع: app/Support/SimilarityCalculator.php للتفاصيل
+ * =============================================================================
+ */
 
 class CandidateService
 {
@@ -227,7 +293,8 @@ class CandidateService
         $exact = $input === $candidate ? 1.0 : 0.0;
         $starts = (str_starts_with($candidate, $input) || str_starts_with($input, $candidate)) ? 0.85 : 0.0;
         $contains = (str_contains($candidate, $input) || str_contains($input, $candidate)) ? 0.75 : 0.0;
-        $lev = $this->levenshteinRatio($input, $candidate);
+        // استخدام النسخة الآمنة - قد يدخل المستخدم نصوص طويلة
+        $lev = SimilarityCalculator::safeLevenshteinRatio($input, $candidate);
         $tokens = $this->tokenSimilarity($input, $candidate);
         return compact('exact', 'starts', 'contains', 'lev', 'tokens');
     }
@@ -237,21 +304,8 @@ class CandidateService
         return max($sim['exact'], $sim['starts'], $sim['contains'], $sim['lev'], $sim['tokens']);
     }
 
-    private function levenshteinRatio(string $a, string $b): float
-    {
-        $len = max(mb_strlen($a), mb_strlen($b));
-        if ($len === 0) {
-            return 0.0;
-        }
-        // levenshtein limit is 255 bytes. mb_strlen is chars, but typically safely bounded check helps.
-        // We will just cap checks for very long strings to avoid warnings/errors.
-        if (strlen($a) > 255 || strlen($b) > 255) {
-            return 0.0;
-        }
-
-        $dist = levenshtein($a, $b);
-        return max(0.0, 1.0 - ($dist / $len));
-    }
+    // ملاحظة: تم نقل دوال حساب التشابه إلى SimilarityCalculator
+    // راجع: app/Support/SimilarityCalculator.php
 
     private function tokenSimilarity(string $a, string $b): float
     {
@@ -330,8 +384,8 @@ class CandidateService
                             'score_raw' => 1.0,
                         ];
                     } else {
-                        // Fuzzy Short
-                        $score = $this->levenshteinRatio($short, $sc);
+                        // استخدام النسخة الآمنة - short codes عادة قصيرة لكن نحتاط
+                        $score = SimilarityCalculator::safeLevenshteinRatio($short, $sc);
                         if ($score >= 0.9) {
                             $candidates[] = [
                                 'source' => 'short_fuzzy',
@@ -359,8 +413,8 @@ class CandidateService
                         'score_raw' => 1.0,
                     ];
                 } else {
-                    // Fuzzy
-                    $score = $this->levenshteinRatio($normalized, $key);
+                    // استخدام النسخة الآمنة - أسماء البنوك قد تكون طويلة
+                    $score = SimilarityCalculator::safeLevenshteinRatio($normalized, $key);
                     if ($score >= 0.95) {
                         $candidates[] = [
                             'source' => 'fuzzy_official',

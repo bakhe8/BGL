@@ -1,4 +1,25 @@
 <?php
+/**
+ * =============================================================================
+ * Settings - Application Configuration Manager
+ * =============================================================================
+ * 
+ * 📚 DOCUMENTATION: docs/matching-system-guide.md
+ * 
+ * This class manages application settings stored in storage/settings.json.
+ * Default values are defined below and can be overridden via the Settings UI.
+ * 
+ * MATCHING THRESHOLDS EXPLAINED:
+ * ------------------------------
+ * - MATCH_AUTO_THRESHOLD (0.90): Scores >= 90% are auto-accepted
+ * - MATCH_REVIEW_THRESHOLD (0.70): Scores < 70% are HIDDEN from suggestions
+ * - MATCH_WEAK_THRESHOLD (0.70): Same as Review (kept for backward compat)
+ * 
+ * ⚠️ WARNING: Lowering MATCH_REVIEW_THRESHOLD will show irrelevant suggestions.
+ *             This is NOT recommended as a solution for "no candidates" issues.
+ *             See docs/matching-system-guide.md for proper solutions.
+ * =============================================================================
+ */
 declare(strict_types=1);
 
 namespace App\Support;
@@ -6,16 +27,29 @@ namespace App\Support;
 class Settings
 {
     private string $path;
+
+    /**
+     * Default settings with documentation
+     * 
+     * @var array<string, mixed>
+     */
     private array $defaults = [
-        'MATCH_AUTO_THRESHOLD' => Config::MATCH_AUTO_THRESHOLD, // 0.90
-        'MATCH_REVIEW_THRESHOLD' => Config::MATCH_REVIEW_THRESHOLD, // 0.70
-        'MATCH_WEAK_THRESHOLD' => 0.70, // Synced with Review Threshold to avoid hiding results
-        'CONFLICT_DELTA' => Config::CONFLICT_DELTA, // 0.1
-        'WEIGHT_OFFICIAL' => 1.0,
-        'WEIGHT_ALT_CONFIRMED' => 0.95, // Increased confidence for manual aliases
-        'WEIGHT_ALT_LEARNING' => 0.75,
-        'WEIGHT_FUZZY' => 0.80, // Increased to not penalize typos too harshly
-        'CANDIDATES_LIMIT' => 20,
+        // Matching Thresholds
+        'MATCH_AUTO_THRESHOLD' => Config::MATCH_AUTO_THRESHOLD,      // 0.90 - Auto-accept without review
+        'MATCH_REVIEW_THRESHOLD' => Config::MATCH_REVIEW_THRESHOLD,  // 0.70 - Minimum to show in list
+        'MATCH_WEAK_THRESHOLD' => 0.70,                              // Synced with Review Threshold
+
+        // Conflict Detection
+        'CONFLICT_DELTA' => Config::CONFLICT_DELTA,                  // 0.1 - Score difference for conflicts
+
+        // Score Weights (multipliers applied to raw scores)
+        'WEIGHT_OFFICIAL' => 1.0,        // Official name match
+        'WEIGHT_ALT_CONFIRMED' => 0.95,  // Confirmed alternative name
+        'WEIGHT_ALT_LEARNING' => 0.75,   // Learned alternative name
+        'WEIGHT_FUZZY' => 0.80,          // Fuzzy match penalty
+
+        // Limits
+        'CANDIDATES_LIMIT' => 20,        // Max suggestions shown
     ];
 
     public function __construct(string $path = '')

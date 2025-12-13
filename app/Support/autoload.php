@@ -33,3 +33,8 @@ function storage_path(string $path = ''): string
     $base = base_path('storage');
     return $path ? $base . '/' . ltrim($path, '/') : $base;
 }
+
+/**
+ * Simple logger helper
+ * Usage: \App\Support\Logger::error('message', ['context' => 'data']);
+ */

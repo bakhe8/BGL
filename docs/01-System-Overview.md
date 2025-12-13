@@ -1,3 +1,9 @@
+---
+last_updated: 2025-12-13
+version: 1.1
+status: active
+---
+
 # 01 - نظرة عامة على النظام (System Overview)
 
 ## مقدمة

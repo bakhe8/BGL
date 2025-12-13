@@ -1,42 +1,115 @@
-# 04 - المرجع التقني (Technical Reference)
+---
+last_updated: 2025-12-13
+version: 2.0
+status: active
+---
+
+# 02 - المرجع التقني (Technical Reference)
+
+يوفر هذا المرجع تفاصيل تقنية حول بنية النظام، قاعدة البيانات، والـ API.
 
 ## 1. قاعدة البيانات (Database Schema)
-يستخدم النظام SQLite ملف `storage/database.sqlite`.
 
-### الجداول الرئيسية:
+يستخدم النظام **SQLite** في ملف `storage/database.sqlite`.
+
+### الجداول الرئيسية (Core Tables)
+
 > [!IMPORTANT]
 > لاحظ الاختلاف الجذري في الهيكلة بين الموردين والبنوك.
 
-1. **suppliers**:
+1. **`suppliers`**:
    - `official_name`: الاسم الرسمي.
-   - `normalized_name`: الاسم بعد المعالجة (بدون همزات، مسافات...).
-   - **مرتبط بـ**: `supplier_alternative_names` (جدول منفصل يحتوي مئات الأسماء البديلة).
+   - `normalized_name`: الاسم بعد المعالجة (Lowercased, Trimmed).
+   - العلاقة: **Many-to-One** مع `supplier_alternative_names`.
 
-2. **banks**:
+2. **`supplier_alternative_names`** (عقل النظام):
+   - يربط الأسماء الخام (`raw_name`) من ملفات Excel بـ `supplier_id`.
+   - هو الجدول الذي ينمو مع "تعلم" النظام.
+
+3. **`banks`**:
    - `official_name`: الاسم العربي.
-   - `official_name_en`: الاسم الإنجليزي (عمود في نفس الجدول).
-   - `short_code`: الرمز (مثل RIB).
-   - **ملاحظة**: البنوك "ذكية" بذاتها ولا تحتاج لجدول بدائل ضخم مثل الموردين.
+   - `official_name_en`: الاسم الإنجليزي.
+   - `short_code`: الرمز (مثل RIB, SNB).
+   - البنوك لا تحتاج عادةً لجدول بدائل لأن قائمتها محدودة ومعروفة.
 
-3. **supplier_alternative_names**:
-   - المحرك الأساسي لذكاء الموردين. يربط `raw_name` (من Excel) بـ `supplier_id`.
-   
-4. **imported_records**: السجلات المستوردة من Excel.
-  - **ملاحظة**: لا يوجد مفتاح فريد (UNIQUE Constraint) على `guarantee_number` للسماح بالتكرار (History).
-- `learning_logs`: سجلات لتدريب النظام (Audit Trail).
+4. **`imported_records`**:
+   - السجلات الخام المستوردة.
+   - لا يوجد مفتاح فريد (Unique Key) على رقم الضمان، للسماح بالأرشفة التاريخية (Snapshots).
 
-## 2. API Endpoints
-جميع استجابات الـ API تكون بصيغة JSON.
+---
 
-- `GET /api/records`: جلب السجلات.
-- `POST /api/records/{id}/decision`: حفظ قرار المستخدم.
-- `GET /api/settings`: جلب الإعدادات.
-- `POST /api/settings`: حفظ الإعدادات.
-- `POST /api/dictionary/suppliers`: إضافة مورد جديد.
+## 2. API Reference
+
+جميع الاستجابات تكون بصيغة JSON.
+
+### الردود القياسية (Standard Responses)
+
+**النجاح (Success):**
+```json
+{"success": true, "data": { ... }}
+```
+
+**الفشل (Error):**
+```json
+{"success": false, "error": "Error message"}
+```
+
+### نقطة النهاية: `/api/records/{id}/candidates`
+
+هذه أهم نقطة نهاية في النظام، وتستخدم لجلب الاقتراحات للمطابقة.
+
+**بنية الاستجابة (Response Structure):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "supplier": {
+      "normalized": "اسم المورد المعالج",
+      "candidates": [
+        {
+          "source": "official|alternative|learning|fuzzy",
+          "supplier_id": 123,
+          "name": "اسم المورد المقترح",
+          "score": 0.95
+        }
+      ]
+    },
+    "bank": {
+      "normalized": "اسم البنك المعالج",
+      "candidates": [ ... ]
+    },
+    "conflicts": []
+  }
+}
+```
+
+> [!WARNING]
+> **خطأ شائع جداً**: المصفوفة اسمها `candidates` داخل كائن `supplier`، وليست `suppliers` مباشرة.
+> - ✅ Correct: `data.supplier.candidates`
+> - ❌ Wrong: `data.suppliers`
+
+---
 
 ## 3. آلية الاستيراد (Import Logic)
+
 الكلاس المسؤول: `App\Services\ImportService`.
-1. قراءة الملف باستخدام `SimpleXLSX`.
-2. استبعاد الصفوف الفارغة.
-3. التكرار البرمجي (Duplicate Check) **معطل حالياً** للسماح بالأرشفة التاريخية.
-4. حساب التطابق الأولي (Initial Matching) وتخزين الحالة `match_status`.
+
+1. **القراءة**: استخدام مكتبة `SimpleXLSX`.
+2. **التنظيف**: تجاهل الصفوف الفارغة تماماً.
+3. **التاريخ**: السماح بالتكرار (لغرض الأرشفة).
+4. **المعالجة الأولية**: تشغيل `CandidateService` فوراً لحساب حالة المطابقة الأولية (`match_status`).
+
+---
+
+## 4. المجلدات والملفات (Directory Structure)
+
+- `app/`: كود الواجهة الخلفية (PHP).
+  - `Services/`: منطق العمل (Business Logic).
+  - `Repositories/`: التعامل مع قاعدة البيانات.
+  - `Support/`: أدوات مساعدة (Normalizer, Settings).
+- `storage/`: البيانات المتغيرة (DB, Uploads, Logs).
+- `www/`: الواجهة الأمامية (Public).
+
+---
+

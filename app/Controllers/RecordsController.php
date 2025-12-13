@@ -97,6 +97,13 @@ class RecordsController
             if (!$arr['supplierDisplay']) {
                 $arr['supplierDisplay'] = $arr['rawSupplierName'] ?? null;
             }
+
+            // Calculate Max Score (On-the-fly)
+            // Note: This matches logic expected by frontend (0-100)
+            $cand = $this->candidates->supplierCandidates($arr['rawSupplierName'] ?? '');
+            $best = $cand['candidates'][0] ?? null;
+            $arr['maxScore'] = $best ? ($best['score'] * 100) : 0;
+
             return $arr;
         }, $data);
         echo json_encode(array('success' => true, 'data' => $enriched));
@@ -208,14 +215,29 @@ class RecordsController
                     // Ignore if exists
                 }
             } elseif (!empty($payload['supplier_blocked_id']) && !empty($update['raw_supplier_name'])) {
-                // المستخدم رفض مورد مقترح → نسجل blocked مرتبط بمورد محدد
+                /**
+                 * Blocking Mechanism (آلية الحظر):
+                 * CRITICAL UPDATE [User Feedback]:
+                 * The logic must be: Block a specific CANDIDATE (supplier_blocked_id) from being suggested 
+                 * for this specific Raw Name. It should NOT block the Raw Name itself globally.
+                 * 
+                 * Current Impl: Accepts supplier_blocked_id.
+                 * Requirement: Ensure MatcherService respects this 'blocked' relationship.
+                 *
+                 * When user REJECTS a suggested supplier and chooses a different one:
+                 * - Save 'supplier_blocked' in supplier_learning table with the ID of the BAD suggestion.
+                 * - Future imports will skip this supplier_id for this normalized name.
+                 */
                 $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
                 $blockedId = (int) $payload['supplier_blocked_id'];
                 $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_blocked', $blockedId, 'review');
             }
         } catch (\Throwable $e) {
-            // Log error internally but do not fail the request
-            // error_log('Supplier Learning Error: ' . $e->getMessage());
+            // Log supplier learning errors to storage/logs/app.log
+            \App\Support\Logger::error('Supplier Learning Error', [
+                'message' => $e->getMessage(),
+                'record_id' => $id,
+            ]);
         }
 
         // Learning: Bank
@@ -233,8 +255,11 @@ class RecordsController
                 }
             }
         } catch (\Throwable $e) {
-            // Log error internally but do not fail the request
-            // error_log('Bank Learning Error: ' . $e->getMessage());
+            // Log bank learning errors to storage/logs/app.log
+            \App\Support\Logger::error('Bank Learning Error', [
+                'message' => $e->getMessage(),
+                'record_id' => $id,
+            ]);
         }
 
         $updated = $this->records->find($id);
