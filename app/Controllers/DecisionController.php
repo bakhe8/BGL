@@ -16,7 +16,14 @@ use App\Repositories\SupplierOverrideRepository;
 use App\Repositories\SupplierLearningRepository;
 use App\Support\Settings;
 
-class RecordsController
+/**
+ * Decision Controller
+ * 
+ * يتعامل مع عمليات اتخاذ القرار للسجلات المستوردة
+ * 
+ * @package App\Controllers
+ */
+class DecisionController
 {
     private $candidates;
     private $conflicts;
@@ -98,12 +105,6 @@ class RecordsController
                 $arr['supplierDisplay'] = $arr['rawSupplierName'] ?? null;
             }
 
-            // Calculate Max Score (On-the-fly)
-            // Note: This matches logic expected by frontend (0-100)
-            $cand = $this->candidates->supplierCandidates($arr['rawSupplierName'] ?? '');
-            $best = $cand['candidates'][0] ?? null;
-            $arr['maxScore'] = $best ? ($best['score'] * 100) : 0;
-
             return $arr;
         }, $data);
         echo json_encode(array('success' => true, 'data' => $enriched));
@@ -144,8 +145,7 @@ class RecordsController
             return;
         }
 
-        // Hybrid support: accept both snake_case and camelCase
-        $status = $payload['match_status'] ?? $payload['matchStatus'] ?? null;
+        $status = $payload['match_status'] ?? null;
         if (!in_array($status, array('ready', 'needs_review', 'approved'), true)) {
             http_response_code(422);
             echo json_encode(array('success' => false, 'message' => 'حالة غير صالحة'));

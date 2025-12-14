@@ -42,13 +42,13 @@ class BankRepository
     private function map(array $row): Bank
     {
         return new Bank(
-            (int)$row['id'],
+            (int) $row['id'],
             $row['official_name'],
             $row['official_name_en'] ?? null,
-            $row['official_name'] ?? null,
+            $row['official_name_ar'] ?? $row['official_name'] ?? null,  // ✅ Fixed
             $row['normalized_key'] ?? null,
             $row['short_code'] ?? null,
-            (int)($row['is_confirmed'] ?? 0),
+            (int) ($row['is_confirmed'] ?? 0),
             $row['created_at'] ?? null,
         );
     }
@@ -82,8 +82,8 @@ class BankRepository
             'sc' => $data['short_code'] ?? null,
             'c' => $data['is_confirmed'] ?? 0,
         ]);
-        $id = (int)$pdo->lastInsertId();
-        return new Bank($id, $data['official_name'], $data['official_name_en'] ?? null, $data['official_name'], $data['normalized_key'] ?? null, $data['short_code'] ?? null, (int)($data['is_confirmed'] ?? 0), date('c'));
+        $id = (int) $pdo->lastInsertId();
+        return new Bank($id, $data['official_name'], $data['official_name_en'] ?? null, $data['official_name'], $data['normalized_key'] ?? null, $data['short_code'] ?? null, (int) ($data['is_confirmed'] ?? 0), date('c'));
     }
 
     public function update(int $id, array $data): void

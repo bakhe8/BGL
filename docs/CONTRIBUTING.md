@@ -36,6 +36,35 @@ status: active
 - **Database Columns**: `snake_case` (مثل `session_id`, `created_at`).
 - **JSON Responses**: مفاتيح `snake_case` لسهولة ربطها مع قاعدة البيانات (مثل `{"record_id": 1}`).
 
+### 📝 ملاحظة مهمة: Database vs Models
+هناك تحويل تلقائي بين طبقة البيانات وطبقة التطبيق:
+
+- **Database Columns**: تستخدم `snake_case` دائماً
+  - مثال: `official_name`, `normalized_key`, `created_at`
+  
+- **Model Properties**: تستخدم `camelCase` دائماً
+  - مثال: `$officialName`, `$bankNormalizedKey`, `$createdAt`
+  
+- **التحويل**: يتم تلقائياً في Repositories
+  ```php
+  // Repository يحول من snake_case إلى camelCase:
+  return new Bank(
+      $row['official_name'],        // DB: snake_case
+      $row['normalized_key'],       // DB: snake_case
+  );
+  
+  // Model يستخدم camelCase:
+  public string $officialName;      // Model: camelCase
+  public ?string $bankNormalizedKey; // Model: camelCase
+  ```
+
+**لماذا؟**
+- Database convention: SQL يفضل `snake_case`
+- PHP convention (PSR-12): Properties تستخدم `camelCase`
+- هذا الفصل يحسن قابلية الصيانة ويتبع best practices
+
+
+
 ## 5. قواعد عامة
 - **اللغة**: الكود والتعليقات التقنية بالإنجليزية. النصوص الظاهرة للمستخدم بالعربية.
 - **التوثيق**: يجب توثيق أي دالة معقدة باستخدام PHPDoc.

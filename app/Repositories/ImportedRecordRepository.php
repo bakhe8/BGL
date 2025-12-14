@@ -9,6 +9,13 @@ use PDO;
 
 class ImportedRecordRepository
 {
+    /**
+     * إنشاء سجل مستورد جديد
+     * 
+     * @param ImportedRecord $record السجل المراد إنشاؤه
+     * @return ImportedRecord السجل بعد الإنشاء مع ID
+     * @throws PDOException عند فشل الإدراج
+     */
     public function create(ImportedRecord $record): ImportedRecord
     {
         $pdo = Database::connection();
@@ -56,6 +63,13 @@ class ImportedRecordRepository
         return (bool) $stmt->fetchColumn();
     }
 
+    /**
+     * تحديث قرار المورد/البنك لسجل معين
+     * 
+     * @param int $id معرّف السجل
+     * @param array $data البيانات المراد تحديثها (match_status, supplier_id, bank_id, etc)
+     * @return void
+     */
     public function updateDecision(int $id, array $data): void
     {
         $this->ensureDecisionColumns();
@@ -99,40 +113,23 @@ class ImportedRecordRepository
     }
 
     /**
-     * @return ImportedRecord[]
+     * جلب جميع السجلات المستوردة
+     * 
+     * @return ImportedRecord[] مصفوفة من السجلات مرتبة حسب المعرف تنازلياً
      */
     public function all(): array
     {
         $pdo = Database::connection();
         $stmt = $pdo->query('SELECT * FROM imported_records ORDER BY id DESC');
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return array_map(fn(array $row) => new ImportedRecord(
-            (int) $row['id'],
-            (int) $row['session_id'],
-            $row['raw_supplier_name'],
-            $row['raw_bank_name'],
-            $row['amount'] ?? null,
-            $row['guarantee_number'] ?? null,
-            $row['contract_number'] ?? null,
-            $row['contract_source'] ?? null,
-            $row['issue_date'] ?? null,
-            $row['expiry_date'] ?? null,
-            $row['type'] ?? null,
-            $row['comment'] ?? null,
-            $row['normalized_supplier'] ?? null,
-            $row['normalized_bank'] ?? null,
-            $row['match_status'] ?? null,
-            $row['supplier_id'] ? (int) $row['supplier_id'] : null,
-            $row['bank_id'] ? (int) $row['bank_id'] : null,
-            $row['bank_display'] ?? null,
-            $row['supplier_display_name'] ?? null,
-            $row['created_at'] ?? null,
-        ), $rows);
+        return array_map(fn(array $row) => $this->mapRow($row), $rows);
     }
 
     /**
-     * @return ImportedRecord[]
+     * جلب جميع السجلات المستوردة من جلسة معينة
+     * 
+     * @param int $sessionId معرّف الجلسة
+     * @return ImportedRecord[] مصفوفة من السجلات مرتبة حسب المعرف تنازلياً
      */
     public function allBySession(int $sessionId): array
     {
@@ -140,31 +137,15 @@ class ImportedRecordRepository
         $stmt = $pdo->prepare('SELECT * FROM imported_records WHERE session_id = :sid ORDER BY id DESC');
         $stmt->execute(['sid' => $sessionId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return array_map(fn(array $row) => new ImportedRecord(
-            (int) $row['id'],
-            (int) $row['session_id'],
-            $row['raw_supplier_name'],
-            $row['raw_bank_name'],
-            $row['amount'] ?? null,
-            $row['guarantee_number'] ?? null,
-            $row['contract_number'] ?? null,
-            $row['contract_source'] ?? null,
-            $row['issue_date'] ?? null,
-            $row['expiry_date'] ?? null,
-            $row['type'] ?? null,
-            $row['comment'] ?? null,
-            $row['normalized_supplier'] ?? null,
-            $row['normalized_bank'] ?? null,
-            $row['match_status'] ?? null,
-            $row['supplier_id'] ? (int) $row['supplier_id'] : null,
-            $row['bank_id'] ? (int) $row['bank_id'] : null,
-            $row['bank_display'] ?? null,
-            $row['supplier_display_name'] ?? null,
-            $row['created_at'] ?? null,
-        ), $rows);
+        return array_map(fn(array $row) => $this->mapRow($row), $rows);
     }
 
+    /**
+     * جلب سجل مستورد واحد بالمعرّف
+     * 
+     * @param int $id معرّف السجل
+     * @return ImportedRecord|null السجل أو null إذا لم يُوجد
+     */
     public function find(int $id): ?ImportedRecord
     {
         $pdo = Database::connection();
@@ -174,6 +155,17 @@ class ImportedRecordRepository
         if (!$row) {
             return null;
         }
+        return $this->mapRow($row);
+    }
+
+    /**
+     * تحويل صف من قاعدة البيانات إلى ImportedRecord object
+     * 
+     * @param array $row صف من قاعدة البيانات
+     * @return ImportedRecord
+     */
+    private function mapRow(array $row): ImportedRecord
+    {
         return new ImportedRecord(
             (int) $row['id'],
             (int) $row['session_id'],

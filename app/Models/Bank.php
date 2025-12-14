@@ -10,7 +10,7 @@ class Bank
         public string $officialName,
         public ?string $officialNameEn = null,
         public ?string $officialNameAr = null,
-        public ?string $normalizedKey = null,
+        public ?string $bankNormalizedKey = null,
         public ?string $shortCode = null,
         public int $isConfirmed = 0,
         public ?string $createdAt = null,

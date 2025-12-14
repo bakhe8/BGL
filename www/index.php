@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 use App\Controllers\ImportController;
-use App\Controllers\RecordsController;
+use App\Controllers\DecisionController;
 use App\Controllers\DictionaryController;
 use App\Controllers\SettingsController;
 use App\Repositories\ImportSessionRepository;
@@ -50,13 +50,13 @@ try {
     $importedRecordRepo = new ImportedRecordRepository();
     $importService = new ImportService($importSessionRepo, $importedRecordRepo);
     $importController = new ImportController($importService);
-    $recordsController = new RecordsController($importedRecordRepo);
+    $decisionController = new DecisionController($importedRecordRepo);
     $dictionaryController = new DictionaryController();
     $settingsController = new SettingsController();
 
     // صفحات HTML
-    if ($method === 'GET' && ($uri === '/' || $uri === '/records')) {
-        echo file_get_contents(__DIR__ . '/records.html');
+    if ($method === 'GET' && ($uri === '/' || $uri === '/decision')) {
+        echo file_get_contents(__DIR__ . '/decision.html');
         exit;
     }
 
@@ -67,10 +67,7 @@ try {
     }
     */
 
-    if ($method === 'GET' && $uri === '/records') {
-        echo file_get_contents(__DIR__ . '/records.html');
-        exit;
-    }
+
 
     if ($method === 'GET' && ($uri === '/dictionary' || $uri === '/dictionary/suppliers' || $uri === '/dictionary/banks')) {
         echo file_get_contents(__DIR__ . '/dictionary.html');
@@ -95,20 +92,20 @@ try {
     }
 
     if ($method === 'GET' && $uri === '/api/records') {
-        $recordsController->index();
+        $decisionController->index();
         exit;
     }
 
     if ($method === 'POST' && preg_match('#^/api/records/(\\d+)/decision$#', $uri, $m)) {
         $id = (int) $m[1];
         $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-        $recordsController->saveDecision($id, $payload);
+        $decisionController->saveDecision($id, $payload);
         exit;
     }
 
     if ($method === 'GET' && preg_match('#^/api/records/(\\d+)/candidates$#', $uri, $m)) {
         $id = (int) $m[1];
-        $recordsController->candidates($id);
+        $decisionController->candidates($id);
         exit;
     }
 
