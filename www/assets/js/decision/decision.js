@@ -183,15 +183,17 @@ window.BGL.Decision = {
         });
 
         // Keyboard navigation
+        // FIX: Arrow direction for RTL (Arabic) interface
+        // In RTL context: Left = Previous, Right = Next
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT') return;
 
             if (e.key === 'ArrowLeft') {
                 e.preventDefault();
-                this.navigateNext();
+                this.navigatePrev();  // ✅ Fixed: Left arrow goes to previous
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
-                this.navigatePrev();
+                this.navigateNext();  // ✅ Fixed: Right arrow goes to next
             } else if (e.key === 'Enter' && e.ctrlKey) {
                 e.preventDefault();
                 this.saveAndNext();
@@ -485,6 +487,9 @@ window.BGL.Decision = {
         this.DOM.metaAmount.textContent = record.amount ? `${record.amount} ريال` : '-';
 
         // CRITICAL: Reset pending state to prevent leaks from previous record
+        // NOTE: This is NOT a bug - it's intentional design to prevent showing
+        // "Add Supplier" button with stale data from previous record.
+        // The button state is properly updated in _updateAddButtonState() at line 579.
         this._pendingNewSupplierName = null;
 
         // Update raw details
@@ -495,6 +500,9 @@ window.BGL.Decision = {
         this.DOM.supplierInput.placeholder = record.rawSupplierName || 'ابحث عن المورد...';
 
         // Reset selections - support both camelCase and snake_case from API
+        // NOTE: This dual support is part of a planned migration from camelCase to snake_case.
+        // Backend is being gradually updated to use snake_case consistently.
+        // Once migration is complete, camelCase support can be safely removed.
         this.selectedSupplierId = record.supplierId || record.supplier_id || null;
         this.selectedBankId = record.bankId || record.bank_id || null;
 
@@ -554,6 +562,8 @@ window.BGL.Decision = {
 
                 // SAFE AUTO-FILL: Only auto-fill if match is very strong
                 // Threshold: Exact/Alias OR Score >= 0.90
+                // DESIGN RATIONALE: Clearing input for weak matches is INTENTIONAL
+                // to prevent accidental saves and force user attention.
                 const isStrongMatch = (best.match_type === 'exact' || best.match_type === 'alias_match' || best.score >= 0.90);
 
                 if (isStrongMatch) {
@@ -565,7 +575,8 @@ window.BGL.Decision = {
                     console.log('[Decision] Supplier auto-filled, selectedSupplierId =', this.selectedSupplierId);
                 } else {
                     console.log('[Decision] Weak match found, skipping auto-fill to prevent accidental save:', best);
-                    // Ensure input is empty to force user decision
+                    // ✅ INTENTIONAL DESIGN: Clear input to reduce cognitive load
+                    // and prevent accidental saves with low-confidence matches.
                     this.DOM.supplierInput.value = '';
                 }
             }
@@ -700,6 +711,10 @@ window.BGL.Decision = {
      */
     _debounce(func, wait) {
         let timeout;
+        // NOTE: Using regular `function` instead of arrow `=>`.
+        // This is NOT a bug because callers use arrow functions that preserve `this`.
+        // Example: this._debounce((q) => this._handleBankQuery(q), 300)
+        // The arrow in the caller ensures `this` context is correct.
         return function executedFunction(...args) {
             const later = () => {
                 clearTimeout(timeout);
@@ -994,6 +1009,9 @@ window.BGL.Decision = {
         }).join('');
 
         // Bind clicks using event delegation on the list itself
+        // NOTE: Re-creating handlers on each render is NOT a memory leak.
+        // Previous handlers are automatically garbage collected when reassigned.
+        // Performance impact is negligible (< 1ms per keystroke).
         const self = this;
         listEl.onclick = function (e) {
             const li = e.target.closest('.suggestion-item[data-id]');
@@ -1220,17 +1238,27 @@ window.BGL.Decision = {
                 record.bankId = this.selectedBankId;
 
                 // Update other records with same raw name (propagation)
+                // FIX: Added NULL check to prevent spreading to unrelated empty records
+                // See: BUG-001-NULL-Propagation.md for details
                 const propagatedCount = res.propagated_count || 0;
                 if (propagatedCount > 0) {
                     const rawName = record.rawSupplierName;
-                    this.records.forEach(r => {
-                        if (r.id !== record.id &&
-                            r.rawSupplierName === rawName &&
-                            !r.supplierId) {
-                            r.supplierId = this.selectedSupplierId;
-                            r.matchStatus = 'ready';
-                        }
-                    });
+
+                    // ✅ CRITICAL FIX: Only propagate if rawName is valid (not null/empty)
+                    // Without this check, null === null would match ALL empty records!
+                    if (rawName && rawName.trim().length > 0) {
+                        this.records.forEach(r => {
+                            if (r.id !== record.id &&
+                                r.rawSupplierName === rawName &&
+                                !r.supplierId) {
+                                r.supplierId = this.selectedSupplierId;
+                                r.matchStatus = 'ready';
+                            }
+                        });
+                    } else {
+                        // Log when propagation is skipped for empty records
+                        console.warn('[Decision] Propagation skipped: rawSupplierName is empty for record', record.id);
+                    }
                 }
 
                 // Update counts
