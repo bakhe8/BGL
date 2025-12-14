@@ -110,11 +110,16 @@ window.BGL.Decision = {
             btnNext: document.getElementById('btnNext'),
             btnSaveNext: document.getElementById('btnSaveNext'),
             btnAddSupplier: document.getElementById('btnAddSupplier'),
+            supplierAddError: document.getElementById('supplierAddError'),
             toggleDetails: document.getElementById('toggleDetails'),
             expandedDetails: document.getElementById('expandedDetails'),
 
             // Messages
-            saveMessage: document.getElementById('saveMessage')
+            saveMessage: document.getElementById('saveMessage'),
+
+            // Chips Container
+            supplierChips: document.getElementById('supplierChips'),
+            bankChips: document.getElementById('bankChips')
         };
 
         // Disable add supplier button initially
@@ -150,28 +155,32 @@ window.BGL.Decision = {
         DOM.btnNext.addEventListener('click', () => this.navigateNext());
         DOM.btnSaveNext.addEventListener('click', () => this.saveAndNext());
 
-        // Toggle details
-        DOM.toggleDetails.addEventListener('click', () => {
-            DOM.expandedDetails.classList.toggle('hidden');
-            DOM.toggleDetails.classList.toggle('open');
-        });
+
 
         // Bank input
         DOM.bankInput.addEventListener('input', (e) => this._handleBankInput(e.target.value));
-        DOM.bankInput.addEventListener('focus', () => this._showBankSuggestions());
+        DOM.bankInput.addEventListener('click', () => {
+            // Only show fixed list if empty. If filled, user must clear/type to search.
+            if (!DOM.bankInput.value) {
+                this._handleBankInput('');
+            }
+        });
         DOM.bankInput.addEventListener('blur', () => {
             setTimeout(() => DOM.bankSuggestions.classList.remove('open'), 200);
         });
 
         // Supplier input
         DOM.supplierInput.addEventListener('input', (e) => this._handleSupplierInput(e.target.value));
-        DOM.supplierInput.addEventListener('focus', () => this._showSupplierSuggestions());
         DOM.supplierInput.addEventListener('blur', () => {
             setTimeout(() => DOM.supplierSuggestions.classList.remove('open'), 200);
         });
 
         // Add supplier button - creates new supplier from typed name
-        DOM.btnAddSupplier.addEventListener('click', () => this._addNewSupplier());
+        DOM.btnAddSupplier.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this._addNewSupplier();
+        });
 
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
@@ -285,6 +294,8 @@ window.BGL.Decision = {
                 if (uploadMsg) uploadMsg.textContent = '';
             }
         });
+
+
     },
 
     /**
@@ -318,6 +329,16 @@ window.BGL.Decision = {
             } else {
                 this.records = allRecords;
             }
+
+            // SORTING LOGIC:
+            // 1. Pending records first ('needs_review')
+            // 2. Then by ID ASC
+            this.records.sort((a, b) => {
+                const aDone = this._isCompleted(a);
+                const bDone = this._isCompleted(b);
+                if (aDone === bDone) return a.id - b.id; // Same status, sort by ID
+                return aDone ? 1 : -1; // Pending first
+            });
 
             // Load dictionaries
             await this._loadDictionaries();
@@ -463,13 +484,23 @@ window.BGL.Decision = {
         this.DOM.metaDate.textContent = record.expiryDate || record.date || '-';
         this.DOM.metaAmount.textContent = record.amount ? `${record.amount} ريال` : '-';
 
+        // CRITICAL: Reset pending state to prevent leaks from previous record
+        this._pendingNewSupplierName = null;
+
         // Update raw details
         this.DOM.detailRawSupplier.textContent = record.rawSupplierName || '-';
         this.DOM.detailRawBank.textContent = record.rawBankName || '-';
 
+        // Update placeholder to show raw name
+        this.DOM.supplierInput.placeholder = record.rawSupplierName || 'ابحث عن المورد...';
+
         // Reset selections - support both camelCase and snake_case from API
         this.selectedSupplierId = record.supplierId || record.supplier_id || null;
         this.selectedBankId = record.bankId || record.bank_id || null;
+
+        // Reset Chips
+        this.DOM.supplierChips.innerHTML = '<span class="text-xs text-gray-400 animate-pulse">جاري البحث عن مقترحات...</span>';
+        this.DOM.bankChips.innerHTML = '';
 
         // Set input values
         if (this.selectedBankId && BGL.State.bankMap[this.selectedBankId]) {
@@ -495,6 +526,10 @@ window.BGL.Decision = {
         // Load candidates from API
         await this._loadCandidates(record.id);
 
+        // Render Chips for quick selection
+        this._renderCandidateChips(this.supplierCandidates, 'supplier');
+        this._renderCandidateChips(this.bankCandidates, 'bank');
+
         console.log('[Decision] Candidates loaded:', {
             bankCandidates: this.bankCandidates,
             supplierCandidates: this.supplierCandidates,
@@ -513,15 +548,37 @@ window.BGL.Decision = {
             console.log('[Decision] Bank auto-filled, selectedBankId =', this.selectedBankId);
         }
 
-        if (!this.selectedSupplierId && this.supplierCandidates.length > 0) {
-            const best = this.supplierCandidates[0];
-            console.log('[Decision] Auto-filling supplier:', best);
-            this.DOM.supplierInput.value = best.name;
-            this.selectedSupplierId = parseInt(best.supplier_id || best.id);
-            this.selectedSupplierName = best.name;
-            this.DOM.supplierInput.classList.add('has-value');
-            console.log('[Decision] Supplier auto-filled, selectedSupplierId =', this.selectedSupplierId);
+        if (!this.selectedSupplierId) {
+            if (this.supplierCandidates.length > 0) {
+                const best = this.supplierCandidates[0];
+
+                // SAFE AUTO-FILL: Only auto-fill if match is very strong
+                // Threshold: Exact/Alias OR Score >= 0.90
+                const isStrongMatch = (best.match_type === 'exact' || best.match_type === 'alias_match' || best.score >= 0.90);
+
+                if (isStrongMatch) {
+                    console.log('[Decision] Auto-filling supplier (Strong Match):', best);
+                    this.DOM.supplierInput.value = best.name;
+                    this.selectedSupplierId = parseInt(best.supplier_id || best.id);
+                    this.selectedSupplierName = best.name;
+                    this.DOM.supplierInput.classList.add('has-value');
+                    console.log('[Decision] Supplier auto-filled, selectedSupplierId =', this.selectedSupplierId);
+                } else {
+                    console.log('[Decision] Weak match found, skipping auto-fill to prevent accidental save:', best);
+                    // Ensure input is empty to force user decision
+                    this.DOM.supplierInput.value = '';
+                }
+            }
+
+            // Initialize Add Button State using smart logic
+            // This handles both cases (Empty/Weak Match -> Init with Raw Name) OR (Strong Match -> Init with Input Value)
+            // this._updateAddButtonState(this.DOM.supplierInput.value); // Moved below to ensure global execution
         }
+
+        // CRITICAL: Always update button state logic regardless of selection state
+        this._updateAddButtonState(this.DOM.supplierInput.value);
+
+
 
         // Update navigation buttons
         this.DOM.btnPrev.disabled = this.currentIndex === 0;
@@ -556,12 +613,33 @@ window.BGL.Decision = {
     },
 
     /**
+     * Handle bank input search (Debounced)
+     */
+    _handleBankQuery(query) {
+        const trimmedQuery = query.trim();
+        const suggestions = this._getBankSuggestions(trimmedQuery.toLowerCase());
+
+        if (suggestions.length === 0) {
+            this.DOM.bankSuggestions.classList.remove('open');
+            this.DOM.bankSuggestions.innerHTML = '';
+        } else {
+            this._renderSuggestions(this.DOM.bankSuggestions, suggestions, 'bank');
+            this.DOM.bankSuggestions.classList.add('open');
+        }
+    },
+
+    /**
      * Handle bank input
      */
     _handleBankInput(query) {
         this.selectedBankId = null;
         this.DOM.bankInput.classList.remove('has-value');
-        this._showBankSuggestions(query.toLowerCase().trim());
+
+        // Debounced Search
+        if (!this._debouncedBankSearch) {
+            this._debouncedBankSearch = this._debounce((q) => this._handleBankQuery(q), 300);
+        }
+        this._debouncedBankSearch(query);
     },
 
     /**
@@ -574,68 +652,200 @@ window.BGL.Decision = {
     },
 
     /**
-     * Generate list of bank suggestions based on user query.
+     * Generate list of bank suggestions.
      * 
-     * combining:
-     * 1. Smart Candidates (from API) - appear first
-     * 2. Dictionary Search (client-side filtering of all banks)
+     * LOGIC UPDATE (Smart Select Menu):
+     * 1. **Empty Query**: Returns ALL banks (Top 50) -> Acts like a fixed Select Menu.
+     * 2. **Typed Query**: Filters banks by Name (Ar/En) or Short Code.
      * 
      * @private
-     * @param {string} query - User input text
-     * @returns {Array<Object>} Merged and distinct list of suggestions
+     * @param {string} query 
+     * @returns {Array<Object>}
      */
     _getBankSuggestions(query) {
-        // Candidates first
-        const smart = this.bankCandidates.filter(c =>
-            (c.name || '').toLowerCase().includes(query)
-        );
+        // If query is empty, show ALL banks (treating it as a fixed list/select menu)
+        const banks = Object.values(BGL.State.bankMap || {});
 
-        // Dictionary
-        const dict = Object.values(BGL.State.bankMap || {})
-            .filter(b => (b.official_name || '').toLowerCase().includes(query))
-            .map(b => ({
+        if (!query || query.length === 0) {
+            return banks.map(b => ({
                 name: b.official_name,
                 id: b.id,
                 bank_id: b.id,
                 score: 0
-            }));
+            })).slice(0, 50); // Show top 50 banks
+        }
 
-        // Merge
-        const seen = new Set(smart.map(c => c.name));
-        const merged = [...smart];
-        dict.forEach(d => {
-            if (!seen.has(d.name)) {
-                merged.push(d);
-                seen.add(d.name);
-            }
-        });
+        // Dictionary Search
+        return banks
+            .filter(b => {
+                const q = query.toLowerCase();
+                const nameVal = (b.official_name || '').toLowerCase();
+                const nameEn = (b.official_name_en || '').toLowerCase();
+                const nameAr = (b.official_name_ar || '').toLowerCase(); // If available
+                const short = (b.short_code || '').toLowerCase();
 
-        return merged.slice(0, 20);
+                return nameVal.includes(q) || nameEn.includes(q) || nameAr.includes(q) || short.includes(q);
+            })
+            .map(b => ({
+                name: b.official_name, // Display name
+                id: b.id,
+                bank_id: b.id,
+                score: 0
+            }))
+            .slice(0, 20);
     },
 
     /**
-     * Handle supplier input
+     * Debounce helper
+     */
+    _debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    },
+
+    /**
+     * Simulate strict PHP normalization for validation.
+     * Matches logic in App\Support\Normalizer::normalizeSupplierName
+     */
+    _simulateNormalization(name) {
+        if (!name) return '';
+
+        let val = name.toLowerCase().trim();
+
+        // Remove common prefixes/suffixes (Stop words)
+        const stop = [
+            'شركة', 'شركه', 'مؤسسة', 'مؤسسه', 'مكتب', 'مصنع', 'مقاولات',
+            'trading', 'est', 'est.', 'establishment', 'company', 'co', 'co.', 'ltd', 'ltd.',
+            'limited', 'llc', 'inc', 'inc.', 'international', 'global'
+        ];
+
+        // Replace stop words with space
+        stop.forEach(word => {
+            // Regex matches whole words only
+            const regex = new RegExp(`\\b${word}\\b`, 'gi');
+            val = val.replace(regex, ' ');
+        });
+
+        // Remove non-alphanumeric (keep Arabic letters, English letters, Numbers)
+        // Note: JS regex for Unicode properties needs /u flag and \p{L}
+        // Simplified approach for typical inputs:
+        // Remove known punctuations or just keep letters/numbers
+        val = val.replace(/[^\p{L}\p{N}\s]/gu, '');
+
+        // Collapse spaces
+        val = val.replace(/\s+/g, ' ').trim();
+
+        return val;
+    },
+
+    /**
+     * Handle supplier input search (Debounced in event listener)
+     */
+    _handleSupplierQuery(query) {
+        const trimmedQuery = query.trim();
+        const suggestions = this._getSupplierSuggestions(trimmedQuery.toLowerCase());
+
+        if (suggestions.length === 0) {
+            this.DOM.supplierSuggestions.classList.remove('open');
+            this.DOM.supplierSuggestions.innerHTML = '';
+        } else {
+            this._renderSuggestions(this.DOM.supplierSuggestions, suggestions, 'supplier');
+            this.DOM.supplierSuggestions.classList.add('open');
+        }
+    },
+
+    /**
+     * Handle supplier input - main entry point
+     * 
+     * LOGIC UPDATE (Smart Button):
+     * - Clears previous error states.
+     * - Checks "Add New" button eligibility via `_updateAddButtonState`.
+     * - Triggers debounced search (300ms).
+     * 
+     * @param {string} query 
      */
     _handleSupplierInput(query) {
         this.selectedSupplierId = null;
         this.DOM.supplierInput.classList.remove('has-value');
+        // Clear previous error if any
+        this.DOM.supplierAddError.classList.add('hidden');
 
-        const trimmedQuery = query.trim();
-        const suggestions = this._getSupplierSuggestions(trimmedQuery.toLowerCase());
+        // Always update button state immediately for UX responsiveness
+        const record = this.records[this.currentIndex];
+        this._updateAddButtonState(query, record ? record.rawSupplierName : '');
 
-        // Enable "Add New" button if user typed something and no exact match found
-        if (trimmedQuery.length >= 2 && suggestions.length === 0) {
-            this._pendingNewSupplierName = trimmedQuery;
-            this.DOM.btnAddSupplier.disabled = false;
-            this.DOM.btnAddSupplier.title = `إضافة "${trimmedQuery}" كمورد جديد`;
-        } else {
+        // Debounced Search
+        if (!this._debouncedSupplierSearch) {
+            this._debouncedSupplierSearch = this._debounce((q) => this._handleSupplierQuery(q), 300);
+        }
+        this._debouncedSupplierSearch(query);
+    },
+
+    /**
+     * Update "Add New Supplier" button visibility & state.
+     * 
+     * LOGIC UPDATE (Smart Pop-in):
+     * - **Backend Validation**: Uses `_simulateNormalization` to check if name is valid (len >= 5).
+     * - **Collision Check**: Checks if normalized name exists in Dictionary or Candidates.
+     * - **Visibility**: Using `.hidden` class instead of disabled attribute for cleaner UI.
+     * - **Text**: Dynamically updates text to `+ Add "Query"`.
+     * 
+     * @param {string} query - Current input value
+     * @param {string} rawName - Original raw name from record
+     */
+    _updateAddButtonState(inputText) {
+        const record = this.records[this.currentIndex];
+        const rawName = record ? (record.rawSupplierName || '').trim() : '';
+
+        // Determine what name we are dealing with (Input OR Fallback to Raw)
+        const nameToCheck = inputText.length > 0 ? inputText : rawName;
+
+        // 1. Basic Validity Check (Backend Rule: Normalized >= 5)
+        const normalizedCheck = this._simulateNormalization(nameToCheck);
+
+        if (normalizedCheck.length < 5) {
             this._pendingNewSupplierName = null;
-            this.DOM.btnAddSupplier.disabled = true;
-            this.DOM.btnAddSupplier.title = '';
+            this.DOM.btnAddSupplier.classList.add('hidden'); // Hide if invalid
+            return;
         }
 
-        this._renderSuggestions(this.DOM.supplierSuggestions, suggestions, 'supplier');
-        this.DOM.supplierSuggestions.classList.add('open');
+        // 2. Duplicate Check
+        const isDuplicate = this.supplierCandidates.some(c => c.name.toLowerCase() === nameToCheck.toLowerCase());
+
+        if (isDuplicate) {
+            this._pendingNewSupplierName = null;
+            this.DOM.btnAddSupplier.classList.add('hidden'); // Hide if duplicate
+        } else {
+            // Unique Name - Enable & Show
+            this._pendingNewSupplierName = nameToCheck;
+            this.DOM.btnAddSupplier.classList.remove('hidden');
+            this.DOM.btnAddSupplier.disabled = false;
+
+            // Clean styles
+            this.DOM.btnAddSupplier.className = "text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium transition-all";
+
+            if (inputText.length === 0) {
+                // Showing Raw Name Fallback
+                this.DOM.btnAddSupplier.title = `إضافة "${rawName}" (من الملف) كمورد جديد`;
+                this.DOM.btnAddSupplier.textContent = `+ إضافة "${rawName}"`;
+            } else {
+                // Showing Typed Name
+                this.DOM.btnAddSupplier.title = `إضافة "${inputText}" كمورد جديد`;
+                this.DOM.btnAddSupplier.textContent = `+ إضافة "${inputText}"`;
+            }
+
+            // Update error dynamically if we want to show non-blocking info
+            // But currently users want hidden if duplicate, so valid state is clean.
+            this._setAddStatus('', 'info'); // clear
+            this.DOM.supplierAddError.classList.add('hidden');
+        }
     },
 
     /**
@@ -666,33 +876,94 @@ window.BGL.Decision = {
      * @param {string} query - User input text
      * @returns {Array<Object>} Merged and distinct list of suggestions
      */
+    /**
+     * Generate list of supplier suggestions based on user query.
+     * 
+     * LOGIC UPDATE (Strict Search):
+     * 1. **Stop Words**: Ignores common suffixes like "Co", "Ltd", "Company" if typed alone.
+     *    (Synced with Backend `App\Support\Normalizer.php`)
+     * 2. **Min Length**: Requires >= 3 meaningful characters.
+     * 
+     * This prevents "Co" from returning thousands of irrelevant results.
+     * 
+     * @private
+     * @param {string} query - User input text
+     * @returns {Array<Object>} List of suggestions from dictionary
+     */
     _getSupplierSuggestions(query) {
-        // Candidates first
-        const smart = this.supplierCandidates.filter(c =>
-            (c.name || '').toLowerCase().includes(query)
-        );
+        if (!query) return [];
 
-        // Dictionary
-        const dict = (BGL.State.supplierCache || [])
-            .filter(s => (s.official_name || '').toLowerCase().includes(query))
+        // Stop Words from App\Support\Normalizer.php
+        const stopWords = [
+            'شركة', 'شركه', 'مؤسسة', 'مؤسسه', 'مكتب', 'مصنع', 'مقاولات',
+            'trading', 'est', 'est.', 'establishment', 'company', 'co', 'co.', 'ltd', 'ltd.',
+            'limited', 'llc', 'inc', 'inc.', 'international', 'global'
+        ];
+
+        // Normalize query: specific cleaning for search
+        let cleanQuery = query.toLowerCase().trim();
+
+        // 1. Exact Stop Word Match -> Return Empty
+        if (stopWords.includes(cleanQuery)) {
+            return [];
+        }
+
+        // 2. Strict Length Check
+        // If query is very short, ignoring it prevents massive result sets.
+        // Backend normalization might strip meaningful chars, but for *search* we need to be practical.
+        if (cleanQuery.length < 3) {
+            return [];
+        }
+
+        // Dictionary Search
+        return (BGL.State.supplierCache || [])
+            .filter(s => {
+                const name = (s.official_name || '').toLowerCase();
+                return name.includes(cleanQuery);
+            })
             .map(s => ({
                 name: s.official_name,
                 id: s.id,
                 supplier_id: s.id,
                 score: 0
-            }));
+            }))
+            .slice(0, 20);
+    },
 
-        // Merge
-        const seen = new Set(smart.map(c => c.name));
-        const merged = [...smart];
-        dict.forEach(d => {
-            if (!seen.has(d.name)) {
-                merged.push(d);
-                seen.add(d.name);
-            }
-        });
+    /**
+     * Render quick-select chips for top candidates
+     */
+    _renderCandidateChips(candidates, type) {
+        const container = type === 'supplier' ? this.DOM.supplierChips : this.DOM.bankChips;
+        if (!container) return;
 
-        return merged.slice(0, 20);
+        if (!candidates || candidates.length === 0) {
+            container.innerHTML = '<span class="text-xs text-gray-400">لا توجد مقترحات ذكية</span>';
+            return;
+        }
+
+        // Take top 3
+        const top = candidates.slice(0, 3);
+
+        container.innerHTML = top.map(c => {
+            const scoreClass = c.score >= 0.9 ? 'bg-green-100 text-green-700 border-green-200' :
+                c.score >= 0.7 ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                    'bg-gray-100 text-gray-700 border-gray-200';
+
+            const id = c.supplier_id || c.bank_id || c.id;
+            // Escape single quotes for the function call
+            const safeName = (c.name || '').replace(/'/g, "\\'");
+
+            return `
+                <button type="button" 
+                    class="chip-btn flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all hover:scale-105 ${scoreClass}"
+                    onclick="BGL.Decision._selectItem('${type}', '${id}', '${this._escapeHtml(safeName)}')"
+                >
+                    <span>${this._escapeHtml(c.name)}</span>
+                    <span class="font-bold opacity-75">${Math.round(c.score * 100)}%</span>
+                </button>
+            `;
+        }).join('');
     },
 
     /**
@@ -789,15 +1060,36 @@ window.BGL.Decision = {
      * @async
      * @returns {Promise<void>}
      */
+    /**
+     * Helper to show local status message for Add Supplier button
+     */
+    _setAddStatus(msg, type) {
+        const el = this.DOM.supplierAddError;
+        if (!el) return;
+
+        el.textContent = msg;
+        el.classList.remove('hidden', 'text-red-500', 'text-green-600', 'text-gray-500');
+
+        if (type === 'error') {
+            el.classList.add('text-red-500');
+        } else if (type === 'success') {
+            el.classList.add('text-green-600');
+        } else {
+            el.classList.add('text-gray-500'); // info
+        }
+    },
+
     async _addNewSupplier() {
         const name = this._pendingNewSupplierName;
-        if (!name || name.length < 2) {
-            this._showMessage('⚠️ اسم المورد قصير جداً', 'error');
+        const normalized = this._simulateNormalization(name);
+
+        if (!name || normalized.length < 5) {
+            this._setAddStatus('⚠️ اسم المورد يجب أن يحتوي على 5 حروف صالحة على الأقل (بدون كلمات عامة)', 'error');
             return;
         }
 
         this.DOM.btnAddSupplier.disabled = true;
-        this._showMessage('جارٍ إضافة المورد...', 'info');
+        this._setAddStatus('جارٍ إضافة المورد...', 'info');
 
         try {
             const res = await api.post('/api/dictionary/suppliers', {
@@ -821,14 +1113,24 @@ window.BGL.Decision = {
                 // Select the new supplier
                 this._selectItem('supplier', newId, name);
 
-                this._showMessage(`✓ تم إضافة المورد: ${name}`, 'success');
+                // Success message alongside the button
+                this._setAddStatus(`✓ تم إضافة "${name}" للقائمة. اضغط "حفظ" لاعتماد السجل.`, 'success');
+
                 console.log('[Decision] New supplier added:', { id: newId, name });
             } else {
                 throw new Error(res.message || 'فشل إضافة المورد');
             }
         } catch (e) {
             console.error('[Decision] Add supplier failed:', e);
-            this._showMessage('خطأ: ' + e.message, 'error');
+            // Clean up error message (remove "Error: " prefix if present)
+            const msg = e.message.replace(/^Error:\s*/, '');
+
+            // Show local error
+            this._setAddStatus(msg, 'error');
+
+            // Hide global loading message if present
+            this.DOM.saveMessage.classList.add('hidden');
+
             this.DOM.btnAddSupplier.disabled = false;
         }
     },

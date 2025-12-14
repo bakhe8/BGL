@@ -36,7 +36,17 @@ const api = {
 
             // Check HTTP status
             if (!response.ok) {
-                throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+                // Try to parse error message from JSON response
+                let errorMsg = `HTTP Error ${response.status}: ${response.statusText}`;
+                try {
+                    const errJson = await response.json();
+                    if (errJson && errJson.message) {
+                        errorMsg = errJson.message;
+                    }
+                } catch (e) {
+                    // Ignore JSON parse error for error responses, fall back to status text
+                }
+                throw new Error(errorMsg);
             }
 
             // Parse JSON
