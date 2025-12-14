@@ -54,34 +54,19 @@ try {
     $dictionaryController = new DictionaryController();
     $settingsController = new SettingsController();
 
-    // صفحات HTML
-    if ($method === 'GET' && ($uri === '/' || $uri === '/decision')) {
+    // ═══════════════════════════════════════════════════════════════════
+    // الواجهات المتاحة (فقط):
+    // 1. / → صفحة اتخاذ القرار (الرئيسية)
+    // 2. /settings → صفحة الإعدادات
+    // ═══════════════════════════════════════════════════════════════════
+    
+    if ($method === 'GET' && $uri === '/') {
         echo file_get_contents(__DIR__ . '/decision.html');
-        exit;
-    }
-
-    /* Deprecated import.html route
-    if ($method === 'GET' && ($uri === '/' || $uri === '/import')) {
-        echo file_get_contents(__DIR__ . '/import.html');
-        exit;
-    }
-    */
-
-
-
-    if ($method === 'GET' && ($uri === '/dictionary' || $uri === '/dictionary/suppliers' || $uri === '/dictionary/banks')) {
-        echo file_get_contents(__DIR__ . '/dictionary.html');
         exit;
     }
 
     if ($method === 'GET' && $uri === '/settings') {
         echo file_get_contents(__DIR__ . '/settings.html');
-        exit;
-    }
-
-    // New: Decision page (single-record view)
-    if ($method === 'GET' && $uri === '/decision') {
-        echo file_get_contents(__DIR__ . '/decision.html');
         exit;
     }
 
@@ -126,10 +111,8 @@ try {
         exit;
     }
 
-    if ($method === 'DELETE' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
-        $dictionaryController->deleteSupplier((int) $m[1]);
-        exit;
-    }
+    // NOTE: DELETE suppliers route removed - not needed per user requirements
+    // The function deleteSupplier() was never implemented in DictionaryController
 
     if ($method === 'GET' && $uri === '/api/dictionary/banks') {
         $dictionaryController->listBanks();
@@ -148,26 +131,12 @@ try {
         exit;
     }
 
-    if ($method === 'DELETE' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
-        $dictionaryController->deleteBank((int) $m[1]);
-        exit;
-    }
+    // NOTE: DELETE banks route removed - not needed per user requirements
+    // The function deleteBank() was never implemented in DictionaryController
 
-    if ($method === 'GET' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
-        $dictionaryController->listAlternativeNames((int) $m[1]);
-        exit;
-    }
-
-    if ($method === 'POST' && preg_match('#^/api/dictionary/suppliers/(\\d+)/alternatives$#', $uri, $m)) {
-        $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-        $dictionaryController->createAlternativeName((int) $m[1], $payload);
-        exit;
-    }
-
-    if ($method === 'DELETE' && preg_match('#^/api/dictionary/alternatives/(\\d+)$#', $uri, $m)) {
-        $dictionaryController->deleteAlternativeName((int) $m[1]);
-        exit;
-    }
+    // NOTE: Alternatives routes removed - functions never implemented in DictionaryController
+    // These were planned features but never used by the frontend
+    // If needed in future, implement listAlternativeNames(), createAlternativeName(), deleteAlternativeName() first
 
     if ($method === 'POST' && $uri === '/api/dictionary/suggest-alias') {
         $payload = json_decode(file_get_contents('php://input'), true) ?? [];

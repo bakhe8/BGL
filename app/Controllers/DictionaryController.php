@@ -174,10 +174,9 @@ class DictionaryController
         echo json_encode(['success' => true, 'data' => $bank]);
     }
 
-    public function updateBank(string $id, array $payload): void
+    public function updateBank(int $id, array $payload): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $idIdx = (int) $id;
         $name = trim((string) ($payload['official_name'] ?? ''));
         $nameEn = trim((string) ($payload['official_name_en'] ?? ''));
         $norm = trim((string) ($payload['normalized_key'] ?? ''));
@@ -189,7 +188,7 @@ class DictionaryController
             return;
         }
 
-        $this->banks->update($idIdx, [
+        $this->banks->update($id, [
             'official_name' => $name,
             'official_name_en' => $nameEn,
             'normalized_key' => $norm,

@@ -19,3 +19,11 @@ test-data/
 *.tmp
 *.log
 .vscode/
+storage/uploads/upload_20251214_142657.xlsx
+storage/uploads/upload_20251214_142409.xlsx
+storage/uploads/upload_20251214_135620.xlsx
+debug_issue.php
+debug_search_2.php
+debug_search.php
+scripts/reset_record.php
+.gitignore

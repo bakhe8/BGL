@@ -104,7 +104,31 @@ class CandidateService
     public function supplierCandidates(string $rawSupplier): array
     {
         $normalized = $this->normalizer->normalizeSupplierName($rawSupplier);
-        // عتبات الفزي الجديدة
+        
+        /**
+         * ═══════════════════════════════════════════════════════════════════
+         * العتبات الثلاث ودورها (Thresholds Explained)
+         * ═══════════════════════════════════════════════════════════════════
+         * 
+         * 1. MATCH_AUTO_THRESHOLD (strongTh) = 0.90
+         *    → النتائج >= 0.90 تُعتبر "قوية" وموثوقة للاعتماد التلقائي
+         *    → تُستخدم لتحديد match_type: 'fuzzy_strong' vs 'fuzzy_weak'
+         * 
+         * 2. MATCH_WEAK_THRESHOLD (weakTh) = 0.80
+         *    → الحد الأدنى للنتائج التي تظهر في القائمة النهائية
+         *    → النتائج < 0.80 تُرفض نهائياً ولا تُعرض للمستخدم
+         *    → يمكن تعديلها من واجهة الإعدادات
+         * 
+         * 3. MATCH_REVIEW_THRESHOLD (reviewThreshold) = 0.70
+         *    → عتبة أقل للسماح بمرور النتائج أثناء المعالجة الداخلية
+         *    → الشرط (< reviewThreshold && < weakTh) يعني: رفض فوري للضعيف جداً
+         * 
+         * لماذا نتحقق من كلاهما (reviewThreshold && weakTh)؟
+         * ─────────────────────────────────────────────────────
+         * لإعطاء مرونة: المستخدم يمكنه تعديل weakTh من الإعدادات،
+         * لكن reviewThreshold ثابت كحد أدنى صلب (hardcoded floor).
+         * ═══════════════════════════════════════════════════════════════════
+         */
         $strongTh = (float) $this->settings->get('MATCH_AUTO_THRESHOLD', Config::MATCH_AUTO_THRESHOLD);
         $weakTh = (float) $this->settings->get('MATCH_WEAK_THRESHOLD', 0.80);
         $reviewThreshold = $this->settings->get('MATCH_REVIEW_THRESHOLD', Config::MATCH_REVIEW_THRESHOLD);

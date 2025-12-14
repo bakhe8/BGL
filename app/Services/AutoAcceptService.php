@@ -63,7 +63,18 @@ class AutoAcceptService
                 'score_raw' => $best['score_raw'] ?? null,
             ]);
 
-            // تحديث الحقلين للتوضيح داخل السجل
+            /**
+             * NOTE: الاستدعاء الثاني لـ updateDecision مقصود
+             * ─────────────────────────────────────────────
+             * الاستدعاء الأول (أعلاه): تحديث supplier_id + match_status
+             * → يحدث قبل تسجيل learning_log
+             * 
+             * الاستدعاء الثاني (أدناه): إضافة decision_result = 'auto'
+             * → يحدث بعد نجاح تسجيل learning_log
+             * 
+             * السبب: إذا فشل learning_log لأي سبب، السجل يبقى 'ready' 
+             * لكن بدون علامة 'auto' للتمييز في الواجهة.
+             */
             $this->records->updateDecision($record->id ?? 0, [
                 'decision_result' => 'auto',
                 'match_status' => 'ready',

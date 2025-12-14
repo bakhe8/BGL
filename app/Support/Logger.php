@@ -27,10 +27,16 @@ class Logger
         file_put_contents(self::getLogPath(), $logMessage, FILE_APPEND | LOCK_EX);
     }
 
-    public static function info(string $message): void
+    public static function info(string $message, array $context = []): void
     {
         $timestamp = date('Y-m-d H:i:s');
-        $logMessage = "[$timestamp] INFO: $message" . PHP_EOL;
+        $contextStr = !empty($context) ? json_encode($context, JSON_UNESCAPED_UNICODE) : '';
+        $logMessage = "[$timestamp] INFO: $message";
+        if ($contextStr) {
+            $logMessage .= " | Context: $contextStr";
+        }
+        $logMessage .= PHP_EOL;
+
         file_put_contents(self::getLogPath(), $logMessage, FILE_APPEND | LOCK_EX);
     }
 }
