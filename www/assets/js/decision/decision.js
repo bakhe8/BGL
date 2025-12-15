@@ -1387,7 +1387,8 @@ window.BGL.Decision = {
             department: bankData?.department || "إدارة الضمانات",
             addressLines: [
                 bankData?.address_line_1 || "المقر الرئيسي",
-                bankData?.address_line_2
+                bankData?.address_line_2,
+                bankData?.contact_email ? `البريد الالكتروني: ${bankData.contact_email}` : null // Added email with label
             ].filter(Boolean), // Remove null/empty values
             email: bankData?.contact_email || ""
         };
@@ -1395,8 +1396,56 @@ window.BGL.Decision = {
         const supplierName = this.selectedSupplierName || record.rawSupplierName || "المورد";
         const guaranteeNo = record.guaranteeNumber || "-";
         const contractNo = record.contractNumber || "-";
-        const amount = record.amount ? Number(record.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "-";
-        const renewalDate = record.expiryDate || "-";
+        let amount = record.amount ? Number(record.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "-";
+        // Convert to Hindi Numerals
+        if (amount !== "-") {
+            amount = amount.replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+        }
+
+        // Calculate Renewal Date (Expiry + 1 Year) as requested
+        let renewalDate = "-";
+        if (record.expiryDate) {
+            try {
+                const dateObj = new Date(record.expiryDate);
+                if (!isNaN(dateObj.getTime())) {
+                    // Calculate next year date
+                    const nextYearDate = new Date(dateObj);
+                    nextYearDate.setFullYear(dateObj.getFullYear() + 1);
+
+                    // Format: Day MonthName Year (Arabic)
+                    const formatter = new Intl.DateTimeFormat('ar-EG', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                    });
+
+                    // "10 أكتوبر 2026"
+                    let dateStr = formatter.format(nextYearDate);
+
+                    // Convert to Hindi Numerals
+                    dateStr = dateStr.replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+                    // Append 'م'
+                    renewalDate = dateStr + 'م';
+                } else {
+                    // For manually entered dates, try to format them if possible, otherwise use as is
+                    const d = new Date(record.expiryDate);
+                    if (!isNaN(d.getTime())) {
+                        const formatter = new Intl.DateTimeFormat('ar-EG', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric'
+                        });
+                        renewalDate = formatter.format(d).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]) + 'م';
+                    } else {
+                        renewalDate = record.expiryDate;
+                    }
+                }
+            } catch (e) {
+                console.error("Date parse error", e);
+                renewalDate = record.expiryDate;
+            }
+        }
 
         // Determine watermark status
         const hasSupplier = this.selectedSupplierId !== null;
@@ -1416,6 +1465,13 @@ window.BGL.Decision = {
             watermarkClass = 'status-draft';
         }
 
+        let guaranteeDesc = "الضمان البنكي";
+        if (record.type) {
+            const t = record.type.toUpperCase();
+            if (t === 'FINAL') guaranteeDesc = "الضمان البنكي النهائي";
+            else if (t === 'ADVANCED') guaranteeDesc = "ضمان الدفعة المقدمة البنكي";
+        }
+
         // Clean HTML template (styling handled by letter.css)
         return `
         <div class="letter-preview">
@@ -1425,36 +1481,50 @@ window.BGL.Decision = {
                 <div class="watermark ${watermarkClass}">${watermarkText}</div>
                 
                 <div class="header-line">
-                  <div class="fw-800-sharp">السادة / ${this._escapeHtml(bankName)}</div>
+                  <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">السادة / ${this._escapeHtml(bankName)}</div>
                   <div class="greeting">المحترمين</div>
                 </div>
 
                 <div>
-                   <div class="fw-800-sharp">${bankContact.department}</div>
-                   ${bankContact.addressLines.map(line => `<div>${line}</div>`).join('')}
+                   <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${bankContact.department}</div>
+                   ${bankContact.addressLines.map(line => {
+            if (line.includes('البريد الالكتروني:')) {
+                const parts = line.split('البريد الالكتروني:');
+                return `<div><span style="text-shadow: 0 0 1px #333, 0 0 1px #333;">البريد الالكتروني:</span>${parts[1]}</div>`;
+            }
+            return `<div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${line.replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d])}</div>`;
+        }).join('')}
                 </div>
 
-                <div style="text-align:right; margin: 20px 0;">السَّلام عليكُم ورحمَة الله وبركاتِه</div>
+                <div style="text-align:right; margin: 5px 0;">السَّلام عليكُم ورحمَة الله وبركاتِه</div>
 
                 <div class="subject">
                     <span style="flex:0 0 70px;">الموضوع:</span>
                     <span>
                       طلب تمديد الضمان البنكي رقم (${this._escapeHtml(guaranteeNo)}) 
-                      ${contractNo !== '-' ? `والعائد لعقد رقم (${contractNo})` : ''}
+                      ${(() => {
+                if (contractNo === '-') return '';
+                let displayNo = contractNo;
+                // If it's a PO, convert to Hindi numerals as requested
+                if (record.contractSource === 'po') {
+                    displayNo = String(displayNo).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+                }
+                return `والعائد ${record.contractSource === 'po' ? 'لأمر الشراء' : 'لعقد'} رقم (${displayNo})`;
+            })()}
                     </span>
                 </div>
 
                 <div class="first-paragraph">
-                    إشارة الى الضمان البنكي الموضح أعلاه، والصادر منكم لصالحنا على حساب 
+                    إشارة الى ${guaranteeDesc} الموضح أعلاه، والصادر منكم لصالحنا على حساب 
                     <strong>${this._escapeHtml(supplierName)}</strong> 
                     بمبلغ قدره (<strong>${amount}</strong>) ريال، 
                     نأمل منكم <span class="fw-800-sharp">تمديد فترة سريان الضمان حتى تاريخ ${renewalDate}</span>، 
-                    مع بقاء الشروط الأخرى دون تغيير.
+                    مع بقاء الشروط الأخرى دون تغيير، وإفادتنا بذلك من خلال البريد الالكتروني المخصص للضمانات البنكية لدى مستشفى الملك فيصل التخصصي ومركز الأبحاث بالرياض (bgfinance@kfshrc.edu.sa)، كما نأمل منكم إرسال أصل تمديد الضمان الى:
                 </div>
 
-                <div style="margin-top: 20px;">
-                    <div style="margin-bottom: 5px;">مستشفى الملك فيصل التخصصي ومركز الأبحاث – الرياض</div>
-                    <div style="margin-bottom: 5px;">ص.ب ٣٣٥٤ الرياض ١١٢١١</div>
+                <div style="margin-top: 5px; margin-right: 50px;">
+                    <div>مستشفى الملك فيصل التخصصي ومركز الأبحاث – الرياض</div>
+                    <div>ص.ب ٣٣٥٤ الرياض ١١٢١١</div>
                     <div>مكتب الخدمات الإدارية</div>
                 </div>
 
@@ -1462,11 +1532,11 @@ window.BGL.Decision = {
                     علمًا بأنه في حال عدم تمكن البنك من تمديد الضمان المذكور قبل انتهاء مدة سريانه، فيجب على البنك دفع قيمة الضمان إلينا حسب النظام.
                 </div>
 
-                <div style="text-indent:5em; margin-top:40px;">وَتفضَّلوا بِقبُول خَالِص تحيَّاتِي</div>
+                <div style="text-indent:5em; margin-top:5px;">وَتفضَّلوا بِقبُول خَالِص تحيَّاتِي</div>
 
-                <div class="fw-800-sharp" style="text-align: center; margin-top: 40px; margin-right: 200px;">
-                    مُدير الإدارة العامَّة للعمليَّات المحاسبيَّة<br><br>
-                    سَامِي بن عبَّاس الفايز
+                <div class="fw-800-sharp" style="text-align: center; margin-top: 5px; margin-right: 320px;">
+                    <div style="margin-bottom: 60px; text-shadow: 0 0 1px #333, 0 0 1px #333;">مُدير الإدارة العامَّة للعمليَّات المحاسبيَّة</div>
+                    <div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">سَامِي بن عبَّاس الفايز</div>
                 </div>
 
                 <div style="position:absolute; left:1in; right:1in; bottom:0.7in; display:flex; justify-content:space-between; font-size:9pt;">

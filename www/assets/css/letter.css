@@ -6,20 +6,21 @@
 @font-face {
   font-family: 'AL-Mohanad';
   src: url('/assets/letter/AL-Mohanad-Bold.ttf') format('truetype');
-  font-weight: bold;
+  font-weight: normal;
 }
 
 .letter-preview {
   font-family: 'Cairo', 'Segoe UI', sans-serif;
-  line-height: 1.9;
+  line-height: 23pt;
   background: #f3f4f6;
   padding: 20px;
   direction: rtl;
 }
 
 .letter-preview .letter-paper {
-  font-family: 'AL-Mohanad', 'Arial', sans-serif;
+  font-family: 'EnglishOnly', 'AL-Mohanad', 'Arial', sans-serif;
   font-size: 15pt;
+  line-height: 23pt;
   box-sizing: border-box;
   background: #ffffff url("/assets/letter/letter_bg.svg") top center/contain no-repeat;
   width: 210mm;
@@ -30,9 +31,15 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+@font-face {
+  font-family: 'EnglishOnly';
+  src: local('Arial');
+  unicode-range: U+0000-00FF;
+}
+
 .letter-preview .letter-paper * {
-  font-family: 'AL-Mohanad', 'Arial', sans-serif;
-  line-height: 23pt;
+  font-family: 'EnglishOnly', 'AL-Mohanad', 'Arial', sans-serif;
+  line-height: 23pt !important;
 }
 
 .letter-preview .fw-800-sharp {
@@ -41,32 +48,34 @@
 
 .letter-preview .subject {
   background: #f0f1f5;
-  padding: 10px;
+  padding: 0 10px;
   border-radius: 6px;
   border: 1px solid #c8c9d1;
-  margin: 12px 0;
+  margin: 5px 0;
   display: flex;
   align-items: flex-start;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .letter-preview .header-line {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 0px;
 }
 
 .letter-preview .first-paragraph {
   text-align: justify;
-  margin-top: 15px;
+  margin-top: 5px;
 }
 
 /* Watermark Styles */
 .letter-preview .watermark {
   position: absolute;
-  top: 120px;
+  top: 80px;
   left: 50px;
-  transform: rotate(-15deg);
+  transform: rotate(-25deg);
   font-size: 48pt;
   font-weight: bold;
   opacity: 0.15;
