@@ -1,0 +1,139 @@
+/**
+ * Letter Preview Styles
+ * Scoped with .letter-preview prefix to avoid conflicts
+ */
+
+@font-face {
+  font-family: 'AL-Mohanad';
+  src: url('/assets/letter/AL-Mohanad-Bold.ttf') format('truetype');
+  font-weight: normal;
+  font-display: swap;
+}
+
+.letter-preview {
+  font-family: 'Cairo', 'Segoe UI', sans-serif;
+  line-height: 23pt;
+  background: #f3f4f6;
+  padding: 20px;
+  direction: rtl;
+}
+
+.letter-preview .letter-paper {
+  font-family: 'EnglishOnly', 'AL-Mohanad', 'Arial', sans-serif;
+  font-size: 15pt;
+  line-height: 23pt;
+  box-sizing: border-box;
+  background: #ffffff url("/assets/letter/letter_bg.svg") top center/contain no-repeat;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 2.2in 1in 1in 1in;
+  margin: 0 auto;
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+@font-face {
+  font-family: 'EnglishOnly';
+  src: local('Arial');
+  unicode-range: U+0000-00FF;
+}
+
+.letter-preview .letter-paper * {
+  font-family: 'EnglishOnly', 'AL-Mohanad', 'Arial', sans-serif;
+  line-height: 23pt !important;
+}
+
+.letter-preview .fw-800-sharp {
+  font-weight: 800;
+}
+
+.letter-preview .subject {
+  background: #f0f1f5;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #c8c9d1;
+  margin: 5px 0;
+  display: flex;
+  align-items: flex-start;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.letter-preview .header-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0px;
+}
+
+.letter-preview .first-paragraph {
+  text-align: justify;
+  margin-top: 5px;
+}
+
+/* Watermark Styles */
+.letter-preview .watermark {
+  position: absolute;
+  top: 80px;
+  left: 50px;
+  transform: rotate(-25deg);
+  font-size: 48pt;
+  font-weight: bold;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 10;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.letter-preview .watermark.status-draft {
+  color: #ef4444;
+  /* Red */
+}
+
+.letter-preview .watermark.status-ready {
+  color: #22c55e;
+  /* Green */
+}
+
+.letter-preview .watermark.status-partial {
+  color: #f59e0b;
+  /* Orange */
+}
+
+/* Print-optimized @page rules */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .letter-preview,
+  .letter-preview * {
+    visibility: visible;
+  }
+
+  .letter-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: white;
+    padding: 0;
+  }
+
+  .letter-preview .letter-paper {
+    box-shadow: none;
+    margin: 0;
+    page-break-after: always;
+  }
+
+  /* Hide watermark when printing */
+  .letter-preview .watermark {
+    display: none !important;
+  }
+}

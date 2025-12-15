@@ -14,7 +14,7 @@ class ImportedRecordRepository
      * 
      * @param ImportedRecord $record السجل المراد إنشاؤه
      * @return ImportedRecord السجل بعد الإنشاء مع ID
-     * @throws PDOException عند فشل الإدراج
+     * @throws \PDOException عند فشل الإدراج
      */
     public function create(ImportedRecord $record): ImportedRecord
     {
@@ -272,12 +272,61 @@ class ImportedRecordRepository
         $pdo = Database::connection();
         $cols = [];
         $res = $pdo->query("PRAGMA table_info('imported_records')");
-        while ($row = $res->fetch(\PDO::FETCH_ASSOC)) {
+        while ($row = $res->fetch(PDO::FETCH_ASSOC)) {
             $cols[] = $row['name'];
         }
         if (!in_array('decision_result', $cols, true)) {
             $pdo->exec("ALTER TABLE imported_records ADD COLUMN decision_result TEXT NULL");
         }
         $checked = true;
+    }
+    public function getStats(): array
+    {
+        $pdo = Database::connection();
+        
+        // Total Records
+        $total = $pdo->query('SELECT COUNT(*) FROM imported_records')->fetchColumn();
+        
+        // Completed (Ready or Approved)
+        $completed = $pdo->query("SELECT COUNT(*) FROM imported_records WHERE match_status IN ('ready', 'approved')")->fetchColumn();
+        
+        // Pending
+        $pending = $pdo->query("SELECT COUNT(*) FROM imported_records WHERE match_status IS NULL OR match_status = 'needs_review'")->fetchColumn();
+        
+        // Unique Suppliers
+        $suppliers = $pdo->query('SELECT COUNT(*) FROM suppliers')->fetchColumn();
+
+        // 1. Status Distribution
+        // "Completed" = ready/approved
+        // "Pending" = needs_review/null
+        // We can just query counts directly or group by. Since we already have counts, let's just use them.
+        // Actually, let's get a break down for the chart: Ready vs Approved vs Needs Review vs New.
+        // Simplified for Pie: Completed vs Pending.
+        $statusDist = [
+            'completed' => (int)$completed,
+            'pending' => (int)$pending
+        ];
+
+        // 2. Top 5 Banks
+        // Group by normalized bank or raw bank? Raw bank is what we found mostly.
+        // Let's use raw_bank_name for now as it's the source of truth for volume.
+        $stmt = $pdo->query("
+            SELECT raw_bank_name, COUNT(*) as count 
+            FROM imported_records 
+            WHERE raw_bank_name IS NOT NULL AND raw_bank_name != ''
+            GROUP BY raw_bank_name 
+            ORDER BY count DESC 
+            LIMIT 5
+        ");
+        $topBanks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'total_records' => (int)$total,
+            'completed' => (int)$completed,
+            'pending' => (int)$pending,
+            'suppliers_count' => (int)$suppliers,
+            'status_distribution' => $statusDist,
+            'top_banks' => $topBanks
+        ];
     }
 }

@@ -49,7 +49,7 @@ class DecisionController
      * @param Normalizer|null $normalizer Text normalization utility (auto-created if null)
      * @param LearningLogRepository|null $learningLog Repository for learning system logs (auto-created if null)
      */
-    public function __construct(ImportedRecordRepository $records, CandidateService $candidates = null, ConflictDetector $conflicts = null, BankRepository $banks = null, SupplierAlternativeNameRepository $supplierAlts = null, Normalizer $normalizer = null, LearningLogRepository $learningLog = null)
+    public function __construct(ImportedRecordRepository $records, ?CandidateService $candidates = null, ?ConflictDetector $conflicts = null, ?BankRepository $banks = null, ?SupplierAlternativeNameRepository $supplierAlts = null, ?Normalizer $normalizer = null, ?LearningLogRepository $learningLog = null)
     {
         $this->records = $records;
         $this->candidates = $candidates ?: new CandidateService(
@@ -89,7 +89,15 @@ class DecisionController
     {
         header('Content-Type: application/json; charset=utf-8');
         $sessionId = isset($_GET['session_id']) ? (int) $_GET['session_id'] : null;
-        $data = $sessionId ? $this->records->allBySession($sessionId) : $this->records->all();
+        
+        // Default to latest session if none specified (Session Scope vs Global Scope)
+        if (!$sessionId) {
+            $sessions = $this->records->getAvailableSessions();
+            $sessionId = !empty($sessions) ? (int)$sessions[0]['session_id'] : null;
+        }
+
+        $data = $sessionId ? $this->records->allBySession($sessionId) : [];
+        // Note: If no sessions exist, return empty array.
         $bankMap = [];
         $bankNormMap = [];
         $supplierMap = [];

@@ -109,9 +109,10 @@
         }
 
         .field-input input:focus {
-            border-color: #2563eb;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            /* User Request: Remove focus completely */
+            outline: none !important;
+            box-shadow: none !important;
+            border-color: #e2e8f0 !important;
         }
 
         /* Removed .has-value styling per user request for cleaner UI */
@@ -121,7 +122,7 @@
             top: 100%;
             right: 0;
             left: 0;
-            z-index: 100;
+            z-index: 9000;
             background: #fff;
             border: 1px solid #e2e8f0;
             border-radius: 0 0 8px 8px;
@@ -315,6 +316,11 @@
                                 📑
                             </button>
 
+                            <a href="/stats"
+                                class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                title="الإحصائيات">
+                                📊
+                            </a>
                             <a href="/settings"
                                 class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
                                 title="الإعدادات">
@@ -352,7 +358,7 @@
                                         class="text-xs font-bold text-gray-700 whitespace-nowrap mt-1.5">المورد:</span>
                                     <div class="relative w-full">
                                         <input type="text" id="supplierInput"
-                                            class="w-full border border-gray-300 rounded px-2 py-0 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            class="w-full border border-gray-300 rounded px-2 py-0 text-xs outline-none transition-all"
                                             placeholder="تحديد المورد..." autocomplete="off">
                                         <ul class="suggestions-list" id="supplierSuggestions"></ul>
 
@@ -360,8 +366,8 @@
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="supplierChips" class="flex flex-wrap gap-1"></div>
                                             <button
-                                                class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                                                id="btnAddSupplier" title="إضافة مورد جديد">+ جديد</button>
+                                                class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap hidden"
+                                                id="btnAddSupplier" title="إضافة مورد جديد"></button>
                                             <div id="supplierAddError" class="text-red-500 text-[10px] hidden"></div>
                                         </div>
                                     </div>
@@ -377,7 +383,7 @@
                                     <span class="text-xs font-bold text-gray-700 whitespace-nowrap mt-1.5">البنك:</span>
                                     <div class="relative w-full">
                                         <input type="text" id="bankInput"
-                                            class="w-full border border-gray-300 rounded px-2 py-0 text-xs focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+                                            class="w-full border border-gray-300 rounded px-2 py-0 text-xs outline-none transition-all"
                                             placeholder="تحديد البنك..." autocomplete="off">
                                         <ul class="suggestions-list" id="bankSuggestions"></ul>
 
@@ -429,12 +435,34 @@
             </section>
 
         </div>
+        </div>
     </main>
+
+    <!-- Custom Confirmation Modal -->
+    <div id="confirmModal"
+        class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center backdrop-blur-sm transition-opacity">
+        <div
+            class="bg-white rounded-xl shadow-2xl p-6 w-96 max-w-[90%] transform transition-all scale-100 border border-gray-100">
+            <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+                <span class="text-2xl">⚠️</span>
+                <span>تأكيد الإجراء</span>
+            </h3>
+            <p class="text-gray-600 mb-6 text-sm leading-relaxed font-medium" id="confirmModalMessage">هل أنت متأكد من
+                هذا الإجراء؟</p>
+            <div class="flex justify-end gap-3">
+                <button id="btnConfirmCancel"
+                    class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-bold transition-colors">إلغاء</button>
+                <button id="btnConfirmOk"
+                    class="px-5 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg hover:shadow-xl transition-all border border-red-700">نعم،
+                    متابعة</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="assets/js/shared/api.js?v=183"></script>
-    <!-- state.js archived - BGL.State now initialized in decision.js -->
-    <script src="assets/js/decision/decision.js?v=186"></script>
+    <!-- Refactored Modular Decision Logic -->
+    <script type="module" src="assets/js/decision/index.js?v=189"></script>
 </body>
 
 </html>

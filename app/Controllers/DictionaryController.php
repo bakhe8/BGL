@@ -222,6 +222,48 @@ class DictionaryController
 
     // ... (rest of the file until findSimilarExisting)
 
+    // ---------- Delete Methods ----------
+
+    public function deleteSupplier(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        // Check if exists
+        $s = $this->suppliers->find($id);
+        if (!$s) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'المورد غير موجود']);
+            return;
+        }
+
+        // Hard Delete (as per repository)
+        $this->suppliers->delete($id);
+        echo json_encode(['success' => true, 'message' => 'تم حذف المورد بنجاح']);
+    }
+
+    public function deleteBank(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+         // Check if exists
+         $b = $this->banks->find($id);
+         if (!$b) {
+             http_response_code(404);
+             echo json_encode(['success' => false, 'message' => 'البنك غير موجود']);
+             return;
+         }
+ 
+         // Hard Delete
+         $this->banks->delete($id);
+         echo json_encode(['success' => true, 'message' => 'تم حذف البنك بنجاح']);
+    }
+
+    public function deleteAlias(int $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        // Simple Delete
+        $this->altNames->delete($id);
+        echo json_encode(['success' => true, 'message' => 'تم حذف الاسم البديل']);
+    }
+
     /**
      * التحقق من تشابه مرتفع وأرجاع الاسم المشابه
      */

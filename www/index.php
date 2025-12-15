@@ -5,6 +5,7 @@ use App\Controllers\ImportController;
 use App\Controllers\DecisionController;
 use App\Controllers\DictionaryController;
 use App\Controllers\SettingsController;
+use App\Controllers\StatsController;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\ImportedRecordRepository;
 use App\Services\ImportService;
@@ -56,6 +57,7 @@ try {
     $decisionController = new DecisionController($importedRecordRepo);
     $dictionaryController = new DictionaryController();
     $settingsController = new SettingsController();
+    $statsController = new StatsController($importedRecordRepo);
 
     // ═══════════════════════════════════════════════════════════════════
     // الواجهات المتاحة (فقط):
@@ -76,6 +78,11 @@ try {
 
     if ($method === 'GET' && $uri === '/settings') {
         echo file_get_contents(__DIR__ . '/settings.html');
+        exit;
+    }
+
+    if ($method === 'GET' && $uri === '/stats') {
+        echo file_get_contents(__DIR__ . '/stats.html');
         exit;
     }
 
@@ -132,8 +139,11 @@ try {
         exit;
     }
 
-    // NOTE: DELETE suppliers route removed - not needed per user requirements
-    // The function deleteSupplier() was never implemented in DictionaryController
+    // DELETE: Supplier
+    if ($method === 'DELETE' && preg_match('#^/api/dictionary/suppliers/(\\d+)$#', $uri, $m)) {
+        $dictionaryController->deleteSupplier((int) $m[1]);
+        exit;
+    }
 
     if ($method === 'GET' && $uri === '/api/dictionary/banks') {
         $dictionaryController->listBanks();
@@ -152,8 +162,11 @@ try {
         exit;
     }
 
-    // NOTE: DELETE banks route removed - not needed per user requirements
-    // The function deleteBank() was never implemented in DictionaryController
+    // DELETE: Bank
+    if ($method === 'DELETE' && preg_match('#^/api/dictionary/banks/(\\d+)$#', $uri, $m)) {
+        $dictionaryController->deleteBank((int) $m[1]);
+        exit;
+    }
 
     // NOTE: Alternatives routes removed - functions never implemented in DictionaryController
     // These were planned features but never used by the frontend
@@ -162,6 +175,12 @@ try {
     if ($method === 'POST' && $uri === '/api/dictionary/suggest-alias') {
         $payload = json_decode(file_get_contents('php://input'), true) ?? [];
         $dictionaryController->suggestAlias($payload);
+        exit;
+    }
+
+    // DELETE: Alias
+    if ($method === 'DELETE' && preg_match('#^/api/dictionary/aliases/(\\d+)$#', $uri, $m)) {
+        $dictionaryController->deleteAlias((int) $m[1]);
         exit;
     }
 
@@ -192,6 +211,10 @@ try {
         exit;
     }
 
+    if ($method === 'GET' && $uri === '/api/stats') {
+        $statsController->index();
+        exit;
+    }
     http_response_code(404);
     echo 'Not Found';
 

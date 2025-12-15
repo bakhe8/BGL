@@ -52,6 +52,15 @@ class ImportService
         $session = $this->sessions->create('excel');
 
         $rows = $this->xlsxReader->read($filePath);
+        
+        // التحقق من الحد الأقصى للصفوف (الأداء)
+        // تم الرفع إلى 500 بناءً على طلب المستخدم (كان 100)
+        if (count($rows) > 500) {
+            throw new RuntimeException(
+                sprintf('عفواً، الملف يحتوي على %d صفاً. الحد الأقصى المسموح به هو 500 صف لضمان استقرار النظام.', count($rows))
+            );
+        }
+
         if (count($rows) < 2) {
             throw new RuntimeException('لم يتم العثور على صفوف صالحة في الملف.');
         }
@@ -82,142 +91,136 @@ class ImportService
 
         // تسريع عمليات SQLite: تجميع الإدخالات في معاملة واحدة
         $pdo = \App\Support\Database::connection();
-        $pdo->beginTransaction();
-        $count = 0;
-        $skipped = [];
-        $rowIndex = $headerRowIndex + 1; // Start counting from header position + 1
+        
+        try {
+            $pdo->beginTransaction();
+            $count = 0;
+            $skipped = [];
+            $rowIndex = $headerRowIndex + 1; // Start counting from header position + 1
 
-        foreach ($dataRows as $row) {
-            $rowIndex++;
-            $supplier = $this->colValue($row, $map['supplier'] ?? null);
-            $bank = $this->colValue($row, $map['bank'] ?? null);
-            $amount = $this->normalizeAmount($this->colValue($row, $map['amount'] ?? null));
-            $guarantee = $this->colValue($row, $map['guarantee'] ?? null);
-            $contractVal = $this->colValue($row, $map['contract'] ?? null);
-            $poVal = $this->colValue($row, $map['po'] ?? null);
-            $contractSource = null;
-            $finalContract = null;
-            if ($contractVal !== '') {
-                $finalContract = $contractVal;
-                $contractSource = 'contract';
-            } elseif ($poVal !== '') {
-                $finalContract = $poVal;
-                $contractSource = 'po';
+            foreach ($dataRows as $row) {
+                $rowIndex++;
+                $supplier = $this->colValue($row, $map['supplier'] ?? null);
+                $bank = $this->colValue($row, $map['bank'] ?? null);
+                $amount = $this->normalizeAmount($this->colValue($row, $map['amount'] ?? null));
+                $guarantee = $this->colValue($row, $map['guarantee'] ?? null);
+                $contractVal = $this->colValue($row, $map['contract'] ?? null);
+                $poVal = $this->colValue($row, $map['po'] ?? null);
+                $contractSource = null;
+                $finalContract = null;
+                if ($contractVal !== '') {
+                    $finalContract = $contractVal;
+                    $contractSource = 'contract';
+                } elseif ($poVal !== '') {
+                    $finalContract = $poVal;
+                    $contractSource = 'po';
+                }
+                $typeRaw = $this->colValue($row, $map['type'] ?? null);
+                $typeVal = trim($typeRaw) !== '' ? trim($typeRaw) : null;
+                $commentVal = $this->colValue($row, $map['comment'] ?? null);
+                $expiry = $this->normalizeDate($this->colValue($row, $map['expiry'] ?? null));
+                $issue = $this->colValue($row, $map['issue'] ?? null);
+
+                // تخطي السطر إذا نقصت البيانات
+                $hasSupplierAndBank = ($supplier !== '' && $bank !== '');
+                $hasContract = $finalContract !== null && $finalContract !== '';
+                $hasGuarantee = $guarantee !== null && $guarantee !== '';
+                $hasAmount = $amount !== null && $amount !== '';
+
+                if (!$hasSupplierAndBank) {
+                    $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود اسم مورد وبنك معاً.";
+                    continue;
+                }
+                if (!$hasContract) {
+                    $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود رقم عقد أو أمر شراء.";
+                    continue;
+                }
+                if (!$hasGuarantee) {
+                    $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود رقم ضمان.";
+                    continue;
+                }
+                if (!$hasAmount) {
+                    $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود مبلغ صالح.";
+                    continue;
+                }
+
+                $match = $this->matchingService->matchSupplier($supplier);
+                $bankMatch = $this->matchingService->matchBank($bank);
+                $bankDisplay = $bankMatch['final_name'] ?? null;
+
+                // Fix: Status Override logic respecting 'needs_review'
+                $status = $match['match_status'];
+
+                if (empty($match['supplier_id']) || empty($bankMatch['bank_id'])) {
+                    $status = 'needs_review';
+                }
+
+                $candidates = $this->candidateService->supplierCandidates($supplier)['candidates'] ?? [];
+                $bankCandidatesArr = $this->candidateService->bankCandidates($bank)['candidates'] ?? [];
+                $bankCandidates = ['normalized' => $bankMatch['normalized'] ?? null, 'candidates' => $bankCandidatesArr];
+                $conflicts = $this->conflictDetector->detect(
+                    ['supplier' => ['candidates' => $candidates, 'normalized' => $match['normalized'] ?? ''], 'bank' => $bankCandidates],
+                    ['raw_supplier_name' => $supplier, 'raw_bank_name' => $bank]
+                );
+
+                $record = new ImportedRecord(
+                    id: null,
+                    sessionId: $session->id ?? 0,
+                    rawSupplierName: (string) $supplier,
+                    rawBankName: (string) $bank,
+                    amount: $amount ?: null,
+                    guaranteeNumber: $guarantee ?: null,
+                    contractNumber: $finalContract,
+                    contractSource: $contractSource,
+                    expiryDate: $expiry ?: null,
+                    issueDate: $issue ?: null,
+                    type: $typeVal ?: null,
+                    comment: $commentVal ?: null,
+                    matchStatus: $status,
+                    supplierId: $match['supplier_id'] ?? null,
+                    bankId: $bankMatch['bank_id'] ?? null,
+                    normalizedSupplier: $match['normalized'] ?? null,
+                    normalizedBank: $bankMatch['normalized'] ?? null,
+                    bankDisplay: $bankDisplay,
+                    supplierDisplayName: null,
+                );
+                $this->records->create($record);
+
+                $this->autoAcceptService->tryAutoAccept($record, $candidates, $conflicts);
+                $this->autoAcceptService->tryAutoAcceptBank($record, $bankCandidatesArr, $conflicts);
+
+                // تسجيل التعلم المؤرَّخ للمورد والبنك (للسجلات الجديدة فقط)
+                $this->learningLog->create([
+                    'raw_input' => (string) $supplier,
+                    'normalized_input' => $match['normalized'] ?? '',
+                    'suggested_supplier_id' => $match['supplier_id'] ?? null,
+                    'decision_result' => $status,
+                    'candidate_source' => 'import',
+                    'score' => null,
+                    'score_raw' => null,
+                    'created_at' => date('c'),
+                ]);
+                $this->learningLog->createBank([
+                    'raw_input' => (string) $bank,
+                    'normalized_input' => $bankMatch['normalized'] ?? '',
+                    'suggested_bank_id' => $bankMatch['bank_id'] ?? null,
+                    'decision_result' => $status,
+                    'candidate_source' => 'import',
+                    'score' => null,
+                    'score_raw' => null,
+                    'created_at' => date('c'),
+                ]);
+                $count++;
             }
-            $typeRaw = $this->colValue($row, $map['type'] ?? null);
-            $typeVal = trim($typeRaw) !== '' ? trim($typeRaw) : null;
-            $commentVal = $this->colValue($row, $map['comment'] ?? null);
-            $expiry = $this->normalizeDate($this->colValue($row, $map['expiry'] ?? null));
-            $issue = $this->colValue($row, $map['issue'] ?? null);
-
-            // تخطي السطر إذا نقصت البيانات
-            $hasSupplierAndBank = ($supplier !== '' && $bank !== '');
-            $hasContract = $finalContract !== null && $finalContract !== '';
-            $hasGuarantee = $guarantee !== null && $guarantee !== '';
-            $hasAmount = $amount !== null && $amount !== '';
-
-            if (!$hasSupplierAndBank) {
-                $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود اسم مورد وبنك معاً.";
-                continue;
+            $pdo->commit();
+            // تحديث عدد السجلات دفعة واحدة بدلاً من كل صف
+            $this->sessions->incrementRecordCount($session->id ?? 0, $count);
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
-            if (!$hasContract) {
-                $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود رقم عقد أو أمر شراء.";
-                continue;
-            }
-            if (!$hasGuarantee) {
-                $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود رقم ضمان.";
-                continue;
-            }
-            if (!$hasAmount) {
-                $skipped[] = "الصف #{$rowIndex}: تم تخطيه لعدم وجود مبلغ صالح.";
-                continue;
-            }
-
-            // منع التكرار (Duplicate Check) - DISABLED BY USER REQUEST to allow history
-            // if ($this->records->existsByGuarantee($guarantee, $bank)) {
-            //     $skipped[] = "الصف #{$rowIndex}: تم تخطيه (رقم الضمان مكرر: $guarantee)";
-            //     continue;
-            // }
-
-            $match = $this->matchingService->matchSupplier($supplier);
-            $bankMatch = $this->matchingService->matchBank($bank);
-            $bankDisplay = $bankMatch['final_name'] ?? null;
-
-            // Fix: Status Override logic respecting 'needs_review'
-            // Default to what MatchingService said
-            $status = $match['match_status'];
-
-            // Only force ready if we have IDs AND both are CONFIDENT matches
-            // If match_status is 'needs_review' (fuzzy), we KEEP it needs_review.
-            // But if one is ready and other is missing? 
-            // The constraint is: We need both SupplierID and BankID to be even considered 'ready'.
-            // If we have IDs but status is 'needs_review', it STAYS 'needs_review'.
-            if (empty($match['supplier_id']) || empty($bankMatch['bank_id'])) {
-                // Even if one was 'ready', if the other is missing, it's not ready.
-                $status = 'needs_review';
-            }
-
-            $candidates = $this->candidateService->supplierCandidates($supplier)['candidates'] ?? [];
-            $bankCandidatesArr = $this->candidateService->bankCandidates($bank)['candidates'] ?? [];
-            $bankCandidates = ['normalized' => $bankMatch['normalized'] ?? null, 'candidates' => $bankCandidatesArr];
-            $conflicts = $this->conflictDetector->detect(
-                ['supplier' => ['candidates' => $candidates, 'normalized' => $match['normalized'] ?? ''], 'bank' => $bankCandidates],
-                ['raw_supplier_name' => $supplier, 'raw_bank_name' => $bank]
-            );
-
-            $record = new ImportedRecord(
-                id: null,
-                sessionId: $session->id ?? 0,
-                rawSupplierName: (string) $supplier,
-                rawBankName: (string) $bank,
-                amount: $amount ?: null,
-                guaranteeNumber: $guarantee ?: null,
-                contractNumber: $finalContract,
-                contractSource: $contractSource,
-                expiryDate: $expiry ?: null,
-                issueDate: $issue ?: null,
-                type: $typeVal ?: null,
-                comment: $commentVal ?: null,
-                matchStatus: $status,
-                supplierId: $match['supplier_id'] ?? null,
-                bankId: $bankMatch['bank_id'] ?? null,
-                normalizedSupplier: $match['normalized'] ?? null,
-                normalizedBank: $bankMatch['normalized'] ?? null,
-                bankDisplay: $bankDisplay,
-                supplierDisplayName: null,
-            );
-            $this->records->create($record);
-
-            // Attempt Auto-Accept only if status allows or enhances it
-            $this->autoAcceptService->tryAutoAccept($record, $candidates, $conflicts);
-            $this->autoAcceptService->tryAutoAcceptBank($record, $bankCandidatesArr, $conflicts);
-
-            // تسجيل التعلم المؤرَّخ للمورد والبنك (للسجلات الجديدة فقط)
-            $this->learningLog->create([
-                'raw_input' => (string) $supplier,
-                'normalized_input' => $match['normalized'] ?? '',
-                'suggested_supplier_id' => $match['supplier_id'] ?? null,
-                'decision_result' => $status,
-                'candidate_source' => 'import',
-                'score' => null,
-                'score_raw' => null,
-                'created_at' => date('c'),
-            ]);
-            $this->learningLog->createBank([
-                'raw_input' => (string) $bank,
-                'normalized_input' => $bankMatch['normalized'] ?? '',
-                'suggested_bank_id' => $bankMatch['bank_id'] ?? null,
-                'decision_result' => $status,
-                'candidate_source' => 'import',
-                'score' => null,
-                'score_raw' => null,
-                'created_at' => date('c'),
-            ]);
-            $count++;
+            throw $e;
         }
-        $pdo->commit();
-        // تحديث عدد السجلات دفعة واحدة بدلاً من كل صف
-        $this->sessions->incrementRecordCount($session->id ?? 0, $count);
 
         return [
             'session_id' => $session->id,

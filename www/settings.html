@@ -1,19 +1,13 @@
 <!doctype html>
 <!--
 ═══════════════════════════════════════════════════════════════════════════════
-صفحة الإعدادات (settings.html)
+صفحة الإعدادات (Management Console)
 ═══════════════════════════════════════════════════════════════════════════════
-المسار: /settings
-
-تتضمن:
-- إعدادات المطابقة (العتبات والأوزان)
-- النسخ الاحتياطي
-- تصدير/استيراد القاموس
-
-الواجهة الرئيسية: / (decision.html)
-
-آخر تحديث: 2024-12
-راجع: docs/08-ChangeLog-Cleanup-2024-12.md
+تشمل:
+- إعدادات النظام (General)
+- إدارة الموردين (Suppliers)
+- إدارة البنوك (Banks)
+- النسخ الاحتياطي (System)
 ═══════════════════════════════════════════════════════════════════════════════
 -->
 <html lang="ar" dir="rtl">
@@ -23,28 +17,127 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>الإعدادات - نظام خطابات الضمان</title>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif'],
+            mono: ['Inter', 'monospace'],
+          },
+          colors: {
+            primary: '#2563eb',
+            'primary-soft': '#dbeafe',
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    .help-text {
-      display: block;
-      margin-top: 0.25rem;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      line-height: 1.4;
+    /* Tab Styles matching Request */
+    .tabs-nav {
+      display: flex;
+      gap: 1rem;
+      border-bottom: 2px solid var(--border-color);
+      margin-bottom: 2rem;
     }
 
-    .section-title {
-      font-size: 1.1rem;
+    .tab-btn {
+      padding: 0.75rem 1.5rem;
       font-weight: bold;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border-color);
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
       color: var(--text-color);
+    }
+
+    .tab-btn.active {
+      color: var(--primary-color);
+      border-bottom-color: var(--primary-color);
     }
 
     .settings-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 1.5rem;
+    }
+
+    /* Table Styles */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+
+    .data-table th {
+      text-align: right;
+      padding: 0.75rem;
+      background: var(--bg-hover);
+      border-bottom: 2px solid var(--border-color);
+      font-weight: bold;
+    }
+
+    .data-table td {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .data-table tr:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Utility */
+    .btn-xs {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      border: 1px solid;
+      cursor: pointer;
+    }
+
+    .btn-outline-primary {
+      color: var(--primary-color);
+      border-color: var(--primary-color);
+      background: none;
+    }
+
+    .btn-outline-danger {
+      color: #dc2626;
+      border-color: #dc2626;
+      background: none;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      width: 500px;
+      max-width: 90%;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     }
   </style>
 </head>
@@ -58,6 +151,7 @@
       </div>
       <nav class="app-nav">
         <a href="/" class="app-nav-link">الرئيسية</a>
+        <a href="/stats" class="app-nav-link">الإحصائيات</a>
         <a href="/settings" class="app-nav-link is-active">الإعدادات</a>
       </nav>
     </div>
@@ -65,218 +159,222 @@
 
   <main class="app-main">
     <div class="app-container">
-      <section class="page-header">
-        <div class="page-header-main">
-          <h1 class="page-title">الإعدادات</h1>
-          <p class="page-subtitle">تهيئة قواعد المطابقة والتحكم في النظام.</p>
-        </div>
-      </section>
 
-      <form id="settingsForm">
+      <div class="page-header">
+        <h1 class="page-title">إدارة النظام</h1>
+      </div>
 
-        <!-- Section 1: Matching Rules -->
-        <section class="card" style="margin-bottom: 2rem;">
-          <div class="card-header">
-            <h2 class="card-title">التحكم في المطابقة الآلية</h2>
+      <!-- Navigation Tabs -->
+      <div class="tabs-nav">
+        <div class="tab-btn active" data-target="general">الإعدادات العامة</div>
+        <div class="tab-btn" data-target="suppliers">إدارة الموردين</div>
+        <div class="tab-btn" data-target="banks">إدارة البنوك</div>
+        <div class="tab-btn" data-target="system">النسخ الاحتياطي</div>
+      </div>
+
+      <!-- Content: General -->
+      <div id="general" class="tab-content" style="display: block;">
+        <form id="settingsForm">
+          <section class="card" style="margin-bottom: 2rem;">
+            <div class="card-header">
+              <h2 class="card-title">قواعد المطابقة</h2>
+            </div>
+            <div class="settings-grid">
+              <div class="form-group">
+                <label class="form-label">نسبة التطابق التلقائي (Auto Match)</label>
+                <input type="number" step="0.01" id="autoTh" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">حد المراجعة (Review Threshold)</label>
+                <input type="number" step="0.01" id="revTh" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">حد التطابق الضعيف (Weak)</label>
+                <input type="number" step="0.01" id="weakTh" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">هامش التعارض (Conflict Delta)</label>
+                <input type="number" step="0.01" id="confDelta" class="form-control" />
+              </div>
+            </div>
+          </section>
+
+          <section class="card" style="margin-bottom: 2rem;">
+            <div class="card-header">
+              <h2 class="card-title">الأوزان (Weights)</h2>
+            </div>
+            <div class="settings-grid">
+              <div class="form-group"><label class="form-label">الاسم الرسمي</label><input type="number" step="0.05"
+                  id="wOfficial" class="form-control" /></div>
+              <div class="form-group"><label class="form-label">الأسماء البديلة (مؤكدة)</label><input type="number"
+                  step="0.05" id="wAltConf" class="form-control" /></div>
+              <div class="form-group"><label class="form-label">الأسماء البديلة (تعلم)</label><input type="number"
+                  step="0.05" id="wAltLearn" class="form-control" /></div>
+              <div class="form-group"><label class="form-label">المطابقة التقريبية (Fuzzy)</label><input type="number"
+                  step="0.05" id="wFuzzy" class="form-control" /></div>
+            </div>
+            <div class="form-group" style="margin-top:1rem;">
+              <label class="form-label">عدد الاقتراحات</label>
+              <input type="number" id="candLimit" class="form-control" style="width:100px;">
+            </div>
+          </section>
+
+          <button type="submit" class="btn btn-primary" style="width:100%;">حفظ الإعدادات</button>
+        </form>
+      </div>
+
+      <!-- Content: Suppliers -->
+      <div id="suppliers" class="tab-content" style="display: none;">
+        <div class="card">
+          <div class="flex justify-between items-center mb-4">
+            <input type="text" id="searchSupplier" placeholder="بحث عن مورد..." class="form-control"
+              style="max-width:300px;">
+            <button class="btn btn-primary" onclick="Settings.Dictionaries.createSupplier()">+ إضافة مورد</button>
           </div>
-          <div class="settings-grid">
-            <div class="form-group">
-              <label class="form-label">نسبة التطابق التلقائي/القوي</label>
-              <input type="number" step="0.01" id="autoTh" class="form-control" />
-              <span class="help-text">الحد الأدنى (0.0 - 1.0) لاعتبار النتيجة "مطابقة قوية". النتائج فوق هذه النسبة
-                عالية الموثوقية. (الإفتراضي: 0.90)</span>
-            </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>الاسم الرسمي</th>
+                <th>الاسم المعياري (Standardized)</th>
+                <th>بدائل</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="suppliersTableBody"></tbody>
+          </table>
+        </div>
+      </div>
 
-            <div class="form-group">
-              <label class="form-label">حد المراجعة الأدنى</label>
-              <input type="number" step="0.01" id="revTh" class="form-control" />
-              <span class="help-text">الحد الأدنى للدرجة (0.0 - 1.0) لكي يظهر الاقتراح في القائمة. النتائج أقل من هذا
-                الرقم سيتم تجاهلها. (الإفتراضي: 0.70)</span>
+      <!-- Content: Banks -->
+      <div id="banks" class="tab-content" style="display: none;">
+        <div class="card">
+          <div class="flex justify-between items-center mb-4">
+            <input type="text" id="searchBank" placeholder="بحث عن بنك..." class="form-control"
+              style="max-width:300px;">
+            <button class="btn btn-primary" onclick="Settings.Dictionaries.createBank()">+ إضافة بنك</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>الاسم الرسمي</th>
+                <th>English Name</th>
+                <th>Short Code</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="banksTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Content: System (Backup) -->
+      <div id="system" class="tab-content" style="display: none;">
+        <section class="card">
+          <div class="card-header">
+            <h2 class="card-title">النسخ الاحتياطي</h2>
+          </div>
+          <div class="grid margin-top:2rem; gap:1rem;">
+            <!-- Existing Backup Logic (re-implemented in JS) -->
+            <div class="p-4 bg-gray-50 rounded">
+              <h3 class="font-bold mb-2">قاعدة البيانات</h3>
+              <button id="btnBackup" class="btn btn-secondary">إنشاء نسخة احتياطية كاملة</button>
             </div>
+            <div class="p-4 bg-gray-50 rounded mt-4">
+              <h3 class="font-bold mb-2">قاموس البيانات (JSON)</h3>
+              <div class="flex gap-2">
+                <button id="btnExportDict" class="btn btn-secondary">تصدير القاموس</button>
+                <button id="btnImportDict" class="btn btn-secondary">استيراد القاموس</button>
+              </div>
+            </div>
+            <div id="backupMsg" class="mt-4 p-2"></div>
           </div>
         </section>
-
-        <!-- Section 2: Scoring Weights -->
-        <section class="card" style="margin-bottom: 2rem;">
-          <div class="card-header">
-            <h2 class="card-title">نظام النقاط والأوزان</h2>
-            <p class="card-subtitle">تحدد هذه الأوزان أهمية كل معيار في حساب النتيجة النهائية (1.0 = مهم جداً، 0.0 = غير
-              مهم).</p>
-          </div>
-          <div class="settings-grid">
-            <div class="form-group">
-              <label class="form-label">وزن الاسم الرسمي</label>
-              <input type="number" step="0.05" id="wOfficial" class="form-control" />
-              <span class="help-text">أهمية تطابق الاسم المدخل مع الاسم الرسمي للمورد/البنك في قاعدة البيانات.</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">وزن الأسماء البديلة (المؤكدة)</label>
-              <input type="number" step="0.05" id="wAltConf" class="form-control" />
-              <span class="help-text">أهمية التطابق مع اسم بديل تم إدخاله يدوياً ومراجعته.</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">وزن الأسماء البديلة (التعلم الآلي)</label>
-              <input type="number" step="0.05" id="wAltLearn" class="form-control" />
-              <span class="help-text">أهمية التطابق مع اسم بديل اكتشفه النظام تلقائياً من خلال سلوك المستخدم.</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">وزن المطابقة التقريبية (Fuzzy)</label>
-              <input type="number" step="0.05" id="wFuzzy" class="form-control" />
-              <span class="help-text">مدى تأثير التشابه الجزئي (مثلاً اختلاف حرف واحد) على الدرجة النهائية. تقليل هذا
-                الرقم يجعل النظام أكثر صرامة.</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Section 3: Advanced -->
-        <section class="card" style="margin-bottom: 2rem;">
-          <div class="card-header">
-            <h2 class="card-title">إعدادات متقدمة</h2>
-          </div>
-          <div class="settings-grid">
-            <div class="form-group">
-              <label class="form-label">حد المطابقة الضعيفة</label>
-              <input type="number" step="0.01" id="weakTh" class="form-control" />
-              <span class="help-text">الدرجة التي يعتبر عندها النظام المطابقة "ضعيفة" وتحتاج انتباه خاص، حتى لو تجاوزت
-                حد المراجعة.</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">عدد الاقتراحات في القائمة</label>
-              <input type="number" step="1" id="candLimit" class="form-control" />
-              <span class="help-text">الحد الأقصى لعدد النتائج المعروضة في القائمة المنسدلة (لتحسين الأداء).</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">هامش التعارض (Conflict Delta)</label>
-              <input type="number" step="0.01" id="confDelta" class="form-control" />
-              <span class="help-text">الفرق المطلوب بين أفضل نتيجة والنتيجة التي تليها. إذا كان الفرق أقل من هذا الرقم،
-                يعتبر النظام النتيجة "متعارضة" (غير حاسمة).</span>
-            </div>
-          </div>
-        </section>
-
-        <div
-          style="position: sticky; bottom: 0; background: var(--bg-color); padding: 1rem 0; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 1rem;">
-          <button type="submit" class="btn btn-primary" style="font-weight: bold; padding: 0.75rem 2rem;">حفظ كافة
-            الإعدادات</button>
-          <div id="sMsg" class="muted"></div>
-        </div>
-
-      </form>
-
-      <!-- Backup Section -->
-      <section class="card" style="margin-top: 3rem; border: 1px dashed var(--border-color);">
-        <div class="card-header">
-          <h2 class="card-title">النسخ الاحتياطي والبيانات</h2>
-        </div>
-        <div class="grid-3">
-          <button id="btnBackup" class="btn btn-secondary">نسخ احتياطي (Full Backup)</button>
-          <button id="btnExportDict" class="btn btn-secondary">تصدير القاموس (Export)</button>
-          <button id="btnImportDict" class="btn btn-secondary">استيراد قاموس (Import)</button>
-        </div>
-        <div id="backupMsg" class="muted" style="margin-top: 1rem;"></div>
-      </section>
+      </div>
 
     </div>
   </main>
 
-  <script>
-    async function loadSettings() {
-      const res = await fetch('/api/settings');
-      const json = await res.json();
-      if (!json.success) return;
-      const d = json.data;
+  <!-- Modals -->
+  <div id="supplierModal" class="modal-overlay">
+    <div class="modal-content">
+      <h2 class="text-xl font-bold mb-4">بيانات المورد</h2>
+      <form id="supplierForm">
+        <input type="hidden" id="supId">
+        <div class="form-group mb-4">
+          <label class="form-label">الاسم الرسمي</label>
+          <input type="text" id="supName" class="form-control" required>
+        </div>
 
-      const setVal = (id, val, def) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val !== undefined && val !== null ? val : def;
-      };
+        <div class="form-group mb-4" id="divSupAlts" style="display:none;">
+          <label class="form-label">الأسماء البديلة (Aliases)</label>
+          <ul id="supAltsList" class="dashed-list" style="padding-right: 1.5rem; color: var(--text-muted);"></ul>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button type="button" class="btn btn-secondary"
+            onclick="Settings.UI.closeModal('supplierModal')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-      setVal('autoTh', d.MATCH_AUTO_THRESHOLD, 0.90);
-      setVal('revTh', d.MATCH_REVIEW_THRESHOLD, 0.70);
-      setVal('confDelta', d.CONFLICT_DELTA, 0.1);
+  <div id="bankModal" class="modal-overlay">
+    <div class="modal-content" style="width:600px;">
+      <h2 class="text-xl font-bold mb-4">بيانات البنك</h2>
+      <form id="bankForm">
+        <input type="hidden" id="bankId">
+        <div class="settings-grid mb-4">
+          <div class="form-group"><label class="form-label">الاسم بالعربي</label><input type="text" id="bankName"
+              class="form-control" required></div>
+          <div class="form-group"><label class="form-label">الاسم بالانجليزي</label><input type="text" id="bankNameEn"
+              class="form-control"></div>
+          <div class="form-group"><label class="form-label">الكود المختصر</label><input type="text" id="bankCode"
+              class="form-control"></div>
+          <div class="form-group"><label class="form-label">الإدارة (القسم)</label><input type="text" id="bankDept"
+              class="form-control"></div>
+        </div>
+        <h3 class="font-bold mb-2 border-b">العنوان والاتصال</h3>
+        <div class="settings-grid mb-4">
+          <div class="form-group"><label class="form-label">البريد الالكتروني</label><input type="email" id="bankEmail"
+              class="form-control"></div>
+          <div class="form-group"><label class="form-label">السطر الأول</label><input type="text" id="bankAddr1"
+              class="form-control"></div>
+          <div class="form-group"><label class="form-label">السطر الثاني</label><input type="text" id="bankAddr2"
+              class="form-control"></div>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button type="button" class="btn btn-secondary" onclick="Settings.UI.closeModal('bankModal')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-      setVal('weakTh', d.MATCH_WEAK_THRESHOLD, 0.80);
-      setVal('candLimit', d.CANDIDATES_LIMIT, 20);
-      setVal('wOfficial', d.WEIGHT_OFFICIAL, 1.0);
-      setVal('wAltConf', d.WEIGHT_ALT_CONFIRMED, 0.85);
-      setVal('wAltLearn', d.WEIGHT_ALT_LEARNING, 0.75);
-      setVal('wFuzzy', d.WEIGHT_FUZZY, 0.60);
-    }
+  </div>
+  </div>
 
-    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const payload = {
-        MATCH_AUTO_THRESHOLD: parseFloat(document.getElementById('autoTh').value),
-        MATCH_REVIEW_THRESHOLD: parseFloat(document.getElementById('revTh').value),
-        CONFLICT_DELTA: parseFloat(document.getElementById('confDelta').value),
+  <!-- Custom Confirm Modal (Decision Style) -->
+  <div id="confirmModal"
+    class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center backdrop-blur-sm transition-opacity"
+    style="display: none;">
+    <div
+      class="bg-white rounded-xl shadow-2xl p-6 w-96 max-w-[90%] transform transition-all scale-100 border border-gray-100">
+      <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+        <span class="text-2xl">⚠️</span>
+        <span>تأكيد الإجراء</span>
+      </h3>
+      <p id="confirmMsg" class="text-gray-600 mb-6 text-sm leading-relaxed font-medium">هل أنت متأكد؟</p>
+      <div class="flex justify-end gap-3">
+        <button id="btnConfirmNo"
+          class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-bold transition-colors">إلغاء</button>
+        <button id="btnConfirmYes"
+          class="px-5 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-bold shadow-lg hover:shadow-xl transition-all border border-red-700">نعم،
+          حذف</button>
+      </div>
+    </div>
+  </div>
 
-        MATCH_WEAK_THRESHOLD: parseFloat(document.getElementById('weakTh').value),
-        CANDIDATES_LIMIT: parseInt(document.getElementById('candLimit').value),
-        WEIGHT_OFFICIAL: parseFloat(document.getElementById('wOfficial').value),
-        WEIGHT_ALT_CONFIRMED: parseFloat(document.getElementById('wAltConf').value),
-        WEIGHT_ALT_LEARNING: parseFloat(document.getElementById('wAltLearn').value),
-        WEIGHT_FUZZY: parseFloat(document.getElementById('wFuzzy').value),
-      };
-
-      const res = await fetch('/api/settings', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      const json = await res.json();
-      const msg = document.getElementById('sMsg');
-      if (!json.success) { msg.textContent = json.message || 'تعذر الحفظ'; msg.className = 'alert alert-error'; return; }
-      msg.textContent = 'تم حفظ الإعدادات بنجاح';
-      msg.className = 'alert alert-success';
-
-      // Auto-hide message
-      setTimeout(() => msg.textContent = '', 3000);
-    });
-
-    // Backup & Export Handlers
-    async function doBackup() {
-      const res = await fetch('/api/settings/backup', { method: 'POST' });
-      const json = await res.json();
-      const el = document.getElementById('backupMsg');
-      el.textContent = json.success ? `تم إنشاء النسخة الاحتياطية: ${json.path}` : 'تعذر إنشاء النسخة الاحتياطية';
-      el.className = json.success ? 'alert alert-success' : 'alert alert-error';
-    }
-    async function exportDict() {
-      const res = await fetch('/api/settings/export-dictionary', { method: 'POST' });
-      const json = await res.json();
-      const el = document.getElementById('backupMsg');
-      el.textContent = json.success ? `تم تصدير القاموس إلى: ${json.path}` : 'تعذر التصدير';
-      el.className = json.success ? 'alert alert-success' : 'alert alert-error';
-    }
-    async function importDict() {
-      const path = prompt('أدخل مسار ملف القاموس JSON (داخل الجهاز المحلي):');
-      if (!path) return;
-      try {
-        const content = await (await fetch(path)).json();
-        const res = await fetch('/api/settings/import-dictionary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dictionary: content })
-        });
-        const json = await res.json();
-        const el = document.getElementById('backupMsg');
-        el.textContent = json.success ? `تم الاستيراد: ${JSON.stringify(json.stats)}` : (json.message || 'تعذر الاستيراد');
-        el.className = json.success ? 'alert alert-success' : 'alert alert-error';
-      } catch (e) {
-        const el = document.getElementById('backupMsg');
-        el.textContent = 'تعذر قراءة الملف المحدد';
-        el.className = 'alert alert-error';
-      }
-    }
-    document.getElementById('btnBackup').addEventListener('click', doBackup);
-    document.getElementById('btnExportDict').addEventListener('click', exportDict);
-    document.getElementById('btnImportDict').addEventListener('click', importDict);
-
-    loadSettings();
-  </script>
+  <script src="/assets/js/settings.js?v=4" type="module"></script>
 </body>
 
 </html>

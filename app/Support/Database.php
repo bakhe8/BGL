@@ -13,7 +13,7 @@ class Database
     public static function connection(): PDO
     {
         if (self::$conn === null) {
-            $dbPath = storage_path('database/app.sqlite');
+            $dbPath = self::$overridePath ?? storage_path('database/app.sqlite');
             $dsn = 'sqlite:' . $dbPath;
             try {
                 $pdo = new PDO($dsn);
@@ -26,5 +26,11 @@ class Database
         }
 
         return self::$conn;
+    }
+
+    private static ?string $overridePath = null;
+    public static function setDatabasePath(string $path): void {
+        self::$overridePath = $path;
+        self::$conn = null; // Reset connection
     }
 }

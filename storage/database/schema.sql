@@ -102,6 +102,10 @@ CREATE TABLE IF NOT EXISTS banks (
     normalized_key TEXT NOT NULL UNIQUE,            -- مفتاح البحث المطبع (بدون مسافات)
     short_code TEXT NULL,                           -- الرمز المختصر (مثل: RJHI, SABB)
     swift_code TEXT NULL,                           -- رمز SWIFT (اختياري)
+    department TEXT NULL,                           -- القسم (مثل: إدارة الضمانات)
+    address_line_1 TEXT NULL,                       -- العنوان 1
+    address_line_2 TEXT NULL,                       -- العنوان 2
+    contact_email TEXT NULL,                        -- البريد الإلكتروني للتواصل
     is_confirmed INTEGER DEFAULT 1,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP

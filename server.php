@@ -6,6 +6,13 @@ $file = __DIR__ . '/www' . $uri;
 // Serve static assets manually from www/ so that docroot doesn't need to be changed
 if ($uri !== '/' && file_exists($file) && !is_dir($file)) {
     $ext = pathinfo($file, PATHINFO_EXTENSION);
+    
+    // Enable standalone PHP scripts (Plugins)
+    if ($ext === 'php') {
+        require $file;
+        exit;
+    }
+
     $types = [
         'css' => 'text/css',
         'js' => 'application/javascript',
