@@ -174,8 +174,8 @@
         }
 
         .nav-btn:hover:not(:disabled) {
-            border-color: #2563eb;
-            color: #2563eb;
+            border-color: #94a3b8;
+            color: #475569;
         }
 
         .nav-btn:disabled {
@@ -327,15 +327,17 @@
                     <div class="flex items-center justify-between px-3 pt-2 pb-2 -mx-1 -mt-1 mb-0">
                         <div class="record-meta text-xs flex flex-wrap items-center justify-between w-full gap-y-1"
                             id="recordMeta">
+                            <span class="text-gray-600 font-mono">رقم الجلسة: <strong
+                                    id="metaSessionId">-</strong></span>
                             <span class="text-gray-600 font-mono">السجل: <strong id="metaRecordId">-</strong></span>
                             <span class="text-gray-600">رقم الضمان: <strong id="metaGuarantee">-</strong></span>
                             <span class="text-gray-600">رقم العقد: <strong id="metaContract">-</strong></span>
                             <span class="text-gray-600">انتهاء الضمان: <strong id="metaDate">-</strong></span>
-                            <span class="text-gray-600">تاريخ الإصدار: <strong id="metaIssueDate">-</strong></span>
+
                             <span class="text-gray-600">المبلغ: <strong id="metaAmount">-</strong></span>
-                            <span class="text-gray-600">المصدر: <strong id="metaSource">-</strong></span>
+
                             <span class="text-gray-600">النوع: <strong id="metaType">-</strong></span>
-                            <span class="text-gray-600">ملاحظات: <strong id="metaComment">-</strong></span>
+
                         </div>
                     </div>
 
@@ -402,7 +404,7 @@
                             <span id="saveMessage" class="text-xs font-medium"></span>
                             <button class="save-btn py-1.5 px-6 text-sm shadow-md hover:shadow-lg" id="btnSaveNext">
                                 <span>✓</span>
-                                <span>حفظ (<span id="currentIndex">1</span> من <span id="totalCount">0</span>)
+                                <span>إحفظ (<span id="currentIndex">1</span> من <span id="totalCount">0</span>)
                                     وانتقال</span>
                             </button>
                         </div>

@@ -126,6 +126,23 @@ class ImportedRecordRepository
     }
 
     /**
+     * جلب قائمة الجلسات المتاحة
+     * 
+     * @return array قائمة بالجلسات مع التواريخ وعدد السجلات
+     */
+    public function getAvailableSessions(): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->query('
+            SELECT session_id, COUNT(*) as record_count, MAX(created_at) as last_date 
+            FROM imported_records 
+            GROUP BY session_id 
+            ORDER BY session_id DESC
+        ');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * جلب جميع السجلات المستوردة من جلسة معينة
      * 
      * @param int $sessionId معرّف الجلسة

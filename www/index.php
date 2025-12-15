@@ -68,6 +68,12 @@ try {
         exit;
     }
 
+    // Redirect /decision or /decision.html to /
+    if ($method === 'GET' && ($uri === '/decision' || $uri === '/decision.html')) {
+        header('Location: /', true, 301);
+        exit;
+    }
+
     if ($method === 'GET' && $uri === '/settings') {
         echo file_get_contents(__DIR__ . '/settings.html');
         exit;
@@ -86,10 +92,20 @@ try {
         exit;
     }
 
+    if ($method === 'GET' && $uri === '/api/sessions') {
+        $decisionController->listSessions();
+        exit;
+    }
+
     if ($method === 'POST' && preg_match('#^/api/records/(\\d+)/decision$#', $uri, $m)) {
         $id = (int) $m[1];
         $payload = json_decode(file_get_contents('php://input'), true) ?? [];
         $decisionController->saveDecision($id, $payload);
+        exit;
+    }
+
+    if ($method === 'POST' && $uri === '/api/records/recalculate') {
+        $decisionController->recalculate();
         exit;
     }
 

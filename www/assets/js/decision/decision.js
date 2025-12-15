@@ -61,6 +61,9 @@ window.BGL.Decision = {
     selectedBankId: null,
     selectedBankName: null,
 
+    // UI State
+    currentFilter: 'all', // 'all', 'pending', 'approved'
+
     // Candidates for current record
     supplierCandidates: [],
     bankCandidates: [],
@@ -91,16 +94,14 @@ window.BGL.Decision = {
             supplierSuggestions: document.getElementById('supplierSuggestions'),
 
             // Meta display
+            metaSessionId: document.getElementById('metaSessionId'),
             metaRecordId: document.getElementById('metaRecordId'),
             metaGuarantee: document.getElementById('metaGuarantee'),
             metaDate: document.getElementById('metaDate'),
             metaAmount: document.getElementById('metaAmount'),
             // New Meta Fields
             metaContract: document.getElementById('metaContract'),
-            metaSource: document.getElementById('metaSource'),
-            metaIssueDate: document.getElementById('metaIssueDate'),
             metaType: document.getElementById('metaType'),
-            metaComment: document.getElementById('metaComment'),
             detailRawSupplier: document.getElementById('detailRawSupplier'),
             detailRawBank: document.getElementById('detailRawBank'),
 
@@ -143,6 +144,137 @@ window.BGL.Decision = {
         this._initLetterPreview();
 
         console.log('[Decision] Ready. Records:', this.records.length);
+
+        // Fetch available sessions for navigation
+        this._loadSessions();
+    },
+
+    /**
+     * Load available import sessions for the dropdown navigation
+     */
+    async _loadSessions() {
+        try {
+            const res = await api.get('/api/sessions');
+            if (res.success && res.data) {
+                this.availableSessions = res.data;
+                this._setupSessionDropdown();
+            }
+        } catch (e) {
+            console.error('[Decision] Failed to load sessions:', e);
+        }
+    },
+
+    /**
+     * Setup the session navigation dropdown
+     */
+    _setupSessionDropdown() {
+        const sessionMeta = this.DOM.metaSessionId;
+        if (!sessionMeta || !this.availableSessions || this.availableSessions.length === 0) return;
+
+        // Make it look clickable
+        sessionMeta.style.cursor = 'pointer';
+        sessionMeta.style.textDecoration = 'underline';
+        sessionMeta.style.textUnderlineOffset = '2px';
+        sessionMeta.title = 'انقر لتغيير الجلسة';
+
+        // Create Dropdown Element (hidden by default)
+        const dropdown = document.createElement('div');
+        dropdown.className = 'absolute bg-white border border-gray-200 shadow-xl rounded-lg z-50 hidden';
+        dropdown.style.top = '100%';
+        dropdown.style.right = '0';
+        dropdown.style.width = '240px';
+        dropdown.style.maxHeight = '300px';
+        dropdown.style.overflowY = 'auto'; // ensure scroll
+
+        // Search Input inside dropdown
+        const searchContainer = document.createElement('div');
+        searchContainer.className = 'sticky top-0 bg-white p-2 border-b border-gray-100';
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = 'بحث (رقم أو تاريخ)...';
+        searchInput.className = 'w-full text-xs px-2 py-1 border rounded focus:ring-1 focus:ring-blue-500 outline-none';
+        searchContainer.appendChild(searchInput);
+        dropdown.appendChild(searchContainer);
+
+        const listContainer = document.createElement('div');
+        dropdown.appendChild(listContainer);
+
+        // Position it relative to the parent
+        sessionMeta.parentElement.style.position = 'relative';
+        sessionMeta.parentElement.appendChild(dropdown);
+
+        // Render function
+        const renderList = (filter = '') => {
+            listContainer.innerHTML = '';
+            const filtered = this.availableSessions.filter(s =>
+                s.session_id.toString().includes(filter) ||
+                (s.last_date && s.last_date.includes(filter))
+            );
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = '<div class="p-2 text-xs text-gray-400 text-center">لا توجد نتائج</div>';
+                return;
+            }
+
+            filtered.forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-50 text-xs flex justify-between items-center';
+
+                // Highlight current session
+                // We need to know current session ID. It's in the first record usually.
+                const currentSessionId = this.records[0]?.sessionId || 0;
+                if (s.session_id == currentSessionId) {
+                    item.classList.add('bg-blue-50', 'font-bold');
+                }
+
+                // Format Date safely
+                const dateStr = s.last_date ? s.last_date.split(' ')[0] : '-';
+
+                item.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="font-medium text-gray-700">جلسة #${s.session_id}</span>
+                        <span class="text-[10px] text-gray-400">${dateStr}</span>
+                    </div>
+                    <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">${s.record_count}</span>
+                `;
+
+                item.addEventListener('click', () => {
+                    window.location.href = `/?session_id=${s.session_id}`;
+                });
+
+                listContainer.appendChild(item);
+            });
+        };
+
+        // Event Listeners
+        sessionMeta.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = dropdown.classList.contains('hidden');
+            // Close others if any (not implemented, but good practice)
+            document.querySelectorAll('.dropdown-menu').forEach(d => d.classList.add('hidden'));
+
+            if (isHidden) {
+                renderList(); // Initial render
+                dropdown.classList.remove('hidden');
+                searchInput.focus();
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Search
+        searchInput.addEventListener('input', (e) => {
+            renderList(e.target.value);
+        });
+
+        searchInput.addEventListener('click', (e) => e.stopPropagation());
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target) && e.target !== sessionMeta) {
+                dropdown.classList.add('hidden');
+            }
+        });
     },
 
     /**
@@ -237,14 +369,39 @@ window.BGL.Decision = {
         });
 
         // Recalculate All button
-        document.getElementById('btnRecalcAll')?.addEventListener('click', async () => {
-            if (!confirm('هل أنت متأكد من إعادة المطابقة لجميع السجلات؟')) return;
+        // Recalculate All button (Non-blocking Confirm)
+        document.getElementById('btnRecalcAll')?.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button'); // Ensure we get the button
+            if (!btn) return;
 
-            const btn = document.getElementById('btnRecalcAll');
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '...';
+            // Step 1: Check if already in 'confirm' mode
+            if (!btn.dataset.confirming) {
+                // Activate confirm mode
+                btn.dataset.confirming = 'true';
+                const originalText = btn.textContent;
+                btn.dataset.originalText = originalText;
+
+                btn.textContent = 'تأكيد؟';
+                btn.classList.add('bg-red-500', 'text-white', 'border-red-600');
+
+                // Auto-revert after 3s
+                btn._confirmTimeout = setTimeout(() => {
+                    delete btn.dataset.confirming;
+                    btn.textContent = originalText;
+                    btn.classList.remove('bg-red-500', 'text-white', 'border-red-600');
+                }, 3000);
+                return;
             }
+
+            // Step 2: Second click (Action)
+            clearTimeout(btn._confirmTimeout); // Cancel timeout
+
+            // Cleanup reset visual state partially but keep disabled state during loading
+            btn.classList.remove('bg-red-500', 'text-white', 'border-red-600');
+            delete btn.dataset.confirming;
+
+            btn.disabled = true;
+            btn.textContent = '...';
 
             try {
                 const res = await api.post('/api/records/recalculate');
@@ -257,11 +414,95 @@ window.BGL.Decision = {
             } catch (e) {
                 this._showMessage('خطأ: ' + e.message, 'error');
             } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = '🔃 إعادة مطابقة';
-                }
+                btn.disabled = false;
+                btn.textContent = btn.dataset.originalText || '🔃 إعادة مطابقة';
             }
+        });
+
+        // Print All Button
+        document.getElementById('btnPrintAll')?.addEventListener('click', async () => {
+            const approvedRecords = this.records.filter(r => this._isCompleted(r));
+            if (approvedRecords.length === 0) {
+                this._showMessage('لا يوجد سجلات جاهزة للطباعة', 'error');
+                return;
+            }
+
+            // Create hidden iframe
+            let iframe = document.getElementById('printFrame');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = 'printFrame';
+                iframe.style.position = 'fixed';
+                iframe.style.right = '0';
+                iframe.style.bottom = '0';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                iframe.style.border = '0';
+                document.body.appendChild(iframe);
+            }
+
+            // Generate HTML for all
+            let content = '';
+            approvedRecords.forEach((record, index) => {
+                // Determine page break class
+                const pageBreak = index < approvedRecords.length - 1 ? 'page-break' : '';
+                content += `<div class="print-page ${pageBreak}">
+                    ${this._generateLetterHtmlForRecord(record)}
+                </div>`;
+            });
+
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <title>طباعة الكل (${approvedRecords.length})</title>
+                    <meta charset="UTF-8">
+                    <link rel="stylesheet" href="/assets/css/letter.css">
+                    <style>
+                        body { margin: 0; padding: 0; background: #fff; }
+                        .print-page { margin: 0; padding: 0; }
+                        @media print {
+                            body, .print-page, .letter-preview {
+                                width: 100% !important;
+                                position: static !important;
+                                visibility: visible !important;
+                                overflow: visible !important;
+                            }
+                            .letter-paper {
+                                position: relative !important;
+                                box-shadow: none !important; 
+                                margin: 0 auto !important; 
+                                min-height: 296mm !important; 
+                                overflow: hidden !important; 
+                            }
+                            .page-break { 
+                                page-break-after: always !important; 
+                                height: 0; 
+                                display: block;
+                            }
+                            @page {
+                                margin: 0;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${content}
+                    <script>
+                        window.addEventListener('load', () => {
+                            document.fonts.ready.then(() => {
+                                setTimeout(() => {
+                                    window.print();
+                                }, 500); 
+                            });
+                        });
+                    </script>
+                </body>
+                </html>
+            `);
+            doc.close();
         });
 
         // Hidden Input Change (Auto-Upload)
@@ -285,7 +526,18 @@ window.BGL.Decision = {
 
                 if (result.success) {
                     this._showMessage(`✓ تم استيراد ${result.data?.imported || 0} سجل بنجاح`, 'success');
+
+                    // UX Improvement: Reset URL to root to ensure we load the NEW latest session
+                    // instead of sticking to the old session ID if present in URL.
+                    const url = new URL(window.location.href);
+                    if (url.searchParams.has('session_id')) {
+                        // Push new history state without reload
+                        window.history.pushState({}, '', '/');
+                    }
+
                     await this._loadData();
+                    // Refresh sessions dropdown
+                    this._loadSessions();
                 } else {
                     throw new Error(result.message);
                 }
@@ -314,19 +566,42 @@ window.BGL.Decision = {
     async _loadData() {
         try {
             // Load records
-            const recordsRes = await api.get('/api/records');
+            // FIX: Pass current query params (session_id) to the API
+            // AND add cache buster to prevent stale data
+            const queryString = window.location.search;
+            const separator = queryString.includes('?') ? '&' : '?';
+            const cacheBuster = `${separator}_t=${Date.now()}`;
+
+            const recordsRes = await api.get(`/api/records${queryString}${cacheBuster}`);
             if (!recordsRes.success) throw new Error(recordsRes.message);
 
             const allRecords = recordsRes.data || [];
 
-            // Filter to latest session only (for focused review)
-            if (allRecords.length > 0) {
-                // Find the latest sessionId
-                const latestSessionId = Math.max(...allRecords.map(r => r.sessionId || 0));
-                this.records = allRecords.filter(r => r.sessionId === latestSessionId);
-                console.log(`[Decision] Filtered to session ${latestSessionId}: ${this.records.length}/${allRecords.length} records`);
-            } else {
+            // Backend now handles session filtering if session_id is provided.
+            // If no session_id is provided, it returns all.
+            // But we want to defaulting behavior? 
+            // The controller: "data = sessionId ? records->allBySession : records->all"
+
+            // Client-side Logic Update:
+            // If URL has session_id -> Use returned data as is.
+            // If URL has NO session_id -> Filter for LATEST session logic (Keep existing "latest" logic for clean landing)
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const requestedSessionId = urlParams.get('session_id');
+
+            if (requestedSessionId) {
+                // User specifically requested a session, show what API returned
                 this.records = allRecords;
+                console.log(`[Decision] Showing requested session ${requestedSessionId}: ${this.records.length} records`);
+            } else {
+                // Default view: Show latest session only
+                if (allRecords.length > 0) {
+                    const latestSessionId = Math.max(...allRecords.map(r => r.sessionId || 0));
+                    this.records = allRecords.filter(r => r.sessionId === latestSessionId);
+                    console.log(`[Decision] Defaulting to latest session ${latestSessionId}: ${this.records.length}/${allRecords.length} records`);
+                } else {
+                    this.records = allRecords;
+                }
             }
 
             // SORTING LOGIC:
@@ -437,16 +712,10 @@ window.BGL.Decision = {
      * @param {string} status - 'pending', 'approved', or 'all'
      */
     _filterRecords(status) {
-        // For now, just navigate to first matching record
-        let targetIndex = -1;
+        this.currentFilter = status;
 
-        if (status === 'pending') {
-            targetIndex = this.records.findIndex(r => !this._isCompleted(r));
-        } else if (status === 'approved') {
-            targetIndex = this.records.findIndex(r => this._isCompleted(r));
-        } else {
-            targetIndex = 0;
-        }
+        // Find first record matching the new filter
+        const targetIndex = this.records.findIndex(r => this._matchesFilter(r));
 
         if (targetIndex >= 0) {
             this.currentIndex = targetIndex;
@@ -475,12 +744,52 @@ window.BGL.Decision = {
         }
 
         // Update index display
-        this.DOM.currentIndex.textContent = this.currentIndex + 1;
+        // Update index display with filter context
+        const currentFilter = this.currentFilter || 'all';
+        let filterText = 'سجل';
+        let filteredTotal = this.records.length;
+        let filteredIndex = this.currentIndex + 1;
+
+        if (currentFilter === 'approved') {
+            filterText = 'سجل جاهز';
+            // Calculate index within filtered set
+            const approvedRecords = this.records.filter(r => this._isCompleted(r));
+            filteredTotal = approvedRecords.length;
+            filteredIndex = approvedRecords.findIndex(r => r.id === record.id) + 1;
+        } else if (currentFilter === 'pending') {
+            filterText = 'سجل يحتاج قرار';
+            const pendingRecords = this.records.filter(r => !this._isCompleted(r));
+            filteredTotal = pendingRecords.length;
+            filteredIndex = pendingRecords.findIndex(r => r.id === record.id) + 1;
+        }
+
+        // Update Button Text
+        // "حفظ سجل رقم XX من اجمالي XX [نوع]، وانتقل للتالي"
+        this.DOM.currentIndex.textContent = filteredIndex;
+        this.DOM.totalCount.textContent = filteredTotal;
+
+        const btnText = `إحفظ (${filteredIndex} من ${filteredTotal}) ${filterText}، وانتقل للتالي`;
+        // We replace the text node but keep the icon if possible, or just replace innerHTML
+        // Existing: <span>✓</span> <span>حفظ (<span id="currentIndex">1</span> من <span id="totalCount">22</span>) وانتقال</span>
+
+        // Let's update the span text specifically to preserve structure if needed, 
+        // or just update the text parts.
+        // Actually, user wants full dynamic text.
+
+        const btnLabel = this.DOM.btnSaveNext.querySelector('span:last-child');
+        if (btnLabel) {
+            btnLabel.innerHTML = `إحفظ (<span id="currentIndex">${filteredIndex}</span> من <span id="totalCount">${filteredTotal}</span>) ${filterText}، وانتقل للتالي`;
+            // Re-bind DOM references because we just wiped them
+            this.DOM.currentIndex = document.getElementById('currentIndex');
+            this.DOM.totalCount = document.getElementById('totalCount');
+        }
+
         if (this.DOM.metaRecordIndex) {
-            this.DOM.metaRecordIndex.textContent = `${this.currentIndex + 1} من ${this.records.length}`;
+            this.DOM.metaRecordIndex.textContent = `${filteredIndex} من ${filteredTotal} (${filterText})`;
         }
 
         // Update meta
+        if (this.DOM.metaSessionId) this.DOM.metaSessionId.textContent = record.sessionId || '-';
         this.DOM.metaRecordId.textContent = record.id;
         this.DOM.metaGuarantee.textContent = record.guaranteeNumber || '-';
         this.DOM.metaDate.textContent = record.expiryDate || record.date || '-';
@@ -488,10 +797,17 @@ window.BGL.Decision = {
 
         // Populate new meta fields
         if (this.DOM.metaContract) this.DOM.metaContract.textContent = record.contractNumber || '-';
-        if (this.DOM.metaSource) this.DOM.metaSource.textContent = record.contractSource || '-';
-        if (this.DOM.metaIssueDate) this.DOM.metaIssueDate.textContent = record.issueDate || '-';
-        if (this.DOM.metaType) this.DOM.metaType.textContent = record.type || '-';
-        if (this.DOM.metaComment) this.DOM.metaComment.textContent = record.comment || '-';
+        if (this.DOM.metaContract) this.DOM.metaContract.textContent = record.contractNumber || '-';
+
+        // Hide Type field if empty
+        if (this.DOM.metaType) {
+            const hasType = record.type && record.type !== '-';
+            this.DOM.metaType.textContent = record.type || '-';
+            // Toggle visibility of the parent span (label + value)
+            if (this.DOM.metaType.parentElement) {
+                this.DOM.metaType.parentElement.style.display = hasType ? 'inline' : 'none';
+            }
+        }
 
         // CRITICAL: Reset pending state to prevent leaks from previous record
         // NOTE: This is NOT a bug - it's intentional design to prevent showing
@@ -526,6 +842,7 @@ window.BGL.Decision = {
             this.DOM.bankInput.classList.add('has-value');
         } else {
             this.DOM.bankInput.value = '';
+            this.selectedBankName = null; // FIX: Clear stale name
             this.DOM.bankInput.classList.remove('has-value');
         }
 
@@ -536,6 +853,7 @@ window.BGL.Decision = {
             this.DOM.supplierInput.classList.add('has-value');
         } else {
             this.DOM.supplierInput.value = '';
+            this.selectedSupplierName = null; // FIX: Clear stale name
             this.DOM.supplierInput.classList.remove('has-value');
         }
 
@@ -602,6 +920,9 @@ window.BGL.Decision = {
         // Update navigation buttons
         this.DOM.btnPrev.disabled = this.currentIndex === 0;
         this.DOM.btnNext.disabled = this.currentIndex >= this.records.length - 1;
+
+        // Update Letter Preview
+        this._updateLetterPreview(record);
 
         // Render Letter Preview
         this._updateLetterPreview(record);
@@ -1165,20 +1486,60 @@ window.BGL.Decision = {
     /**
      * Navigate to previous record
      */
+    /**
+     * Helper to check if record matches current filter
+     */
+    _matchesFilter(record) {
+        if (this.currentFilter === 'all') return true;
+
+        const isCompleted = this._isCompleted(record);
+        if (this.currentFilter === 'approved') return isCompleted;
+        if (this.currentFilter === 'pending') return !isCompleted;
+
+        return true;
+    },
+
+    /**
+     * Navigate to previous record matching current filter
+     */
     navigatePrev() {
-        if (this.currentIndex > 0) {
-            this.currentIndex--;
+        // Find previous matching record
+        let newIndex = -1;
+        for (let i = this.currentIndex - 1; i >= 0; i--) {
+            if (this._matchesFilter(this.records[i])) {
+                newIndex = i;
+                break;
+            }
+        }
+
+        // If found, go to it
+        if (newIndex >= 0) {
+            this.currentIndex = newIndex;
             this._displayCurrentRecord();
+        } else {
+            // Optional: User feedback for "No previous records"
         }
     },
 
     /**
-     * Navigate to next record
+     * Navigate to next record matching current filter
      */
     navigateNext() {
-        if (this.currentIndex < this.records.length - 1) {
-            this.currentIndex++;
+        // Find next matching record
+        let newIndex = -1;
+        for (let i = this.currentIndex + 1; i < this.records.length; i++) {
+            if (this._matchesFilter(this.records[i])) {
+                newIndex = i;
+                break;
+            }
+        }
+
+        // If found, go to it
+        if (newIndex >= 0) {
+            this.currentIndex = newIndex;
             this._displayCurrentRecord();
+        } else {
+            // Optional: User feedback for "End of list"
         }
     },
 
@@ -1379,10 +1740,55 @@ window.BGL.Decision = {
      * Uses external letter.css for styling (no inline CSS)
      */
     _generateLetterHtml(record) {
-        const bankName = this.selectedBankName || record.rawBankName || "البنك الرسمي";
+        // Wrapper that uses current UI selection if matching record, or falls back to record data
+        // For preview of CURRENT record, we prefer current UI selection (if user changed dropdown but didn't save)
+        // For Print All, we must strictly use record data.
 
+        // If this is the current record being edited, use UI state
+        if (record.id === this.records[this.currentIndex]?.id) {
+            return this._generateLetterHtmlFromState(record);
+        }
+        return this._generateLetterHtmlForRecord(record);
+    },
+
+    // Refactored to use UI state (Current behavior)
+    _generateLetterHtmlFromState(record) {
+        const bankName = this.selectedBankName || record.rawBankName || "البنك الرسمي";
+        const bankId = this.selectedBankId;
+        const supplierName = this.selectedSupplierName || record.rawSupplierName || "المورد";
+        const supplierId = this.selectedSupplierId;
+
+        return this._buildLetterHtml(record, bankId, bankName, supplierId, supplierName);
+    },
+
+    // Refactored to use Record data purely (For Print All)
+    _generateLetterHtmlForRecord(record) {
+        // We need to look up bank name from ID if possible, or use raw if valid, or fallback
+        // Since record.bankId is stored, get details from State.bankMap
+        const bankId = record.bankId;
+        let bankName = record.rawBankName || "البنك الرسمي";
+        if (bankId && BGL.State.bankMap[bankId]) {
+            // In map, it might be 'official_name' or similar. 
+            // Let's check map structure usage in original code: BGL.State.bankMap[this.selectedBankId]
+            const b = BGL.State.bankMap[bankId];
+            bankName = b.official_name || bankName;
+        }
+
+        const supplierId = record.supplierId;
+        let supplierName = record.rawSupplierName || "المورد";
+        if (supplierId && BGL.State.supplierMap[supplierId]) {
+            const s = BGL.State.supplierMap[supplierId];
+            supplierName = s.official_name || supplierName;
+        }
+
+        return this._buildLetterHtml(record, bankId, bankName, supplierId, supplierName);
+    },
+
+    // Core generator
+    _buildLetterHtml(record, bankId, bankName, supplierId, supplierName) {
         // Get bank address data from dictionary (dynamic)
-        const bankData = this.selectedBankId ? BGL.State.bankMap[this.selectedBankId] : null;
+        const bankData = bankId ? BGL.State.bankMap[bankId] : null;
+
         const bankContact = {
             department: bankData?.department || "إدارة الضمانات",
             addressLines: [
@@ -1393,7 +1799,7 @@ window.BGL.Decision = {
             email: bankData?.contact_email || ""
         };
 
-        const supplierName = this.selectedSupplierName || record.rawSupplierName || "المورد";
+
         const guaranteeNo = record.guaranteeNumber || "-";
         const contractNo = record.contractNumber || "-";
         let amount = record.amount ? Number(record.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "-";
@@ -1472,6 +1878,14 @@ window.BGL.Decision = {
             else if (t === 'ADVANCED') guaranteeDesc = "ضمان الدفعة المقدمة البنكي";
         }
 
+
+        // Determine font style based on language
+        // If it contains Arabic characters, use default (Arabic). Otherwise (English), use Inter/Sans.
+        const hasArabic = /[\u0600-\u06FF]/.test(supplierName);
+        const supplierStyle = !hasArabic
+            ? "font-family: 'Arial', sans-serif !important; direction: ltr; display: inline-block;"
+            : "";
+
         // Clean HTML template (styling handled by letter.css)
         return `
         <div class="letter-preview">
@@ -1509,16 +1923,16 @@ window.BGL.Decision = {
                 if (record.contractSource === 'po') {
                     displayNo = String(displayNo).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
                 }
-                return `والعائد ${record.contractSource === 'po' ? 'لأمر الشراء' : 'لعقد'} رقم (${displayNo})`;
+                return `والعائد ${record.contractSource === 'po' ? 'لأمر الشراء' : 'للعقد'} رقم (${displayNo})`;
             })()}
                     </span>
                 </div>
 
                 <div class="first-paragraph">
                     إشارة الى ${guaranteeDesc} الموضح أعلاه، والصادر منكم لصالحنا على حساب 
-                    <strong>${this._escapeHtml(supplierName)}</strong> 
+                    <span style="${supplierStyle}">${this._escapeHtml(supplierName)}</span> 
                     بمبلغ قدره (<strong>${amount}</strong>) ريال، 
-                    نأمل منكم <span class="fw-800-sharp">تمديد فترة سريان الضمان حتى تاريخ ${renewalDate}</span>، 
+                    نأمل منكم <span class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">تمديد فترة سريان الضمان حتى تاريخ ${renewalDate}</span>، 
                     مع بقاء الشروط الأخرى دون تغيير، وإفادتنا بذلك من خلال البريد الالكتروني المخصص للضمانات البنكية لدى مستشفى الملك فيصل التخصصي ومركز الأبحاث بالرياض (bgfinance@kfshrc.edu.sa)، كما نأمل منكم إرسال أصل تمديد الضمان الى:
                 </div>
 

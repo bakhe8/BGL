@@ -15,6 +15,8 @@ use App\Repositories\SupplierRepository;
 use App\Repositories\SupplierOverrideRepository;
 use App\Repositories\SupplierLearningRepository;
 use App\Support\Settings;
+use App\Services\MatchingService;
+use App\Services\AutoAcceptService;
 
 /**
  * Decision Controller
@@ -34,6 +36,7 @@ class DecisionController
     private $learningLog;
     private $bankLearning;
     private $supplierLearning;
+    private $matchingService;
 
     /**
      * Initialize Decision Controller with required dependencies
@@ -64,6 +67,11 @@ class DecisionController
         $this->learningLog = $learningLog ?: new LearningLogRepository();
         $this->bankLearning = new BankLearningRepository();
         $this->supplierLearning = new SupplierLearningRepository();
+        $this->matchingService = new MatchingService(
+            new SupplierRepository(),
+            new SupplierAlternativeNameRepository(),
+            new BankRepository()
+        );
     }
 
     /**
@@ -130,6 +138,21 @@ class DecisionController
             return $arr;
         }, $data);
         echo json_encode(array('success' => true, 'data' => $enriched));
+    }
+
+    /**
+     * API: List available sessions
+     */
+    public function listSessions(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $sessions = $this->records->getAvailableSessions();
+            echo json_encode(['success' => true, 'data' => $sessions]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -395,5 +418,91 @@ class DecisionController
                 'conflicts' => $conflicts,
             ),
         ));
+    }
+
+    /**
+     * Recalculate matches for all non-approved records in the LATEST SESSION
+     */
+    public function recalculate(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        // 1. Find latest session
+        // Only fetching IDs to find max might be slow if many records, 
+        // but typically efficient enough. Or fetch one record order by session desc.
+        // Let's grab all records (cached in memory mostly or query optimized)
+        // Better: Query DB for latest session ID. 
+        // For now, reuse repository logic: fetch all, find max session.
+        $all = $this->records->all();
+        if (empty($all)) {
+            echo json_encode(['success' => true, 'data' => ['processed' => 0]]);
+            return;
+        }
+
+        $maxSession = 0;
+        foreach ($all as $r) {
+            if ($r->sessionId > $maxSession) {
+                $maxSession = $r->sessionId;
+            }
+        }
+
+        // 2. Filter target records covering the session
+        $targets = array_filter($all, function($r) use ($maxSession) {
+            return $r->sessionId === $maxSession && $r->matchStatus !== 'approved';
+        });
+
+        $processed = 0;
+        $updated = 0;
+
+        foreach ($targets as $record) {
+            $processed++;
+            
+            // Re-run matching
+            // Supplier
+            $suppMatch = $this->matchingService->matchSupplier($record->rawSupplierName);
+            
+            // Bank
+            $bankMatch = $this->matchingService->matchBank($record->rawBankName);
+
+            // Determine status
+            $newStatus = $suppMatch['match_status'];
+            
+            // Constraint: Needs both IDs to be ready
+            if (empty($suppMatch['supplier_id']) || empty($bankMatch['bank_id'])) {
+                $newStatus = 'needs_review';
+            }
+
+            // Only update if something changed
+            // We check if we got a BETTER decision or different one.
+            // If current status is ready and we find same supplier -> no change
+            // If current is needs_review and we find ready -> update!
+            // If current is ready (old supplier) and we find different supplier -> update!
+            
+            // NOTE: If user manually set a supplier, this MIGHT overwrite it if it wasn't 'approved'.
+            // But user asked for this: "updates based on dictionary".
+            // If manual override was done, it should have been saved as alias if it was a real fix.
+            // If it was valid 'ready' record, it stays ready.
+            
+            $payload = [
+                'match_status' => $newStatus,
+                'supplier_id' => $suppMatch['supplier_id'] ?? null,
+                'bank_id' => $bankMatch['bank_id'] ?? null,
+                'normalized_supplier' => $suppMatch['normalized'] ?? null,
+                'normalized_bank' => $bankMatch['normalized'] ?? null,
+            ];
+            
+            // Only execute update if IDs changed or status changed to ready
+            // Simple approach: Always update to remain consistent with "Recalculate" meaning.
+            $this->records->updateDecision($record->id, $payload);
+            $updated++;
+        }
+
+        echo json_encode([
+            'success' => true, 
+            'data' => [
+                'processed' => $processed, 
+                'session_id' => $maxSession
+            ]
+        ]);
     }
 }
