@@ -148,6 +148,12 @@ class DictionaryController
         $nameEn = trim((string) ($payload['official_name_en'] ?? ''));
         $norm = trim((string) ($payload['normalized_key'] ?? ''));
         $short = trim((string) ($payload['short_code'] ?? ''));
+        
+        // New address fields
+        $department = trim((string) ($payload['department'] ?? ''));
+        $addressLine1 = trim((string) ($payload['address_line_1'] ?? ''));
+        $addressLine2 = trim((string) ($payload['address_line_2'] ?? ''));
+        $contactEmail = trim((string) ($payload['contact_email'] ?? ''));
 
         if ($name === '') {
             http_response_code(422);
@@ -161,15 +167,17 @@ class DictionaryController
         }
 
         // Check duplicates? (Optional for now)
-
-        // Check duplicates? (Optional for now)
         // Note: Repository calculates ID and confirmed status
         $bank = $this->banks->create([
             'official_name' => $name,
             'official_name_en' => $nameEn,
             'normalized_key' => $norm,
             'short_code' => $short,
-            'is_confirmed' => 1, // Auto-confirm created via this API? Generally yes if explicit add.
+            'department' => $department ?: null,
+            'address_line_1' => $addressLine1 ?: null,
+            'address_line_2' => $addressLine2 ?: null,
+            'contact_email' => $contactEmail ?: null,
+            'is_confirmed' => 1,
         ]);
         echo json_encode(['success' => true, 'data' => $bank]);
     }
@@ -181,6 +189,12 @@ class DictionaryController
         $nameEn = trim((string) ($payload['official_name_en'] ?? ''));
         $norm = trim((string) ($payload['normalized_key'] ?? ''));
         $short = trim((string) ($payload['short_code'] ?? ''));
+        
+        // New address fields
+        $department = trim((string) ($payload['department'] ?? ''));
+        $addressLine1 = trim((string) ($payload['address_line_1'] ?? ''));
+        $addressLine2 = trim((string) ($payload['address_line_2'] ?? ''));
+        $contactEmail = trim((string) ($payload['contact_email'] ?? ''));
 
         if ($name === '') {
             http_response_code(422);
@@ -188,12 +202,21 @@ class DictionaryController
             return;
         }
 
-        $this->banks->update($id, [
+        // Build update array dynamically to only update provided fields
+        $update = [
             'official_name' => $name,
             'official_name_en' => $nameEn,
             'normalized_key' => $norm,
             'short_code' => $short,
-        ]);
+        ];
+        
+        // Only include address fields if provided (allows partial updates)
+        if (isset($payload['department'])) $update['department'] = $department ?: null;
+        if (isset($payload['address_line_1'])) $update['address_line_1'] = $addressLine1 ?: null;
+        if (isset($payload['address_line_2'])) $update['address_line_2'] = $addressLine2 ?: null;
+        if (isset($payload['contact_email'])) $update['contact_email'] = $contactEmail ?: null;
+        
+        $this->banks->update($id, $update);
         echo json_encode(['success' => true]);
     }
 

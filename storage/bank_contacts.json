@@ -1,0 +1,109 @@
+{
+  "default": {
+    "department": "إدارة المؤسسات المالية - قسم الضمانات",
+    "addressLines": ["ص.ب. 56006 الرياض 11554"],
+    "email": "bgfinance@kfshrc.edu.sa"
+  },
+  "banks": {
+    "البنك الأهلي السعودي": {
+      "department": "مركز خدمات التجارة",
+      "addressLines": ["ص.ب. 3555 جدة 21481"],
+      "email": "tradej-lg@alahli.com"
+    },
+    "البنك السعودي الأول": {
+      "department": "التجارة العالمية وتمويل الذمم المدينة",
+      "addressLines": ["ص.ب. 2907، الرياض 11461"],
+      "email": "gtrf.clint.service.cpm@sab.com"
+    },
+    "البنك السعودي الفرنسي": {
+      "department": "إدارة المؤسسات المالية - قسم الضمانات",
+      "addressLines": ["ص.ب. 56006 الرياض 11554"],
+      "email": "ccc@bsf.sa"
+    },
+    "البنك العربي الوطني": {
+      "department": "مركز عمليات التجارة",
+      "addressLines": ["ص.ب. 56921، الرياض 11564"],
+      "email": "toc_central@anb.com.sa"
+    },
+    "بنك الرياض": {
+      "department": "مركز تمويل التجارة",
+      "addressLines": ["ص.ب. 22622، الرياض 11416"],
+      "email": "TFC-LocalLG-Riyadh@riyadbank.com"
+    },
+    "مصرف الإنماء": {
+      "department": "مركز خدمات العمليات التجارية – قسم الضمانات",
+      "addressLines": ["ص.ب. 66674، الرياض 11586"],
+      "email": "governmentadmin@alinma.com"
+    },
+    "مصرف الراجحي": {
+      "department": "إدارة تمويل التجارة العالمية",
+      "addressLines": ["ص.ب. 28، الرياض 11411"],
+      "email": "tradeiuc@alrajhibank.com.sa"
+    },
+    "البنك السعودي للاستثمار": {
+      "department": "قسم الضمانات",
+      "addressLines": ["ص.ب. 3533 الرياض 11481"],
+      "email": "saibguarantee@saib.com.sa"
+    },
+    "بنك البلاد": {
+      "department": "الإدارة العامة - مركز عمليات التجارة",
+      "addressLines": ["ص.ب. 8229، الرياض 12711"],
+      "email": "tradefainanceoprations@bankalbilad.com"
+    },
+    "بنك الجزيرة": {
+      "department": "تمويل العمليات التجارية",
+      "addressLines": ["ص.ب. 6277، جدة 21442"],
+      "email": "guarantee@baj.com.sa"
+    },
+    "بنك الخليج الدولي – السعودية": {
+      "department": "خدمات الشركات",
+      "addressLines": ["ص.ب. 93، الخبر 31952"],
+      "email": "tradefin@gib.com"
+    },
+    "بنك الخليج الدولي": {
+      "department": "خدمات الشركات",
+      "addressLines": ["ص.ب. 93، الخبر 31952"],
+      "email": "tradefin@gib.com"
+    },
+    "بنك بي إن بي باريبا": {
+      "department": "العمليات التجارية",
+      "addressLines": ["ص.ب. 18771 الرياض 11425"],
+      "email": "ksa.bic.complaints@bnpparibas.com"
+    },
+    "البنك البريطاني": {
+      "department": "مركز خدمات التجارة",
+      "addressLines": ["ص.ب. 3555 جدة 21481"],
+      "email": "tradej-lg@alahli.com"
+    },
+    "بنك الكويت الوطني": {
+      "department": "العمليات التجارية",
+      "addressLines": ["—"],
+      "email": "CCKSA@nbk.com.sa"
+    },
+    "دويتشه بنك": {
+      "department": "خدمات التجارة",
+      "addressLines": ["ص.ب. 301806 الرياض 11372"],
+      "email": "tf.riyadh@list.db.com"
+    },
+    "بنك الإمارات دبي الوطني": {
+      "department": "مركز خدمات التجارة",
+      "addressLines": ["ص.ب. 8166 الرياض 11482"],
+      "email": "ksacustomersupport@emiratesnbd.com"
+    },
+    "جي بي مورغان": {
+      "department": "برج الفيصلية – الطابق 25",
+      "addressLines": ["ص.ب. 51907، الرياض 11553"],
+      "email": "riyadh_client_escalation@jpmchase.com"
+    },
+    "بنك البحرين الوطني": {
+      "department": "إدارة العمليات",
+      "addressLines": ["ص.ب. 65543، الرياض 11566"],
+      "email": "nbb@nbbonline.com"
+    },
+    "ستاندرد تشارترد": {
+      "department": "مركز العمليات – برج الفيصلية",
+      "addressLines": ["ص.ب. 92224، الرياض 11653"],
+      "email": "Straight2bank.sa@sc.com"
+    }
+  }
+}

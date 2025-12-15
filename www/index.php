@@ -15,6 +15,9 @@ require __DIR__ . '/../app/Support/autoload.php';
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Specific Routes (High Priority)
+// (Letter template route removed - moved to client-side generation)
+
 // خدمة الملفات الثابتة (CSS/JS/ICO/صور) داخل www
 $staticPath = __DIR__ . $uri;
 if ($uri !== '/' && file_exists($staticPath) && !is_dir($staticPath)) {
@@ -69,6 +72,8 @@ try {
         echo file_get_contents(__DIR__ . '/settings.html');
         exit;
     }
+
+
 
     // API
     if ($method === 'POST' && $uri === '/api/import/excel') {

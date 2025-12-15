@@ -1,21 +1,7 @@
 <!doctype html>
 <!--
-═══════════════════════════════════════════════════════════════════════════════
-الصفحة الرئيسية - اتخاذ القرار (decision.html)
-═══════════════════════════════════════════════════════════════════════════════
-المسار: /
-
-هذه هي الواجهة الأساسية للنظام وتتضمن:
-- استيراد ملفات Excel
-- مراجعة واعتماد السجلات
-- إضافة موردين جدد
-- البحث والفلترة
-
-الواجهة الثانية: /settings (settings.html)
-
-آخر تحديث: 2024-12
-راجع: docs/08-ChangeLog-Cleanup-2024-12.md
-═══════════════════════════════════════════════════════════════════════════════
+ PAGE: decision.html
+ PURPOSE: Main Decision Making Interface (Zen Mode)
 -->
 <html lang="ar" dir="rtl">
 
@@ -24,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>اتخاذ القرار</title>
     <link rel="stylesheet" href="/assets/css/style.css">
+    <link rel="stylesheet" href="/assets/css/letter.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -113,7 +100,8 @@
 
         .field-input input {
             width: 100%;
-            padding: 10px 14px;
+            width: 100%;
+            /* padding handled by utility classes */
             border: 2px solid #e2e8f0;
             border-radius: 8px;
             font-size: 1em;
@@ -126,10 +114,7 @@
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
-        .field-input input.has-value {
-            border-color: #22c55e;
-            background: #f0fdf4;
-        }
+        /* Removed .has-value styling per user request for cleaner UI */
 
         .suggestions-list {
             position: absolute;
@@ -200,7 +185,7 @@
 
         .save-btn {
             padding: 12px 32px;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            background: #000;
             color: #fff;
             border: none;
             border-radius: 8px;
@@ -227,7 +212,7 @@
             display: flex;
             align-items: center;
             gap: 16px;
-            padding: 8px 0;
+            padding: 0;
             color: #64748b;
             font-size: 0.9em;
         }
@@ -251,183 +236,193 @@
 </head>
 
 <body class="app-shell">
-    <header class="app-header">
-        <div class="app-header-inner">
-            <div>
-                <span class="app-logo">BL</span>
-                <span class="app-title">نظام إدارة خطابات الضمان</span>
-            </div>
-            <nav class="app-nav">
-                <a href="/" class="app-nav-link is-active">الرئيسية</a>
-                <a href="/settings" class="app-nav-link">الإعدادات</a>
-            </nav>
-        </div>
-    </header>
+
 
     <main class="app-main">
         <div class="app-container">
 
-            <!-- Header with Status Badges -->
-            <section class="flex items-center justify-between py-4 mb-4">
-                <h1 class="text-2xl font-bold text-gray-800">اتخاذ القرار</h1>
 
-                <div class="flex items-center gap-3">
-                    <!-- Status Badges -->
-                    <div class="flex items-center gap-2" id="statusBadges">
-                        <span class="status-badge status-total" id="badgeTotal" title="إجمالي السجلات">
-                            <span id="countTotal">0</span> 📋
-                        </span>
-                        <span class="status-badge status-approved" id="badgeApproved" title="معتمد">
-                            <span id="countApproved">0</span> ✓
-                        </span>
-                        <span class="status-badge status-pending" id="badgePending" title="قيد الانتظار">
-                            <span id="countPending">0</span> !
-                        </span>
-                        <span class="status-badge status-search" id="badgeSearch" title="بحث">
-                            🔍
-                        </span>
-                    </div>
+            <!-- Hidden File Input for Direct Upload -->
+            <input type="file" id="hiddenFileInput" accept=".xlsx" style="display:none;" />
 
-                    <!-- Action Buttons -->
-                    <div class="flex items-center gap-2 mr-4">
-                        <button class="nav-btn" id="btnToggleImport" title="استيراد ملف">
-                            📥 استيراد
-                        </button>
-                        <button class="nav-btn" id="refreshBtn" title="تحديث البيانات">
-                            🔄 تحديث
-                        </button>
-                        <button class="nav-btn" id="btnRecalcAll" title="إعادة المطابقة">
-                            🔃 إعادة مطابقة
-                        </button>
-                        <button class="nav-btn" id="btnPrintPreview" title="طباعة المعاينة">
-                            🖨️ طباعة المعاينة
-                        </button>
-                        <button class="nav-btn" id="btnPrintAll" title="طباعة كل الجاهز">
-                            🖨️ طباعة كل الجاهز
-                        </button>
-                    </div>
-                </div>
-            </section>
+            <!-- Main Decision Card (Sticky Header) -->
+            <section class="card p-0 sticky top-0 z-50 shadow-md rounded-t-none">
+                <div class="card-body p-1">
 
-            <!-- Import Card (Hidden by default) -->
-            <section class="card" id="importCard" style="display:none; margin-bottom: 1rem;">
-                <div class="card-header">
-                    <div>
-                        <p class="card-title">استيراد ملف Excel</p>
-                        <p class="card-subtitle">الملفات المدعومة: XLSX. اكتشاف الأعمدة تلقائيًا.</p>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <form id="uploadForm" class="form-grid" style="grid-template-columns: 1fr;">
-                        <div class="form-group">
-                            <label class="form-label">اختر الملف</label>
-                            <input type="file" id="fileInput" accept=".xlsx" class="form-control" />
-                            <div class="form-help">الحجم المقترح: حتى 10MB</div>
+                    <!-- Embedded Toolbar (Smart Integration) -->
+                    <div class="flex items-center gap-1 px-2 py-1 mb-1 border-b border-gray-100">
+                        <!-- ZONE 1: Status Badges (Start) -->
+                        <div class="flex items-center gap-1" id="toolbarZoneStart">
+                            <div class="flex items-center gap-1" id="statusBadges">
+                                <button
+                                    class="flex items-center justify-center gap-1 px-2 h-7 rounded text-xs font-bold bg-gray-50 hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600 transition-all"
+                                    id="badgeTotal" title="العدد الكلي">
+                                    <span id="countTotal">0</span> 📋
+                                </button>
+                                <button
+                                    class="flex items-center justify-center gap-1 px-2 h-7 rounded text-xs font-bold bg-green-50 hover:bg-green-100 border border-transparent hover:border-green-200 text-green-700 transition-all"
+                                    id="badgeApproved" title="جاهز للطباعة">
+                                    <span id="countApproved">0</span> ✓
+                                </button>
+                                <button
+                                    class="flex items-center justify-center gap-1 px-2 h-7 rounded text-xs font-bold bg-orange-50 hover:bg-orange-100 border border-transparent hover:border-orange-200 text-orange-700 transition-all"
+                                    id="badgePending" title="معلق">
+                                    <span id="countPending">0</span> !
+                                </button>
+                                <button
+                                    class="flex items-center justify-center w-7 h-7 rounded hover:bg-blue-50 text-blue-600 transition-colors"
+                                    id="badgeSearch" title="بحث">
+                                    🔍
+                                </button>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-sm">
-                            <button type="submit" class="btn btn-primary">رفع ومعالجة</button>
-                            <span id="uploadMsg" class="muted"></span>
-                        </div>
-                    </form>
-                    <div id="uploadError" class="alert alert-danger" style="display:none;"></div>
-                </div>
-            </section>
 
-            <!-- Main Decision Card -->
-            <section class="card">
-                <div class="card-body p-6">
+                        <!-- ZONE 2: Flexible Spacer (Center) -->
+                        <div class="flex-1 flex justify-center" id="toolbarZoneCenter">
+                            <span class="font-bold text-gray-800 text-sm">نظام إدارة خطابات الضمان</span>
+                        </div>
+
+                        <!-- ZONE 3: Tools (End) -->
+                        <div class="flex items-center gap-1" id="toolbarZoneEnd">
+                            <!-- Tools Group: Data & File -->
+                            <button
+                                class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                id="btnToggleImport" title="استيراد ملف">
+                                📥
+                            </button>
+                            <button
+                                class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                id="refreshBtn" title="تحديث البيانات">
+                                🔄
+                            </button>
+                            <button
+                                class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                id="btnRecalcAll" title="إعادة المطابقة">
+                                🔃
+                            </button>
+
+                            <div class="h-4 w-px bg-gray-300 mx-1"></div>
+
+                            <!-- Tools Group: Print -->
+                            <button
+                                class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                id="btnPrintPreview" title="طباعة المعاينة">
+                                🖨️
+                            </button>
+                            <button
+                                class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                id="btnPrintAll" title="طباعة الكل">
+                                📑
+                            </button>
+
+                            <a href="/settings"
+                                class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                title="الإعدادات">
+                                ⚙️
+                            </a>
+                        </div>
+                    </div>
 
                     <!-- Record Meta (ID & Status) -->
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="record-meta" id="recordMeta">
-                            <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-mono">#<strong
-                                    id="metaRecordId">-</strong></span>
-                            <span>🔢 الضمان: <strong id="metaGuarantee">-</strong></span>
-                            <span>📅 التاريخ: <strong id="metaDate">-</strong></span>
-                            <span>💰 المبلغ: <strong id="metaAmount">-</strong></span>
+                    <div class="flex items-center justify-between px-3 pt-2 pb-2 -mx-1 -mt-1 mb-0">
+                        <div class="record-meta text-xs flex flex-wrap items-center justify-between w-full gap-y-1"
+                            id="recordMeta">
+                            <span class="text-gray-600 font-mono">السجل: <strong id="metaRecordId">-</strong></span>
+                            <span class="text-gray-600">رقم الضمان: <strong id="metaGuarantee">-</strong></span>
+                            <span class="text-gray-600">رقم العقد: <strong id="metaContract">-</strong></span>
+                            <span class="text-gray-600">انتهاء الضمان: <strong id="metaDate">-</strong></span>
+                            <span class="text-gray-600">تاريخ الإصدار: <strong id="metaIssueDate">-</strong></span>
+                            <span class="text-gray-600">المبلغ: <strong id="metaAmount">-</strong></span>
+                            <span class="text-gray-600">المصدر: <strong id="metaSource">-</strong></span>
+                            <span class="text-gray-600">النوع: <strong id="metaType">-</strong></span>
+                            <span class="text-gray-600">ملاحظات: <strong id="metaComment">-</strong></span>
                         </div>
                     </div>
 
                     <!-- PROMINENT RAW DATA DISPLAY -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <!-- Supplier Side -->
-                        <div
-                            class="bg-blue-50 border border-blue-100 rounded-xl p-5 relative group hover:border-blue-300 transition-colors">
-                            <div
-                                class="absolute top-0 right-0 bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-bl-lg">
-                                المورد (من الملف)</div>
-                            <h3 class="text-lg font-bold text-gray-800 mb-1 leading-relaxed" id="detailRawSupplier">-
-                            </h3>
-
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-1 mb-1">
+                        <!-- Supplier Side (Zen Mode) -->
+                        <div class="bg-white rounded p-2 relative">
                             <!-- Input Area -->
-                            <div class="mt-4 relative z-10">
-                                <span class="text-xs text-blue-600 font-semibold mb-1 block">اختر المورد المطابق:</span>
-                                <div class="field-input">
-                                    <input type="text" id="supplierInput"
-                                        class="w-full border-2 border-blue-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-                                        placeholder="ابحث عن المورد..." autocomplete="off">
-                                    <ul class="suggestions-list" id="supplierSuggestions"></ul>
-                                </div>
-                                <button
-                                    class="text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:text-gray-400"
-                                    id="btnAddSupplier" title="إضافة مورد جديد">+ إضافة كمورد جديد</button>
-                                <div id="supplierAddError" class="text-red-500 text-xs mt-1 hidden font-bold"></div>
-                            </div>
+                            <div class="mt-0 relative z-10">
+                                <div class="field-input flex items-start gap-2">
+                                    <span
+                                        class="text-xs font-bold text-gray-700 whitespace-nowrap mt-1.5">المورد:</span>
+                                    <div class="relative w-full">
+                                        <input type="text" id="supplierInput"
+                                            class="w-full border border-gray-300 rounded px-2 py-0 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            placeholder="تحديد المورد..." autocomplete="off">
+                                        <ul class="suggestions-list" id="supplierSuggestions"></ul>
 
-                            <!-- Smart Suggestions Chips -->
-                            <div id="supplierChips" class="mt-3 flex flex-wrap gap-2 min-h-[24px]"></div>
+                                        <!-- Details (Inline) -->
+                                        <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
+                                            <div id="supplierChips" class="flex flex-wrap gap-1"></div>
+                                            <button
+                                                class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                                id="btnAddSupplier" title="إضافة مورد جديد">+ جديد</button>
+                                            <div id="supplierAddError" class="text-red-500 text-[10px] hidden"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Bank Side -->
-                        <div
-                            class="bg-purple-50 border border-purple-100 rounded-xl p-5 relative group hover:border-purple-300 transition-colors">
-                            <div
-                                class="absolute top-0 right-0 bg-purple-100 text-purple-600 text-xs px-2 py-1 rounded-bl-lg">
-                                البنك (من الملف)</div>
-                            <h3 class="text-lg font-bold text-gray-800 mb-1 leading-relaxed" id="detailRawBank">-</h3>
-
+                        <!-- Bank Side (Zen Mode) -->
+                        <div class="bg-white rounded p-2 relative">
                             <!-- Input Area -->
-                            <div class="mt-4 relative z-10">
-                                <span class="text-xs text-purple-600 font-semibold mb-1 block">اختر البنك
-                                    المطابق:</span>
-                                <div class="field-input">
-                                    <input type="text" id="bankInput"
-                                        class="w-full border-2 border-purple-200 rounded-lg px-3 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
-                                        placeholder="اختر البنك..." autocomplete="off">
-                                    <ul class="suggestions-list" id="bankSuggestions"></ul>
+                            <div class="mt-0 relative z-10">
+                                <div class="field-input flex items-start gap-2">
+                                    <span class="text-xs font-bold text-gray-700 whitespace-nowrap mt-1.5">البنك:</span>
+                                    <div class="relative w-full">
+                                        <input type="text" id="bankInput"
+                                            class="w-full border border-gray-300 rounded px-2 py-0 text-xs focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+                                            placeholder="تحديد البنك..." autocomplete="off">
+                                        <ul class="suggestions-list" id="bankSuggestions"></ul>
+
+                                        <!-- Details (Inline) -->
+                                        <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
+                                            <div id="bankChips" class="flex flex-wrap gap-1"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-
-                            <!-- Smart Suggestions Chips -->
-                            <div id="bankChips" class="mt-3 flex flex-wrap gap-2 min-h-[24px]"></div>
                         </div>
                     </div>
 
                     <!-- Navigation & Save -->
-                    <div class="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                    <div class="flex items-center justify-between mt-0 pt-2 px-3 pb-2 -mx-1 -mb-1">
                         <!-- Previous Button -->
-                        <button class="nav-btn" id="btnPrev">
-                            <span>◀</span>
+                        <button class="nav-btn py-1 px-3 text-sm bg-white shadow-sm hover:shadow" id="btnPrev">
+                            <span>▶</span>
                             <span>السابق</span>
                         </button>
 
                         <!-- Save & Next -->
                         <div class="flex items-center gap-4">
-                            <span id="saveMessage" class="text-sm font-medium"></span>
-                            <button class="save-btn" id="btnSaveNext">
+                            <span id="saveMessage" class="text-xs font-medium"></span>
+                            <button class="save-btn py-1.5 px-6 text-sm shadow-md hover:shadow-lg" id="btnSaveNext">
                                 <span>✓</span>
-                                <span>حفظ السجل رقم (<span id="currentIndex">1</span> من <span id="totalCount">0</span>)
-                                    والانتقال إلى التالي</span>
+                                <span>حفظ (<span id="currentIndex">1</span> من <span id="totalCount">0</span>)
+                                    وانتقال</span>
                             </button>
                         </div>
 
                         <!-- Next Button -->
-                        <button class="nav-btn" id="btnNext">
+                        <button class="nav-btn py-1 px-3 text-sm bg-white shadow-sm hover:shadow" id="btnNext">
                             <span>التالي</span>
-                            <span>▶</span>
+                            <span>◀</span>
                         </button>
                     </div>
+            </section>
 
+            <!-- Letter Preview Section -->
+            <!-- Letter Preview Section (Simplified) -->
+            <section class="mt-8" id="letterPreviewSection">
+
+
+                <!-- The Letter Container sits directly on the page background -->
+                <div id="letterContainer" class="w-full flex justify-center">
+                    <!-- JS will inject content here -->
                 </div>
             </section>
 
@@ -437,7 +432,7 @@
     <!-- Scripts -->
     <script src="assets/js/shared/api.js?v=183"></script>
     <!-- state.js archived - BGL.State now initialized in decision.js -->
-    <script src="assets/js/decision/decision.js?v=183"></script>
+    <script src="assets/js/decision/decision.js?v=186"></script>
 </body>
 
 </html>

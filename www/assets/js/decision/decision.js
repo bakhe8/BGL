@@ -95,6 +95,12 @@ window.BGL.Decision = {
             metaGuarantee: document.getElementById('metaGuarantee'),
             metaDate: document.getElementById('metaDate'),
             metaAmount: document.getElementById('metaAmount'),
+            // New Meta Fields
+            metaContract: document.getElementById('metaContract'),
+            metaSource: document.getElementById('metaSource'),
+            metaIssueDate: document.getElementById('metaIssueDate'),
+            metaType: document.getElementById('metaType'),
+            metaComment: document.getElementById('metaComment'),
             detailRawSupplier: document.getElementById('detailRawSupplier'),
             detailRawBank: document.getElementById('detailRawBank'),
 
@@ -103,6 +109,7 @@ window.BGL.Decision = {
             countApproved: document.getElementById('countApproved'),
             countPending: document.getElementById('countPending'),
             currentIndex: document.getElementById('currentIndex'),
+            metaRecordIndex: document.getElementById('metaRecordIndex'), // Added element
             totalCount: document.getElementById('totalCount'),
 
             // Buttons
@@ -131,6 +138,9 @@ window.BGL.Decision = {
 
         // Load data
         await this._loadData();
+
+        // Init Letter Preview (Assets only)
+        this._initLetterPreview();
 
         console.log('[Decision] Ready. Records:', this.records.length);
     },
@@ -217,11 +227,12 @@ window.BGL.Decision = {
             this._loadData();
         });
 
-        // Toggle Import Card
+        // Direct Import Button
         document.getElementById('btnToggleImport')?.addEventListener('click', () => {
-            const card = document.getElementById('importCard');
-            if (card) {
-                card.style.display = card.style.display === 'none' ? 'block' : 'none';
+            const fileInput = document.getElementById('hiddenFileInput');
+            if (fileInput) {
+                fileInput.value = ''; // Reset to allow re-selecting same file
+                fileInput.click();
             }
         });
 
@@ -253,26 +264,17 @@ window.BGL.Decision = {
             }
         });
 
-        // Upload Form
-        document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const fileInput = document.getElementById('fileInput');
-            const uploadMsg = document.getElementById('uploadMsg');
-            const uploadError = document.getElementById('uploadError');
+        // Hidden Input Change (Auto-Upload)
+        document.getElementById('hiddenFileInput')?.addEventListener('change', async (e) => {
+            const fileInput = e.target;
 
-            if (!fileInput?.files?.length) {
-                if (uploadError) {
-                    uploadError.textContent = 'اختر ملف أولاً';
-                    uploadError.style.display = 'block';
-                }
-                return;
-            }
+            if (!fileInput.files.length) return;
 
+            const file = fileInput.files[0];
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            formData.append('file', file);
 
-            if (uploadMsg) uploadMsg.textContent = 'جارٍ الرفع...';
-            if (uploadError) uploadError.style.display = 'none';
+            this._showMessage('جارٍ رفع الملف ومعالجته...', 'info');
 
             try {
                 const res = await fetch('/api/import/excel', {
@@ -282,18 +284,13 @@ window.BGL.Decision = {
                 const result = await res.json();
 
                 if (result.success) {
-                    if (uploadMsg) uploadMsg.textContent = `✓ تم استيراد ${result.data?.imported || 0} سجل`;
-                    document.getElementById('importCard').style.display = 'none';
+                    this._showMessage(`✓ تم استيراد ${result.data?.imported || 0} سجل بنجاح`, 'success');
                     await this._loadData();
                 } else {
                     throw new Error(result.message);
                 }
             } catch (e) {
-                if (uploadError) {
-                    uploadError.textContent = e.message;
-                    uploadError.style.display = 'block';
-                }
-                if (uploadMsg) uploadMsg.textContent = '';
+                this._showMessage('فشل الاستيراد: ' + e.message, 'error');
             }
         });
 
@@ -479,12 +476,22 @@ window.BGL.Decision = {
 
         // Update index display
         this.DOM.currentIndex.textContent = this.currentIndex + 1;
+        if (this.DOM.metaRecordIndex) {
+            this.DOM.metaRecordIndex.textContent = `${this.currentIndex + 1} من ${this.records.length}`;
+        }
 
         // Update meta
         this.DOM.metaRecordId.textContent = record.id;
         this.DOM.metaGuarantee.textContent = record.guaranteeNumber || '-';
         this.DOM.metaDate.textContent = record.expiryDate || record.date || '-';
         this.DOM.metaAmount.textContent = record.amount ? `${record.amount} ريال` : '-';
+
+        // Populate new meta fields
+        if (this.DOM.metaContract) this.DOM.metaContract.textContent = record.contractNumber || '-';
+        if (this.DOM.metaSource) this.DOM.metaSource.textContent = record.contractSource || '-';
+        if (this.DOM.metaIssueDate) this.DOM.metaIssueDate.textContent = record.issueDate || '-';
+        if (this.DOM.metaType) this.DOM.metaType.textContent = record.type || '-';
+        if (this.DOM.metaComment) this.DOM.metaComment.textContent = record.comment || '-';
 
         // CRITICAL: Reset pending state to prevent leaks from previous record
         // NOTE: This is NOT a bug - it's intentional design to prevent showing
@@ -493,8 +500,9 @@ window.BGL.Decision = {
         this._pendingNewSupplierName = null;
 
         // Update raw details
-        this.DOM.detailRawSupplier.textContent = record.rawSupplierName || '-';
-        this.DOM.detailRawBank.textContent = record.rawBankName || '-';
+        // Update raw details
+        if (this.DOM.detailRawSupplier) this.DOM.detailRawSupplier.textContent = record.rawSupplierName || '-';
+        if (this.DOM.detailRawBank) this.DOM.detailRawBank.textContent = record.rawBankName || '-';
 
         // Update placeholder to show raw name
         this.DOM.supplierInput.placeholder = record.rawSupplierName || 'ابحث عن المورد...';
@@ -583,7 +591,7 @@ window.BGL.Decision = {
 
             // Initialize Add Button State using smart logic
             // This handles both cases (Empty/Weak Match -> Init with Raw Name) OR (Strong Match -> Init with Input Value)
-            // this._updateAddButtonState(this.DOM.supplierInput.value); // Moved below to ensure global execution
+
         }
 
         // CRITICAL: Always update button state logic regardless of selection state
@@ -594,6 +602,9 @@ window.BGL.Decision = {
         // Update navigation buttons
         this.DOM.btnPrev.disabled = this.currentIndex === 0;
         this.DOM.btnNext.disabled = this.currentIndex >= this.records.length - 1;
+
+        // Render Letter Preview
+        this._updateLetterPreview(record);
 
         // Clear message
         this._showMessage('');
@@ -843,8 +854,8 @@ window.BGL.Decision = {
             this.DOM.btnAddSupplier.classList.remove('hidden');
             this.DOM.btnAddSupplier.disabled = false;
 
-            // Clean styles
-            this.DOM.btnAddSupplier.className = "text-xs text-blue-600 hover:text-blue-800 mt-1 font-medium transition-all";
+            // Clean styles (Match Chip Style)
+            this.DOM.btnAddSupplier.className = "flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 whitespace-nowrap";
 
             if (inputText.length === 0) {
                 // Showing Raw Name Fallback
@@ -961,9 +972,7 @@ window.BGL.Decision = {
         const top = candidates.slice(0, 3);
 
         container.innerHTML = top.map(c => {
-            const scoreClass = c.score >= 0.9 ? 'bg-green-100 text-green-700 border-green-200' :
-                c.score >= 0.7 ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                    'bg-gray-100 text-gray-700 border-gray-200';
+            const scoreClass = 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300';
 
             const id = c.supplier_id || c.bank_id || c.id;
             // Escape single quotes for the function call
@@ -1326,6 +1335,157 @@ window.BGL.Decision = {
 
         this.DOM.saveMessage.textContent = text;
         this.DOM.saveMessage.className = `text-sm font-medium ${colors[type] || colors.info}`;
+    },
+
+    // --- Letter Preview Extension ---
+
+    /**
+     * Initialize letter preview by loading the template one time
+     */
+    // --- Letter Preview Extension (Legacy Logic Port) ---
+
+    /**
+     * Initialize letter preview
+     */
+    _initLetterPreview() {
+        this.DOM.btnPrintPreview = document.getElementById('btnPrintPreview');
+        this.DOM.letterContainer = document.getElementById('letterContainer');
+
+        if (this.DOM.btnPrintPreview) {
+            this.DOM.btnPrintPreview.addEventListener('click', () => {
+                this._printLetter();
+            });
+        }
+    },
+
+    /**
+     * Update the letter preview using Client-Side Template Generation
+     * Logic ported from DecisionView.jsx
+     */
+    _updateLetterPreview(record) {
+        if (!this.DOM.letterContainer) return;
+
+        const html = this._generateLetterHtml(record);
+
+        // Inject directly into container (Shadow DOM not needed as styles are scoped via class or unique rules)
+        // However, to ensure total isolation like the legacy system apparently did via iframe or careful CSS:
+        // The legacy system used <style> inside the string. Let's do the same.
+        // We will put it in a friendly wrapper.
+        this.DOM.letterContainer.innerHTML = html;
+    },
+
+    /**
+     * Generate the HTML string for the letter using the record data.
+     * Uses external letter.css for styling (no inline CSS)
+     */
+    _generateLetterHtml(record) {
+        const bankName = this.selectedBankName || record.rawBankName || "البنك الرسمي";
+
+        // Get bank address data from dictionary (dynamic)
+        const bankData = this.selectedBankId ? BGL.State.bankMap[this.selectedBankId] : null;
+        const bankContact = {
+            department: bankData?.department || "إدارة الضمانات",
+            addressLines: [
+                bankData?.address_line_1 || "المقر الرئيسي",
+                bankData?.address_line_2
+            ].filter(Boolean), // Remove null/empty values
+            email: bankData?.contact_email || ""
+        };
+
+        const supplierName = this.selectedSupplierName || record.rawSupplierName || "المورد";
+        const guaranteeNo = record.guaranteeNumber || "-";
+        const contractNo = record.contractNumber || "-";
+        const amount = record.amount ? Number(record.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : "-";
+        const renewalDate = record.expiryDate || "-";
+
+        // Determine watermark status
+        const hasSupplier = this.selectedSupplierId !== null;
+        const hasBank = this.selectedBankId !== null;
+
+        let watermarkText = '';
+        let watermarkClass = '';
+
+        if (hasSupplier && hasBank) {
+            watermarkText = 'جاهز';
+            watermarkClass = 'status-ready';
+        } else if (hasSupplier || hasBank) {
+            watermarkText = 'يحتاج قرار';
+            watermarkClass = 'status-partial';
+        } else {
+            watermarkText = 'يحتاج قرار';
+            watermarkClass = 'status-draft';
+        }
+
+        // Clean HTML template (styling handled by letter.css)
+        return `
+        <div class="letter-preview">
+            <div class="letter-paper">
+                
+                <!-- Watermark -->
+                <div class="watermark ${watermarkClass}">${watermarkText}</div>
+                
+                <div class="header-line">
+                  <div class="fw-800-sharp">السادة / ${this._escapeHtml(bankName)}</div>
+                  <div class="greeting">المحترمين</div>
+                </div>
+
+                <div>
+                   <div class="fw-800-sharp">${bankContact.department}</div>
+                   ${bankContact.addressLines.map(line => `<div>${line}</div>`).join('')}
+                </div>
+
+                <div style="text-align:right; margin: 20px 0;">السَّلام عليكُم ورحمَة الله وبركاتِه</div>
+
+                <div class="subject">
+                    <span style="flex:0 0 70px;">الموضوع:</span>
+                    <span>
+                      طلب تمديد الضمان البنكي رقم (${this._escapeHtml(guaranteeNo)}) 
+                      ${contractNo !== '-' ? `والعائد لعقد رقم (${contractNo})` : ''}
+                    </span>
+                </div>
+
+                <div class="first-paragraph">
+                    إشارة الى الضمان البنكي الموضح أعلاه، والصادر منكم لصالحنا على حساب 
+                    <strong>${this._escapeHtml(supplierName)}</strong> 
+                    بمبلغ قدره (<strong>${amount}</strong>) ريال، 
+                    نأمل منكم <span class="fw-800-sharp">تمديد فترة سريان الضمان حتى تاريخ ${renewalDate}</span>، 
+                    مع بقاء الشروط الأخرى دون تغيير.
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div style="margin-bottom: 5px;">مستشفى الملك فيصل التخصصي ومركز الأبحاث – الرياض</div>
+                    <div style="margin-bottom: 5px;">ص.ب ٣٣٥٤ الرياض ١١٢١١</div>
+                    <div>مكتب الخدمات الإدارية</div>
+                </div>
+
+                <div class="first-paragraph">
+                    علمًا بأنه في حال عدم تمكن البنك من تمديد الضمان المذكور قبل انتهاء مدة سريانه، فيجب على البنك دفع قيمة الضمان إلينا حسب النظام.
+                </div>
+
+                <div style="text-indent:5em; margin-top:40px;">وَتفضَّلوا بِقبُول خَالِص تحيَّاتِي</div>
+
+                <div class="fw-800-sharp" style="text-align: center; margin-top: 40px; margin-right: 200px;">
+                    مُدير الإدارة العامَّة للعمليَّات المحاسبيَّة<br><br>
+                    سَامِي بن عبَّاس الفايز
+                </div>
+
+                <div style="position:absolute; left:1in; right:1in; bottom:0.7in; display:flex; justify-content:space-between; font-size:9pt;">
+                  <span>MBC:09-2</span>
+                  <span>BAMZ</span>
+                </div>
+
+            </div>
+        </div>
+        `;
+    },
+
+    /**
+     * Handle printing logic via hidden iframe or window.print styles
+     */
+    _printLetter() {
+        // Since we are now injecting into main DOM, we can use window.print() 
+        // relying on @media print styles to hide everything else.
+        window.print();
     },
 
     /**

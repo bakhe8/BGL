@@ -53,11 +53,15 @@ class BankRepository
         );
     }
 
-    /** @return array<int, array{id:int, official_name:string, official_name_en:?string, normalized_key:?string, short_code:?string, is_confirmed:int, created_at:?string, updated_at:?string}> */
     public function allNormalized(): array
     {
         $pdo = Database::connection();
-        $stmt = $pdo->query('SELECT id, official_name, official_name_en, normalized_key, short_code, is_confirmed, created_at, updated_at FROM banks');
+        $stmt = $pdo->query('
+            SELECT id, official_name, official_name_en, normalized_key, short_code, 
+                   is_confirmed, created_at, updated_at,
+                   department, address_line_1, address_line_2, contact_email
+            FROM banks
+        ');
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -89,14 +93,53 @@ class BankRepository
     public function update(int $id, array $data): void
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('UPDATE banks SET official_name=:o, official_name_en=:oe, normalized_key=:nk, short_code=:sc WHERE id=:id');
-        $stmt->execute([
-            'o' => $data['official_name'],
-            'oe' => $data['official_name_en'] ?? null,
-            'nk' => $data['normalized_key'] ?? null,
-            'sc' => $data['short_code'] ?? null,
-            'id' => $id,
-        ]);
+        
+        // Build dynamic UPDATE statement to support partial updates
+        $fields = [];
+        $params = ['id' => $id];
+        
+        if (isset($data['official_name'])) {
+            $fields[] = 'official_name = :o';
+            $params['o'] = $data['official_name'];
+        }
+        if (isset($data['official_name_en'])) {
+            $fields[] = 'official_name_en = :oe';
+            $params['oe'] = $data['official_name_en'];
+        }
+        if (isset($data['normalized_key'])) {
+            $fields[] = 'normalized_key = :nk';
+            $params['nk'] = $data['normalized_key'];
+        }
+        if (isset($data['short_code'])) {
+            $fields[] = 'short_code = :sc';
+            $params['sc'] = $data['short_code'];
+        }
+        
+        // Address fields
+        if (isset($data['department'])) {
+            $fields[] = 'department = :dept';
+            $params['dept'] = $data['department'];
+        }
+        if (isset($data['address_line_1'])) {
+            $fields[] = 'address_line_1 = :addr1';
+            $params['addr1'] = $data['address_line_1'];
+        }
+        if (isset($data['address_line_2'])) {
+            $fields[] = 'address_line_2 = :addr2';
+            $params['addr2'] = $data['address_line_2'];
+        }
+        if (isset($data['contact_email'])) {
+            $fields[] = 'contact_email = :email';
+            $params['email'] = $data['contact_email'];
+        }
+        
+        if (empty($fields)) {
+            return; // Nothing to update
+        }
+        
+        $sql = 'UPDATE banks SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
     }
 
     public function delete(int $id): void

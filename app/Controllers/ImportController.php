@@ -11,6 +11,15 @@ class ImportController
     {
     }
 
+    /**
+     * Handle Excel file upload and import
+     * 
+     * Validates uploaded file, processes Excel data, and returns
+     * session ID with import statistics.
+     * 
+     * @return void Outputs JSON response with session_id and records_count
+     * @throws RuntimeException If file upload fails or file is invalid
+     */
     public function upload(): void
     {
         ini_set('memory_limit', '-1');

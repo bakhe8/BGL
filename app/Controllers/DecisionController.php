@@ -35,6 +35,17 @@ class DecisionController
     private $bankLearning;
     private $supplierLearning;
 
+    /**
+     * Initialize Decision Controller with required dependencies
+     * 
+     * @param ImportedRecordRepository $records Main repository for imported records
+     * @param CandidateService|null $candidates Service for finding supplier/bank matches (auto-created if null)
+     * @param ConflictDetector|null $conflicts Service for detecting name conflicts (auto-created if null)
+     * @param BankRepository|null $banks Repository for bank dictionary (auto-created if null)
+     * @param SupplierAlternativeNameRepository|null $supplierAlts Repository for supplier aliases (auto-created if null)
+     * @param Normalizer|null $normalizer Text normalization utility (auto-created if null)
+     * @param LearningLogRepository|null $learningLog Repository for learning system logs (auto-created if null)
+     */
     public function __construct(ImportedRecordRepository $records, CandidateService $candidates = null, ConflictDetector $conflicts = null, BankRepository $banks = null, SupplierAlternativeNameRepository $supplierAlts = null, Normalizer $normalizer = null, LearningLogRepository $learningLog = null)
     {
         $this->records = $records;
@@ -55,6 +66,17 @@ class DecisionController
         $this->supplierLearning = new SupplierLearningRepository();
     }
 
+    /**
+     * List all imported records with their current decision status
+     * 
+     * Returns JSON array of all records with:
+     * - Basic info (ID, amount, dates, guarantee number)
+     * - Selected supplier and bank (if decided)
+     * - Status (pending/ready/approved)
+     * - Learning flags
+     * 
+     * @return void Outputs JSON response
+     */
     public function index(): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -334,6 +356,15 @@ class DecisionController
         ));
     }
 
+    /**
+     * Get candidate suggestions for a specific record
+     * 
+     * Uses fuzzy matching to find best supplier and bank matches
+     * based on the raw imported names.
+     * 
+     * @param int $id Record ID to get candidates for
+     * @return void Outputs JSON response with supplier and bank candidates array
+     */
     public function candidates(int $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
