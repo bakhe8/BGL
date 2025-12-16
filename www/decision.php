@@ -738,6 +738,51 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 }
             });
         }
+
+        // Recalculate All button
+        const btnRecalc = document.getElementById('btnRecalcAll');
+        if (btnRecalc) {
+            btnRecalc.addEventListener('click', async () => {
+                if (!btnRecalc.dataset.confirming) {
+                    // First click - show confirm
+                    btnRecalc.dataset.confirming = 'true';
+                    btnRecalc.dataset.originalHtml = btnRecalc.innerHTML;
+                    btnRecalc.innerHTML = '⚠️ تأكيد؟';
+                    btnRecalc.classList.add('bg-red-500', 'text-white');
+                    
+                    // Auto-revert after 3 seconds
+                    btnRecalc._timeout = setTimeout(() => {
+                        delete btnRecalc.dataset.confirming;
+                        btnRecalc.innerHTML = btnRecalc.dataset.originalHtml;
+                        btnRecalc.classList.remove('bg-red-500', 'text-white');
+                    }, 3000);
+                    return;
+                }
+                
+                // Second click - execute
+                clearTimeout(btnRecalc._timeout);
+                delete btnRecalc.dataset.confirming;
+                btnRecalc.classList.remove('bg-red-500', 'text-white');
+                btnRecalc.innerHTML = '⏳...';
+                btnRecalc.disabled = true;
+                
+                try {
+                    const res = await fetch('/api/records/recalculate', { method: 'POST' });
+                    const json = await res.json();
+                    if (json.success) {
+                        alert('تمت إعادة المطابقة: ' + (json.data?.processed || 0) + ' سجل');
+                        window.location.reload();
+                    } else {
+                        alert('خطأ: ' + (json.message || 'فشلت العملية'));
+                    }
+                } catch (err) {
+                    alert('خطأ في الاتصال');
+                } finally {
+                    btnRecalc.disabled = false;
+                    btnRecalc.innerHTML = btnRecalc.dataset.originalHtml || '🔃';
+                }
+            });
+        }
     })();
     </script>
 </body>
