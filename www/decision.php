@@ -562,6 +562,18 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 // Check if supplier name is English for styling
                 $isEnglish = !preg_match('/[\x{0600}-\x{06FF}]/u', $supplierName);
                 $supplierStyle = $isEnglish ? "font-family: 'Arial', sans-serif !important; direction: ltr; display: inline-block;" : "";
+
+                // Bank Details
+                $bankId = $currentRecord->bankId;
+                $bankDetails = array_filter($allBanks, fn($b) => $b['id'] == $bankId);
+                $bankDetails = !empty($bankDetails) ? reset($bankDetails) : null;
+                
+                $bankDept = $bankDetails['department'] ?? 'إدارة الضمانات';
+                $bankAddress = array_filter([
+                    $bankDetails['address_line_1'] ?? 'المقر الرئيسي',
+                    $bankDetails['address_line_2'] ?? null,
+                ]);
+                $bankEmail = $bankDetails['contact_email'] ?? null;
             ?>
             <!-- Letter Preview Section -->
             <section class="mt-8" id="letterPreviewSection">
@@ -576,9 +588,14 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                           <div class="greeting">المحترمين</div>
                         </div>
 
-                        <div>
-                           <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">قسم الضمانات</div>
-                           <div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">المقر الرئيسي</div>
+                        <div id="letterBankDetails">
+                           <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;"><?= htmlspecialchars($bankDept) ?></div>
+                           <?php foreach($bankAddress as $line): ?>
+                           <div style="text-shadow: 0 0 1px #333, 0 0 1px #333;"><?= htmlspecialchars($line) ?></div>
+                           <?php endforeach; ?>
+                           <?php if($bankEmail): ?>
+                           <div><span style="text-shadow: 0 0 1px #333, 0 0 1px #333;">البريد الالكتروني:</span> <?= htmlspecialchars($bankEmail) ?></div>
+                           <?php endif; ?>
                         </div>
 
                         <div style="text-align:right; margin: 5px 0;">السَّلام عليكُم ورحمَة الله وبركاتِه</div>
@@ -655,8 +672,21 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 } else {
                     document.getElementById('bankInput').value = name;
                     document.getElementById('bankId').value = id;
+                    const bank = banks.find(b => b.id == id);
                     if (document.getElementById('letterBank')) {
                         document.getElementById('letterBank').textContent = name;
+                    }
+                    if (bank && document.getElementById('letterBankDetails')) {
+                        let html = `<div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${bank.department || 'إدارة الضمانات'}</div>`;
+                        const addr1 = bank.address_line_1 || 'المقر الرئيسي';
+                        html += `<div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${addr1}</div>`;
+                        if (bank.address_line_2) {
+                            html += `<div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${bank.address_line_2}</div>`;
+                        }
+                        if (bank.contact_email) {
+                            html += `<div><span style="text-shadow: 0 0 1px #333, 0 0 1px #333;">البريد الالكتروني:</span> ${bank.contact_email}</div>`;
+                        }
+                        document.getElementById('letterBankDetails').innerHTML = html;
                     }
                 }
             });
