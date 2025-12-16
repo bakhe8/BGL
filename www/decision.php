@@ -433,12 +433,17 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                 </button>
                                                 <?php endforeach; ?>
                                             </div>
-                                            <!-- Add Supplier Button -->
+                                            <!-- Add Supplier Button - only show if no 100% match -->
+                                            <?php 
+                                            $hasExactMatch = !empty($supplierCandidates) && (($supplierCandidates[0]['score_raw'] ?? $supplierCandidates[0]['score'] ?? 0) >= 1.0);
+                                            if (!$hasExactMatch): 
+                                            ?>
                                             <button type="button" id="btnAddSupplier"
                                                 class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 whitespace-nowrap"
                                                 title="إضافة كمورد جديد">
                                                 ➕ إضافة "<span id="supplierNamePreview"><?= htmlspecialchars(mb_substr($currentRecord->rawSupplierName ?? '', 0, 20)) ?></span>" كمورد جديد
                                             </button>
+                                            <?php endif; ?>
                                             <div id="supplierAddError" class="text-red-500 text-[10px] hidden"></div>
                                         </div>
                                     </div>
