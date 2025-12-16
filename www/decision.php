@@ -473,16 +473,13 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                 <?php endforeach; ?>
                                             </div>
                                             <!-- Add Supplier Button - only show if no 100% match -->
-                                            <?php 
-                                            $hasExactMatch = !empty($supplierCandidates) && (($supplierCandidates[0]['score_raw'] ?? $supplierCandidates[0]['score'] ?? 0) >= 1.0);
-                                            if (!$hasExactMatch): 
-                                            ?>
+                                            <!-- Add Supplier Button -->
                                             <button type="button" id="btnAddSupplier"
                                                 class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 whitespace-nowrap"
-                                                title="إضافة كمورد جديد">
+                                                title="إضافة كمورد جديد"
+                                                style="<?= $hasExactMatch ? 'display:none;' : '' ?>">
                                                 ➕ إضافة "<span id="supplierNamePreview"><?= htmlspecialchars(mb_substr($currentRecord->rawSupplierName ?? '', 0, 20)) ?></span>" كمورد جديد
                                             </button>
-                                            <?php endif; ?>
                                             <div id="supplierAddError" class="text-red-500 text-[10px] hidden"></div>
                                         </div>
                                     </div>
@@ -832,10 +829,21 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
         const supplierNamePreview = document.getElementById('supplierNamePreview');
 
         if (btnAddSupplier && supplierInput && supplierNamePreview) {
-            // 1. Dynamic Text Update
+            // 1. Dynamic Text Update & Visibility
+            const checkMatch = (val) => {
+                // Check if name is in the suppliers list (exact match)
+                const exists = suppliers.some(s => s.official_name === val || s.official_name.toLowerCase() === val.toLowerCase());
+                if (exists || val.length === 0) {
+                    btnAddSupplier.style.display = 'none';
+                } else {
+                    btnAddSupplier.style.display = 'flex'; // Restore flex display
+                    supplierNamePreview.textContent = val;
+                }
+            };
+            
             supplierInput.addEventListener('input', (e) => {
                 const val = e.target.value.trim();
-                supplierNamePreview.textContent = val || '...';
+                checkMatch(val);
             });
 
             // 2. Add Action
@@ -858,6 +866,9 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                      });
                      const json = await res.json();
                      if (json.success) {
+                          // Update suppliers list locally so checkMatch knows about it
+                          suppliers.push(json.data);
+
                           // Select the new supplier
                           document.getElementById('supplierId').value = json.data.id;
                           document.getElementById('supplierInput').value = json.data.official_name;
@@ -865,7 +876,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                               document.getElementById('letterSupplier').textContent = json.data.official_name;
                           }
                           
-                          // Hide the add button since we now have a match (technically we matched what we just created)
+                          // Hide the add button immediately
                           btnAddSupplier.style.display = 'none';
                           
                           // Show success feedback
