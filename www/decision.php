@@ -517,46 +517,112 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 </div>
             </section>
 
-            <?php if ($currentRecord): ?>
+            <?php if ($currentRecord): 
+                // Prepare letter data
+                $bankName = $currentRecord->bankDisplay ?? $currentRecord->rawBankName ?? 'البنك';
+                $supplierName = $currentRecord->supplierDisplayName ?? $currentRecord->rawSupplierName ?? 'المورد';
+                $guaranteeNo = $currentRecord->guaranteeNumber ?? '-';
+                $contractNo = $currentRecord->contractNumber ?? '-';
+                $amount = number_format((float)($currentRecord->amount ?? 0), 2);
+                
+                // Convert amount to Hindi numerals
+                $hindiDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+                $amountHindi = preg_replace_callback('/[0-9]/', fn($m) => $hindiDigits[$m[0]], $amount);
+                
+                // Calculate renewal date (expiry + 1 year)
+                $renewalDate = '-';
+                if ($currentRecord->expiryDate) {
+                    try {
+                        $date = new DateTime($currentRecord->expiryDate);
+                        $date->modify('+1 year');
+                        $months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+                        $day = preg_replace_callback('/[0-9]/', fn($m) => $hindiDigits[$m[0]], $date->format('j'));
+                        $month = $months[(int)$date->format('n') - 1];
+                        $year = preg_replace_callback('/[0-9]/', fn($m) => $hindiDigits[$m[0]], $date->format('Y'));
+                        $renewalDate = $day . ' ' . $month . ' ' . $year . 'م';
+                    } catch (Exception $e) {
+                        $renewalDate = $currentRecord->expiryDate;
+                    }
+                }
+                
+                // Watermark status
+                $hasSupplier = !empty($currentRecord->supplierId);
+                $hasBank = !empty($currentRecord->bankId);
+                $watermarkText = ($hasSupplier && $hasBank) ? 'جاهز' : 'يحتاج قرار';
+                $watermarkClass = ($hasSupplier && $hasBank) ? 'status-ready' : 'status-draft';
+                
+                // Guarantee type description
+                $guaranteeDesc = 'الضمان البنكي';
+                if ($currentRecord->type) {
+                    $t = strtoupper($currentRecord->type);
+                    if ($t === 'FINAL') $guaranteeDesc = 'الضمان البنكي النهائي';
+                    elseif ($t === 'ADVANCED') $guaranteeDesc = 'ضمان الدفعة المقدمة البنكي';
+                }
+                
+                // Check if supplier name is English for styling
+                $isEnglish = !preg_match('/[\x{0600}-\x{06FF}]/u', $supplierName);
+                $supplierStyle = $isEnglish ? "font-family: 'Arial', sans-serif !important; direction: ltr; display: inline-block;" : "";
+            ?>
             <!-- Letter Preview Section -->
             <section class="mt-8" id="letterPreviewSection">
-                <div id="letterContainer" class="w-full flex justify-center">
-                    <div class="letter-paper bg-white shadow-lg p-8 max-w-2xl w-full" style="border: 1px solid #e5e7eb; border-radius: 8px;">
-                        <div class="text-center mb-6">
-                            <h2 class="text-xl font-bold">خطاب ضمان بنكي</h2>
+                <div class="letter-preview">
+                    <div class="letter-paper">
+                        
+                        <!-- Watermark -->
+                        <div class="watermark <?= $watermarkClass ?>"><?= $watermarkText ?></div>
+                        
+                        <div class="header-line">
+                          <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">السادة / <span id="letterBank"><?= htmlspecialchars($bankName) ?></span></div>
+                          <div class="greeting">المحترمين</div>
                         </div>
-                        <table class="w-full" style="border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb; width: 30%; font-weight: 600; background: #f9fafb;">رقم الضمان</td>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb;"><?= htmlspecialchars($currentRecord->guaranteeNumber ?? '-') ?></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600; background: #f9fafb;">رقم العقد</td>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb;"><?= htmlspecialchars($currentRecord->contractNumber ?? '-') ?></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600; background: #f9fafb;">المورد</td>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb;" id="letterSupplier"><?= htmlspecialchars($currentRecord->supplierDisplayName ?? $currentRecord->rawSupplierName ?? '-') ?></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600; background: #f9fafb;">البنك</td>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb;" id="letterBank"><?= htmlspecialchars($currentRecord->bankDisplay ?? $currentRecord->rawBankName ?? '-') ?></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600; background: #f9fafb;">المبلغ</td>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb;"><?= number_format((float)($currentRecord->amount ?? 0), 2) ?> ر.س</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600; background: #f9fafb;">تاريخ الانتهاء</td>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb;"><?= htmlspecialchars($currentRecord->expiryDate ?? '-') ?></td>
-                            </tr>
-                            <?php if ($currentRecord->type): ?>
-                            <tr>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600; background: #f9fafb;">النوع</td>
-                                <td style="padding: 12px; border: 1px solid #e5e7eb;"><?= htmlspecialchars($currentRecord->type) ?></td>
-                            </tr>
-                            <?php endif; ?>
-                        </table>
+
+                        <div>
+                           <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">قسم الضمانات</div>
+                           <div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">المقر الرئيسي</div>
+                        </div>
+
+                        <div style="text-align:right; margin: 5px 0;">السَّلام عليكُم ورحمَة الله وبركاتِه</div>
+
+                        <div class="subject">
+                            <span style="flex:0 0 70px;">الموضوع:</span>
+                            <span>
+                              طلب تمديد الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>) 
+                              <?php if ($contractNo !== '-'): ?>
+                              والعائد للعقد رقم (<?= htmlspecialchars($contractNo) ?>)
+                              <?php endif; ?>
+                            </span>
+                        </div>
+
+                        <div class="first-paragraph">
+                            إشارة الى <?= $guaranteeDesc ?> الموضح أعلاه، والصادر منكم لصالحنا على حساب 
+                            <span style="<?= $supplierStyle ?>" id="letterSupplier"><?= htmlspecialchars($supplierName) ?></span> 
+                            بمبلغ قدره (<strong><?= $amountHindi ?></strong>) ريال، 
+                            نأمل منكم <span class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">تمديد فترة سريان الضمان حتى تاريخ <?= $renewalDate ?></span>، 
+                            مع بقاء الشروط الأخرى دون تغيير، وإفادتنا بذلك من خلال البريد الالكتروني المخصص للضمانات البنكية لدى مستشفى الملك فيصل التخصصي ومركز الأبحاث بالرياض (bgfinance@kfshrc.edu.sa)، كما نأمل منكم إرسال أصل تمديد الضمان الى:
+                        </div>
+
+                        <div style="margin-top: 5px; margin-right: 50px;">
+                            <div>مستشفى الملك فيصل التخصصي ومركز الأبحاث – الرياض</div>
+                            <div>ص.ب ٣٣٥٤ الرياض ١١٢١١</div>
+                            <div>مكتب الخدمات الإدارية</div>
+                        </div>
+
+                        <div class="first-paragraph">
+                            علمًا بأنه في حال عدم تمكن البنك من تمديد الضمان المذكور قبل انتهاء مدة سريانه، فيجب على البنك دفع قيمة الضمان إلينا حسب النظام.
+                        </div>
+
+                        <div style="text-indent:5em; margin-top:5px;">وَتفضَّلوا بِقبُول خَالِص تحيَّاتِي</div>
+
+                        <div class="fw-800-sharp" style="text-align: center; margin-top: 5px; margin-right: 320px;">
+                            <div style="margin-bottom: 60px; text-shadow: 0 0 1px #333, 0 0 1px #333;">مُدير الإدارة العامَّة للعمليَّات المحاسبيَّة</div>
+                            <div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">سَامِي بن عبَّاس الفايز</div>
+                        </div>
+
+                        <div style="position:absolute; left:1in; right:1in; bottom:0.7in; display:flex; justify-content:space-between; font-size:9pt;">
+                          <span>MBC:09-2</span>
+                          <span>BAMZ</span>
+                        </div>
+
                     </div>
                 </div>
             </section>
