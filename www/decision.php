@@ -770,6 +770,27 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                     input.value = name;
                     hidden.value = id;
                     if (letter) letter.textContent = name;
+                    
+                    // Specific logic for bank details update
+                    if (inputId === 'bankInput') {
+                         const bank = banks.find(b => b.id == id);
+                         if (bank && document.getElementById('letterBankDetails')) {
+                             // Helper to convert numbers to Hindi
+                             const toHindi = (str) => String(str).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+                             let html = `<div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${bank.department || 'إدارة الضمانات'}</div>`;
+                             const addr1 = bank.address_line_1 || 'المقر الرئيسي';
+                             html += `<div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${toHindi(addr1)}</div>`;
+                             if (bank.address_line_2) {
+                                 html += `<div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">${toHindi(bank.address_line_2)}</div>`;
+                             }
+                             if (bank.contact_email) {
+                                 html += `<div><span style="text-shadow: 0 0 1px #333, 0 0 1px #333;">البريد الالكتروني:</span> ${bank.contact_email}</div>`;
+                             }
+                             document.getElementById('letterBankDetails').innerHTML = html;
+                         }
+                    }
+
                     suggestions.classList.remove('open');
                 }
             });
