@@ -80,6 +80,10 @@ $stats = [
     'pending' => count(array_filter($allRecords, fn($r) => !in_array($r->matchStatus, ['ready', 'approved']))),
 ];
 
+// Get all suppliers and banks for autocomplete & lookups
+$allSuppliers = $suppliers->allNormalized();
+$allBanks = $banks->allNormalized();
+
 // Get candidates for current record
 $supplierCandidates = [];
 $bankCandidates = [];
@@ -125,10 +129,6 @@ if ($currentRecord) {
         }
     }
 }
-
-// Get all suppliers and banks for autocomplete
-$allSuppliers = $suppliers->allNormalized();
-$allBanks = $banks->allNormalized();
 
 // Build query string for navigation
 $buildUrl = function($newRecordId = null, $newFilter = null, $newSessionId = null) use ($sessionId, $filter) {
