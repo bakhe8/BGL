@@ -15,6 +15,25 @@ use App\Services\ConflictDetector;
 use App\Support\XlsxReader;
 use RuntimeException;
 
+/**
+ * Import Service
+ * 
+ * خدمة استيراد ملفات Excel إلى قاعدة البيانات
+ * 
+ * الوظائف الرئيسية:
+ * - قراءة ملفات Excel ومعالجة الصفوف
+ * - الكشف التلقائي عن أعمدة البيانات (supplier, bank, amount, etc.)
+ * - مطابقة الموردين والبنوك تلقائياً
+ * - إنشاء سجلات ImportedRecord
+ * - تطبيق القبول التلقائي للتطابقات العالية
+ * 
+ * الحدود:
+ * - الحد الأقصى للصفوف: 500 (للأداء)
+ * - يتم تخطي الصفوف الناقصة البيانات
+ * 
+ * @package App\Services
+ * @see docs/08-Import-Debug.md للتوثيق الكامل
+ */
 class ImportService
 {
     public function __construct(

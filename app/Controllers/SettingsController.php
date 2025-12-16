@@ -9,8 +9,29 @@ use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\BankRepository;
 use App\Support\Normalizer;
 
+/**
+ * Settings Controller
+ * 
+ * يتحكم في إعدادات التطبيق العامة والنسخ الاحتياطي للقواميس
+ * 
+ * الوظائف الرئيسية:
+ * - عرض وحفظ الإعدادات العامة
+ * - إنشاء نسخ احتياطية
+ * - تصدير واستيراد القواميس (الموردين، البنوك)
+ * 
+ * @package App\Controllers
+ */
 class SettingsController
 {
+    /**
+     * Constructor with auto-initialized dependencies
+     * 
+     * @param Settings $settings Service for app settings management
+     * @param SupplierRepository $suppliers Repository for suppliers dictionary
+     * @param SupplierAlternativeNameRepository $supplierAlts Repository for supplier aliases
+     * @param BankRepository $banks Repository for banks dictionary
+     * @param Normalizer $normalizer Text normalization utility
+     */
     public function __construct(
         private Settings $settings = new Settings(),
         private SupplierRepository $suppliers = new SupplierRepository(),
@@ -20,6 +41,11 @@ class SettingsController
     ) {
     }
 
+    /**
+     * Get all current settings
+     * 
+     * @return void JSON response with all settings key-value pairs
+     */
     public function all(): void
     {
         header('Content-Type: application/json; charset=utf-8');
