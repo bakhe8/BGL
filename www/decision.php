@@ -518,9 +518,32 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
             </section>
 
             <?php if ($currentRecord): 
-                // Prepare letter data
-                $bankName = $currentRecord->bankDisplay ?? $currentRecord->rawBankName ?? 'البنك';
-                $supplierName = $currentRecord->supplierDisplayName ?? $currentRecord->rawSupplierName ?? 'المورد';
+                // Auto-select 100% candidates if not already set
+                if (empty($currentRecord->supplierId) && !empty($supplierCandidates)) {
+                    $bestSupplier = $supplierCandidates[0];
+                    $score = $bestSupplier['score_raw'] ?? $bestSupplier['score'] ?? 0;
+                    if ($score >= 1.0) {
+                        $currentRecord->supplierId = $bestSupplier['supplier_id'];
+                        $supplierName = $bestSupplier['name']; // Use official name
+                        $currentRecord->supplierDisplayName = $supplierName; // For input value
+                    }
+                }
+
+                if (empty($currentRecord->bankId) && !empty($bankCandidates)) {
+                    $bestBank = $bankCandidates[0];
+                    $score = $bestBank['score_raw'] ?? $bestBank['score'] ?? 0;
+                    if ($score >= 1.0) {
+                        $currentRecord->bankId = $bestBank['bank_id'];
+                        $bankName = $bestBank['name']; // Use official name
+                        $currentRecord->bankDisplay = $bankName; // For input value
+                    }
+                }
+
+                // Prepare letter data (re-run after auto-select)
+                $bankName = $currentRecord->bankDisplay ?? ($currentRecord->bankId ? $bankName : ($currentRecord->rawBankName ?? 'البنك'));
+                $supplierName = $currentRecord->supplierDisplayName ?? ($currentRecord->supplierId ? $supplierName : ($currentRecord->rawSupplierName ?? 'المورد'));
+                
+                // ... rest of data prep ...
                 $guaranteeNo = $currentRecord->guaranteeNumber ?? '-';
                 $contractNo = $currentRecord->contractNumber ?? '-';
                 $amount = number_format((float)($currentRecord->amount ?? 0), 2);
