@@ -728,8 +728,8 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 try {
                     const res = await fetch('/api/import/excel', { method: 'POST', body: formData });
                     const json = await res.json();
-                    if (json.success && json.session_id) {
-                        window.location.href = '/decision.php?session_id=' + json.session_id;
+                    if (json.success && json.data && json.data.session_id) {
+                        window.location.href = '/decision.php?session_id=' + json.data.session_id;
                     } else {
                         alert('خطأ: ' + (json.message || 'فشل الاستيراد'));
                     }
