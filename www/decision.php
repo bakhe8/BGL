@@ -719,12 +719,40 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
             });
         });
 
-        // ... (Session Selector code remains same) ...
-
         // Autocomplete Setup
         function setupAutocomplete(inputId, suggestionsId, hiddenId, data, nameKey, letterId) {
-            // ... (setup code remains same) ...
+            const input = document.getElementById(inputId);
+            const suggestions = document.getElementById(suggestionsId);
+            const hidden = document.getElementById(hiddenId);
+            const letter = document.getElementById(letterId);
             
+            if (!input || !suggestions) return;
+
+            input.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length < 1) {
+                    suggestions.classList.remove('open');
+                    return;
+                }
+
+                const matches = data.filter(item => {
+                    const name = (item[nameKey] || '').toLowerCase();
+                    return name.includes(query);
+                }).slice(0, 10);
+
+                if (matches.length === 0) {
+                    suggestions.classList.remove('open');
+                    return;
+                }
+
+                suggestions.innerHTML = matches.map(item => 
+                    `<li class="suggestion-item" data-id="${item.id}" data-name="${item[nameKey]}">
+                        <span>${item[nameKey]}</span>
+                    </li>`
+                ).join('');
+                suggestions.classList.add('open');
+            });
+
             suggestions.addEventListener('click', (e) => {
                 const item = e.target.closest('.suggestion-item');
                 if (item) {
@@ -743,7 +771,11 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 }
             });
 
-            // ... (document click listener remains same) ...
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+                    suggestions.classList.remove('open');
+                }
+            });
         }
 
         setupAutocomplete('supplierInput', 'supplierSuggestions', 'supplierId', suppliers, 'official_name', 'letterSupplier');
