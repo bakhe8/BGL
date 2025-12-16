@@ -89,7 +89,25 @@ if ($currentRecord) {
     $bankResult = $candidateService->bankCandidates($currentRecord->rawBankName ?? '');
     $bankCandidates = $bankResult['candidates'] ?? [];
     
-    // Auto-select 100% match candidates if not already linked (Threshold 0.99 to catch rounding issues)
+    // Ensure Display Names are populated if ID exists
+    if (!empty($currentRecord->supplierId) && empty($currentRecord->supplierDisplayName)) {
+        foreach ($allSuppliers as $s) {
+            if ($s['id'] == $currentRecord->supplierId) {
+                $currentRecord->supplierDisplayName = $s['official_name'];
+                break;
+            }
+        }
+    }
+    if (!empty($currentRecord->bankId) && empty($currentRecord->bankDisplay)) {
+        foreach ($allBanks as $b) {
+            if ($b['id'] == $currentRecord->bankId) {
+                $currentRecord->bankDisplay = $b['official_name'];
+                break;
+            }
+        }
+    }
+
+    // Auto-select 100% match candidates if not already linked (Threshold 0.99)
     if (empty($currentRecord->supplierId) && !empty($supplierCandidates)) {
         $bestSupplier = $supplierCandidates[0];
         $score = $bestSupplier['score_raw'] ?? $bestSupplier['score'] ?? 0;
@@ -475,6 +493,20 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                 <div class="field-input flex items-start gap-2">
                                     <span class="text-xs font-bold text-gray-700 whitespace-nowrap mt-1.5">البنك:</span>
                                     <div class="relative w-full">
+                                        <!-- DEBUG INFO -->
+                                        <?php if(isset($_GET['debug'])): ?>
+                                        <div style="font-size:10px; color:red; background:#ffeeee; padding:5px; border:1px solid red; margin-bottom:5px;">
+                                            RAW: <?= $currentRecord->rawBankName ?><br>
+                                            Display: <?= $currentRecord->bankDisplay ? 'SET: ' . $currentRecord->bankDisplay : 'NULL' ?><br>
+                                            ID: <?= $currentRecord->bankId ?? 'NULL' ?><br>
+                                            Candidates: <?= count($bankCandidates) ?><br>
+                                            <?php if(!empty($bankCandidates)): ?>
+                                                Top Score: <?= $bankCandidates[0]['score_raw'] ?? $bankCandidates[0]['score'] ?? 'N/A' ?><br>
+                                                Top Name: <?= $bankCandidates[0]['name'] ?? 'N/A' ?>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endif; ?>
+                                        
                                         <input type="text" id="bankInput"
                                             class="w-full border border-gray-300 rounded px-2 py-0 text-xs outline-none transition-all"
                                             placeholder="<?= htmlspecialchars($currentRecord->rawBankName ?? 'ابحث عن البنك...') ?>" autocomplete="off"
