@@ -88,6 +88,24 @@ if ($currentRecord) {
     $supplierCandidates = $supplierResult['candidates'] ?? [];
     $bankResult = $candidateService->bankCandidates($currentRecord->rawBankName ?? '');
     $bankCandidates = $bankResult['candidates'] ?? [];
+    
+    // Auto-select 100% match candidates if not already linked
+    if (empty($currentRecord->supplierId) && !empty($supplierCandidates)) {
+        $bestSupplier = $supplierCandidates[0];
+        $score = $bestSupplier['score_raw'] ?? $bestSupplier['score'] ?? 0;
+        if ($score >= 1.0) {
+            $currentRecord->supplierId = $bestSupplier['supplier_id'];
+            $currentRecord->supplierDisplayName = $bestSupplier['name'];
+        }
+    }
+    if (empty($currentRecord->bankId) && !empty($bankCandidates)) {
+        $bestBank = $bankCandidates[0];
+        $score = $bestBank['score_raw'] ?? $bestBank['score'] ?? 0;
+        if ($score >= 1.0) {
+            $currentRecord->bankId = $bestBank['bank_id'];
+            $currentRecord->bankDisplay = $bestBank['name'];
+        }
+    }
 }
 
 // Get all suppliers and banks for autocomplete
@@ -521,27 +539,6 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 // Initialize names from current record or defaults
                 $supplierName = $currentRecord->supplierDisplayName ?? $currentRecord->rawSupplierName ?? 'المورد';
                 $bankName = $currentRecord->bankDisplay ?? $currentRecord->rawBankName ?? 'البنك';
-
-                // Auto-select 100% candidates OVERRIDE if not already set by ID
-                if (empty($currentRecord->supplierId) && !empty($supplierCandidates)) {
-                    $bestSupplier = $supplierCandidates[0];
-                    $score = $bestSupplier['score_raw'] ?? $bestSupplier['score'] ?? 0;
-                    if ($score >= 1.0) {
-                        $currentRecord->supplierId = $bestSupplier['supplier_id'];
-                        $supplierName = $bestSupplier['name']; // Use official name
-                        $currentRecord->supplierDisplayName = $supplierName; // For input value
-                    }
-                }
-
-                if (empty($currentRecord->bankId) && !empty($bankCandidates)) {
-                    $bestBank = $bankCandidates[0];
-                    $score = $bestBank['score_raw'] ?? $bestBank['score'] ?? 0;
-                    if ($score >= 1.0) {
-                        $currentRecord->bankId = $bestBank['bank_id'];
-                        $bankName = $bestBank['name']; // Use official name
-                        $currentRecord->bankDisplay = $bankName; // For input value
-                    }
-                }
                 
                 // Re-ensure names are set (redundant but safe)
                 $bankName = $bankName ?? 'البنك';
