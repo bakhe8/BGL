@@ -25,4 +25,23 @@ class ImportSessionRepository
         $stmt = $pdo->prepare('UPDATE import_sessions SET record_count = record_count + :by WHERE id = :id');
         $stmt->execute(['by' => $by, 'id' => $sessionId]);
     }
+
+    /**
+     * Get all sessions for dropdown selection
+     */
+    public function getAllSessions(): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->query("
+            SELECT 
+                s.id as session_id,
+                s.record_count,
+                MAX(r.created_at) as last_date
+            FROM import_sessions s
+            LEFT JOIN imported_records r ON r.session_id = s.id
+            GROUP BY s.id
+            ORDER BY s.id DESC
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

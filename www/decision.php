@@ -28,8 +28,16 @@ $sessionId = isset($_GET['session_id']) ? (int) $_GET['session_id'] : null;
 $recordId = isset($_GET['record_id']) ? (int) $_GET['record_id'] : null;
 $filter = $_GET['filter'] ?? 'all'; // all, pending, approved
 
+// Get available sessions for dropdown
+$allSessions = $sessions->getAllSessions();
+
+// Default to latest session if none specified
+if (!$sessionId && !empty($allSessions)) {
+    $sessionId = (int) $allSessions[0]['session_id'];
+}
+
 // Get all records for the session
-$allRecords = $records->all($sessionId);
+$allRecords = $sessionId ? $records->allBySession($sessionId) : [];
 
 // Apply filter
 $filteredRecords = array_filter($allRecords, function($r) use ($filter) {
@@ -65,7 +73,7 @@ $hasNext = $currentIndex < $totalRecords - 1;
 $prevId = $hasPrev ? $filteredRecords[$currentIndex - 1]->id : null;
 $nextId = $hasNext ? $filteredRecords[$currentIndex + 1]->id : null;
 
-// Stats for current session
+// Stats for current session (filtered)
 $stats = [
     'total' => count($allRecords),
     'approved' => count(array_filter($allRecords, fn($r) => in_array($r->matchStatus, ['ready', 'approved']))),
@@ -87,13 +95,18 @@ $allSuppliers = $suppliers->allNormalized();
 $allBanks = $banks->allNormalized();
 
 // Build query string for navigation
-$buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $filter) {
+$buildUrl = function($newRecordId = null, $newFilter = null, $newSessionId = null) use ($sessionId, $filter) {
     $params = [];
-    if ($sessionId) $params['session_id'] = $sessionId;
+    $params['session_id'] = $newSessionId ?? $sessionId;
     if ($newRecordId) $params['record_id'] = $newRecordId;
     $params['filter'] = $newFilter ?? $filter;
     return '/decision.php?' . http_build_query($params);
 };
+
+// Filter text for save button
+$filterText = 'سجل';
+if ($filter === 'approved') $filterText = 'سجل جاهز';
+elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
 ?>
 <!doctype html>
 <html lang="ar" dir="rtl">
@@ -360,7 +373,29 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
                     <!-- Record Meta -->
                     <div class="flex items-center justify-between px-3 pt-2 pb-2 -mx-1 -mt-1 mb-0">
                         <div class="record-meta text-xs flex flex-wrap items-center justify-between w-full gap-y-1">
-                            <span class="text-gray-600 font-mono">رقم الجلسة: <strong><?= $currentRecord->sessionId ?? '-' ?></strong></span>
+                            <span class="text-gray-600 font-mono relative" style="position: relative;">
+                                رقم الجلسة: 
+                                <strong id="metaSessionId" class="cursor-pointer underline" style="text-underline-offset: 2px;" title="انقر لتغيير الجلسة"><?= $sessionId ?? '-' ?></strong>
+                                <!-- Session Dropdown -->
+                                <div id="sessionDropdown" class="hidden absolute bg-white border border-gray-200 shadow-xl rounded-lg z-50" style="top: 100%; right: 0; width: 240px; max-height: 300px; overflow-y: auto;">
+                                    <div class="sticky top-0 bg-white p-2 border-b border-gray-100">
+                                        <input type="text" id="sessionSearch" placeholder="بحث (رقم أو تاريخ)..." class="w-full text-xs px-2 py-1 border rounded focus:ring-1 focus:ring-blue-500 outline-none">
+                                    </div>
+                                    <div id="sessionList">
+                                        <?php foreach ($allSessions as $sess): ?>
+                                        <a href="<?= $buildUrl(null, null, $sess['session_id']) ?>" 
+                                           class="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-50 text-xs flex justify-between items-center <?= $sess['session_id'] == $sessionId ? 'bg-blue-50 font-bold' : '' ?>" 
+                                           data-session="<?= $sess['session_id'] ?>" data-date="<?= $sess['last_date'] ?? '' ?>">
+                                            <div class="flex flex-col">
+                                                <span class="font-medium text-gray-700">جلسة #<?= $sess['session_id'] ?></span>
+                                                <span class="text-[10px] text-gray-400"><?= $sess['last_date'] ? explode(' ', $sess['last_date'])[0] : '-' ?></span>
+                                            </div>
+                                            <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]"><?= $sess['record_count'] ?></span>
+                                        </a>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </span>
                             <span class="text-gray-600 font-mono">السجل: <strong><?= $currentRecord->id ?></strong></span>
                             <span class="text-gray-600">رقم الضمان: <strong><?= htmlspecialchars($currentRecord->guaranteeNumber ?? '-') ?></strong></span>
                             <span class="text-gray-600">رقم العقد: <strong><?= htmlspecialchars($currentRecord->contractNumber ?? '-') ?></strong></span>
@@ -380,8 +415,8 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
                                     <div class="relative w-full">
                                         <input type="text" id="supplierInput"
                                             class="w-full border border-gray-300 rounded px-2 py-0 text-xs outline-none transition-all"
-                                            placeholder="تحديد المورد..." autocomplete="off"
-                                            value="<?= htmlspecialchars($currentRecord->supplierDisplayName ?? '') ?>">
+                                            placeholder="<?= htmlspecialchars($currentRecord->rawSupplierName ?? 'ابحث عن المورد...') ?>" autocomplete="off"
+                                            value="<?= htmlspecialchars($currentRecord->supplierDisplayName ?? $currentRecord->rawSupplierName ?? '') ?>">
                                         <input type="hidden" id="supplierId" value="<?= $currentRecord->supplierId ?? '' ?>">
                                         <ul class="suggestions-list" id="supplierSuggestions"></ul>
 
@@ -398,6 +433,13 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
                                                 </button>
                                                 <?php endforeach; ?>
                                             </div>
+                                            <!-- Add Supplier Button -->
+                                            <button type="button" id="btnAddSupplier"
+                                                class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 whitespace-nowrap"
+                                                title="إضافة كمورد جديد">
+                                                ➕ إضافة "<span id="supplierNamePreview"><?= htmlspecialchars(mb_substr($currentRecord->rawSupplierName ?? '', 0, 20)) ?></span>" كمورد جديد
+                                            </button>
+                                            <div id="supplierAddError" class="text-red-500 text-[10px] hidden"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -412,8 +454,8 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
                                     <div class="relative w-full">
                                         <input type="text" id="bankInput"
                                             class="w-full border border-gray-300 rounded px-2 py-0 text-xs outline-none transition-all"
-                                            placeholder="تحديد البنك..." autocomplete="off"
-                                            value="<?= htmlspecialchars($currentRecord->bankDisplay ?? '') ?>">
+                                            placeholder="<?= htmlspecialchars($currentRecord->rawBankName ?? 'ابحث عن البنك...') ?>" autocomplete="off"
+                                            value="<?= htmlspecialchars($currentRecord->bankDisplay ?? $currentRecord->rawBankName ?? '') ?>">
                                         <input type="hidden" id="bankId" value="<?= $currentRecord->bankId ?? '' ?>">
                                         <ul class="suggestions-list" id="bankSuggestions"></ul>
 
@@ -453,16 +495,7 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
                             ?>
                             <button class="save-btn py-1.5 px-6 text-sm shadow-md hover:shadow-lg" id="btnSaveNext">
                                 <span>✓</span>
-                                <span>إحفظ <?= $filterText ?> <span class="record-selector">
-                                    <a href="#" id="recordSelectorLink" class="underline"><?= $currentIndex + 1 ?></a>
-                                    <div class="record-dropdown" id="recordDropdown">
-                                        <?php foreach ($filteredRecords as $idx => $rec): ?>
-                                        <a href="<?= $buildUrl($rec->id) ?>" class="<?= $idx === $currentIndex ? 'current' : '' ?>">
-                                            <?= $idx + 1 ?>. #<?= $rec->id ?> - <?= htmlspecialchars(mb_substr($rec->rawSupplierName ?? '', 0, 30)) ?>
-                                        </a>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </span> من <?= $totalRecords ?>، وانتقل للتالي</span>
+                                <span>إحفظ <?= $filterText ?> <?= $currentIndex + 1 ?> من <?= $totalRecords ?>، وانتقل للتالي</span>
                             </button>
                         </div>
 
@@ -558,18 +591,32 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
             });
         });
 
-        // Record Selector Dropdown
-        const selectorLink = document.getElementById('recordSelectorLink');
-        const dropdown = document.getElementById('recordDropdown');
-        if (selectorLink && dropdown) {
-            selectorLink.addEventListener('click', (e) => {
-                e.preventDefault();
+        // Session Selector Dropdown
+        const sessionBtn = document.getElementById('metaSessionId');
+        const sessionDropdown = document.getElementById('sessionDropdown');
+        const sessionSearch = document.getElementById('sessionSearch');
+        if (sessionBtn && sessionDropdown) {
+            sessionBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                dropdown.classList.toggle('open');
+                sessionDropdown.classList.toggle('hidden');
+                if (!sessionDropdown.classList.contains('hidden') && sessionSearch) {
+                    sessionSearch.focus();
+                }
             });
+            if (sessionSearch) {
+                sessionSearch.addEventListener('input', (e) => {
+                    const filter = e.target.value.toLowerCase();
+                    document.querySelectorAll('#sessionList a').forEach(item => {
+                        const sess = item.dataset.session || '';
+                        const date = item.dataset.date || '';
+                        item.style.display = (sess.includes(filter) || date.includes(filter)) ? '' : 'none';
+                    });
+                });
+                sessionSearch.addEventListener('click', (e) => e.stopPropagation());
+            }
             document.addEventListener('click', (e) => {
-                if (!dropdown.contains(e.target) && e.target !== selectorLink) {
-                    dropdown.classList.remove('open');
+                if (!sessionDropdown.contains(e.target) && e.target !== sessionBtn) {
+                    sessionDropdown.classList.add('hidden');
                 }
             });
         }
