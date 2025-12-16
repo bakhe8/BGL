@@ -931,6 +931,51 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
         setupAutocomplete('supplierInput', 'supplierSuggestions', 'supplierId', suppliers, 'official_name', 'letterSupplier');
         setupAutocomplete('bankInput', 'bankSuggestions', 'bankId', banks, 'official_name', 'letterBank');
 
+        // Session Dropdown Logic
+        const metaSessionId = document.getElementById('metaSessionId');
+        const sessionDropdown = document.getElementById('sessionDropdown');
+        const sessionSearch = document.getElementById('sessionSearch');
+        const sessionList = document.getElementById('sessionList');
+
+        if (metaSessionId && sessionDropdown) {
+            // Toggle
+            metaSessionId.addEventListener('click', (e) => {
+                e.stopPropagation();
+                sessionDropdown.classList.toggle('hidden');
+                if (!sessionDropdown.classList.contains('hidden')) {
+                    sessionSearch.focus();
+                }
+            });
+
+            // Close on click outside
+            document.addEventListener('click', (e) => {
+                if (!sessionDropdown.contains(e.target) && e.target !== metaSessionId) {
+                    sessionDropdown.classList.add('hidden');
+                }
+            });
+
+            // Prevent closing when clicking inside
+            sessionDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
+            // Search Filter
+            if (sessionSearch && sessionList) {
+                sessionSearch.addEventListener('input', (e) => {
+                    const term = e.target.value.toLowerCase();
+                    const items = sessionList.querySelectorAll('a');
+                    items.forEach(item => {
+                        const txt = item.innerText.toLowerCase();
+                         if (txt.includes(term)) {
+                             item.style.display = 'flex';
+                         } else {
+                             item.style.display = 'none';
+                         }
+                    });
+                });
+            }
+        }
+
         // Save & Next
         const btnSaveNext = document.getElementById('btnSaveNext');
         if (btnSaveNext && recordId) {
