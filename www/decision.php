@@ -459,7 +459,10 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                         <!-- Candidate Chips -->
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="supplierChips" class="flex flex-wrap gap-1">
-                                                <?php foreach (array_slice($supplierCandidates, 0, 3) as $cand): ?>
+                                                <?php foreach (array_slice($supplierCandidates, 0, 3) as $cand): 
+                                                    // Hide chip if already selected
+                                                    if (($currentRecord->supplierId ?? null) == $cand['supplier_id']) continue;
+                                                ?>
                                                 <button type="button" class="chip-btn"
                                                       data-id="<?= $cand['supplier_id'] ?>"
                                                       data-name="<?= htmlspecialchars($cand['name']) ?>"
@@ -493,20 +496,6 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                 <div class="field-input flex items-start gap-2">
                                     <span class="text-xs font-bold text-gray-700 whitespace-nowrap mt-1.5">البنك:</span>
                                     <div class="relative w-full">
-                                        <!-- DEBUG INFO -->
-                                        <?php if(isset($_GET['debug'])): ?>
-                                        <div style="font-size:10px; color:red; background:#ffeeee; padding:5px; border:1px solid red; margin-bottom:5px;">
-                                            RAW: <?= $currentRecord->rawBankName ?><br>
-                                            Display: <?= $currentRecord->bankDisplay ? 'SET: ' . $currentRecord->bankDisplay : 'NULL' ?><br>
-                                            ID: <?= $currentRecord->bankId ?? 'NULL' ?><br>
-                                            Candidates: <?= count($bankCandidates) ?><br>
-                                            <?php if(!empty($bankCandidates)): ?>
-                                                Top Score: <?= $bankCandidates[0]['score_raw'] ?? $bankCandidates[0]['score'] ?? 'N/A' ?><br>
-                                                Top Name: <?= $bankCandidates[0]['name'] ?? 'N/A' ?>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php endif; ?>
-                                        
                                         <input type="text" id="bankInput"
                                             class="w-full border border-gray-300 rounded px-2 py-0 text-xs outline-none transition-all"
                                             placeholder="<?= htmlspecialchars($currentRecord->rawBankName ?? 'ابحث عن البنك...') ?>" autocomplete="off"
@@ -517,7 +506,10 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                         <!-- Candidate Chips -->
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="bankChips" class="flex flex-wrap gap-1">
-                                                <?php foreach (array_slice($bankCandidates, 0, 3) as $cand): ?>
+                                                <?php foreach (array_slice($bankCandidates, 0, 3) as $cand): 
+                                                    // Hide chip if already selected
+                                                    if (($currentRecord->bankId ?? null) == $cand['bank_id']) continue;
+                                                ?>
                                                 <button type="button" class="chip-btn"
                                                       data-id="<?= $cand['bank_id'] ?>"
                                                       data-name="<?= htmlspecialchars($cand['name']) ?>"
