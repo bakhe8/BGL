@@ -94,6 +94,8 @@ class ImportedRecordRepository
             'decision_result' => 'decision_result',
             'bank_display' => 'bank_display',
             'supplier_display_name' => 'supplier_display_name',
+            'normalized_supplier' => 'normalized_supplier',
+            'normalized_bank' => 'normalized_bank',
         ];
 
         foreach ($allowed as $key => $col) {
@@ -239,18 +241,19 @@ class ImportedRecordRepository
     ): int {
         $pdo = Database::connection();
 
-        // تحديث فقط السجلات التي لم يتم تحديد مورد لها بعد (supplier_id IS NULL)
-        $sql = 'UPDATE imported_records 
+        // تحديث السجلات التي لديها bank_id إلى 'ready'
+        $sqlReady = 'UPDATE imported_records 
                 SET supplier_id = :sid, 
                     supplier_display_name = :sdn,
                     match_status = :status
                 WHERE session_id = :sess 
                   AND raw_supplier_name = :raw 
                   AND id != :ex 
-                  AND (supplier_id IS NULL OR supplier_id = 0)';
+                  AND (supplier_id IS NULL OR supplier_id = 0)
+                  AND bank_id IS NOT NULL AND bank_id > 0';
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
+        $stmtReady = $pdo->prepare($sqlReady);
+        $stmtReady->execute([
             'sid' => $supplierId,
             'sdn' => $supplierDisplayName,
             'status' => 'ready',
@@ -258,8 +261,30 @@ class ImportedRecordRepository
             'raw' => $rawSupplierName,
             'ex' => $excludeId,
         ]);
+        $readyCount = $stmtReady->rowCount();
 
-        return $stmt->rowCount();
+        // تحديث السجلات التي ليس لديها bank_id إلى 'needs_review'
+        $sqlReview = 'UPDATE imported_records 
+                SET supplier_id = :sid, 
+                    supplier_display_name = :sdn,
+                    match_status = :status
+                WHERE session_id = :sess 
+                  AND raw_supplier_name = :raw 
+                  AND id != :ex 
+                  AND (supplier_id IS NULL OR supplier_id = 0)
+                  AND (bank_id IS NULL OR bank_id = 0)';
+
+        $stmtReview = $pdo->prepare($sqlReview);
+        $stmtReview->execute([
+            'sid' => $supplierId,
+            'sdn' => $supplierDisplayName,
+            'status' => 'needs_review',
+            'sess' => $sessionId,
+            'raw' => $rawSupplierName,
+            'ex' => $excludeId,
+        ]);
+
+        return $readyCount + $stmtReview->rowCount();
     }
 
 

@@ -48,11 +48,7 @@ class AutoAcceptService
             $delta >= $confDelta &&
             !empty($best['supplier_id'])
         ) {
-            $this->records->updateDecision($record->id ?? 0, [
-                'supplier_id' => $best['supplier_id'] ?? null,
-                'match_status' => 'ready',
-            ]);
-            // تسجيل في learning_log
+            // تسجيل في learning_log أولاً
             $this->learningLog->create([
                 'raw_input' => $record->rawSupplierName,
                 'normalized_input' => $this->normalizer->normalizeName($record->rawSupplierName),
@@ -63,21 +59,11 @@ class AutoAcceptService
                 'score_raw' => $best['score_raw'] ?? null,
             ]);
 
-            /**
-             * NOTE: الاستدعاء الثاني لـ updateDecision مقصود
-             * ─────────────────────────────────────────────
-             * الاستدعاء الأول (أعلاه): تحديث supplier_id + match_status
-             * → يحدث قبل تسجيل learning_log
-             * 
-             * الاستدعاء الثاني (أدناه): إضافة decision_result = 'auto'
-             * → يحدث بعد نجاح تسجيل learning_log
-             * 
-             * السبب: إذا فشل learning_log لأي سبب، السجل يبقى 'ready' 
-             * لكن بدون علامة 'auto' للتمييز في الواجهة.
-             */
+            // تحديث واحد شامل بدلاً من تحديثين
             $this->records->updateDecision($record->id ?? 0, [
-                'decision_result' => 'auto',
+                'supplier_id' => $best['supplier_id'] ?? null,
                 'match_status' => 'ready',
+                'decision_result' => 'auto',
             ]);
         }
     }
@@ -109,10 +95,7 @@ class AutoAcceptService
             $delta >= $confDelta &&
             !empty($best['bank_id'])
         ) {
-            $this->records->updateDecision($record->id ?? 0, [
-                'bank_id' => $best['bank_id'] ?? null,
-                'match_status' => 'ready',
-            ]);
+            // تسجيل في learning_log أولاً
             $this->learningLog->createBank([
                 'raw_input' => $record->rawBankName,
                 'normalized_input' => $this->normalizer->normalizeName($record->rawBankName),
@@ -122,9 +105,12 @@ class AutoAcceptService
                 'score' => $best['score'] ?? null,
                 'score_raw' => $best['score_raw'] ?? null,
             ]);
+
+            // تحديث واحد شامل بدلاً من تحديثين
             $this->records->updateDecision($record->id ?? 0, [
-                'decision_result' => 'auto',
+                'bank_id' => $best['bank_id'] ?? null,
                 'match_status' => 'ready',
+                'decision_result' => 'auto',
             ]);
         }
     }

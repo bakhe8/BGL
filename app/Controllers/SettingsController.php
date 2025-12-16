@@ -38,7 +38,7 @@ class SettingsController
         header('Content-Type: application/json; charset=utf-8');
         $dir = storage_path('backups');
         if (!is_dir($dir)) {
-            mkdir($dir, 0777, true);
+            mkdir($dir, 0755, true);
         }
         $timestamp = date('Ymd_His');
         $zipPath = $dir . "/backup_{$timestamp}.zip";
@@ -57,7 +57,7 @@ class SettingsController
             // نسخة بديلة: نسخ الملفات إلى مجلد فرعي
             $folder = $dir . "/backup_{$timestamp}";
             if (!is_dir($folder)) {
-                mkdir($folder, 0777, true);
+                mkdir($folder, 0755, true);
             }
             @copy(storage_path('database/app.sqlite'), $folder . '/app.sqlite');
             @copy(storage_path('settings.json'), $folder . '/settings.json');
@@ -71,7 +71,7 @@ class SettingsController
         header('Content-Type: application/json; charset=utf-8');
         $dir = storage_path('backups');
         if (!is_dir($dir)) {
-            mkdir($dir, 0777, true);
+            mkdir($dir, 0755, true);
         }
         $timestamp = date('Ymd_His');
         $path = $dir . "/dictionary_{$timestamp}.json";

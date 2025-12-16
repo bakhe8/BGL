@@ -18,11 +18,12 @@ class ImportController
      * session ID with import statistics.
      * 
      * @return void Outputs JSON response with session_id and records_count
-     * @throws RuntimeException If file upload fails or file is invalid
+     * @throws \RuntimeException If file upload fails or file is invalid
      */
     public function upload(): void
     {
-        ini_set('memory_limit', '-1');
+        // تعيين حد معقول للذاكرة بدلاً من غير محدود لأسباب أمنية
+        ini_set('memory_limit', '512M');
         header('Content-Type: application/json; charset=utf-8');
 
         if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
@@ -54,7 +55,9 @@ class ImportController
                 }
             }
             $destPath = $uploadDir . '/upload_' . date('Ymd_His') . '.xlsx';
-            move_uploaded_file($tmpPath, $destPath);
+            if (!move_uploaded_file($tmpPath, $destPath)) {
+                throw new \RuntimeException('فشل نقل الملف المرفوع إلى مسار التخزين');
+            }
 
             $result = $this->importService->importExcel($destPath);
 

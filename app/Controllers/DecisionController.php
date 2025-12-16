@@ -255,14 +255,19 @@ class DecisionController
         if (isset($payload['amount'])) {
             // Fix: handle multiple dots or invalid format safely
             $cleanAmount = preg_replace('/[^\d\.\-]/', '', (string) $payload['amount']);
-            // If multiple dots, keep only the first one? Or just trust user input somewhat but cleaned.
-            // Simple check: if multiple dots, it might be invalid. Let's strictly allow one dot.
+            // If multiple dots, keep only the last one (decimal separator)
             if (substr_count($cleanAmount, '.') > 1) {
-                // simple heuristic: remove all but last dot? or just fail? 
-                // Let's just keep it simple as before but ensure not empty.
-                $cleanAmount = (float) $cleanAmount;
+                // Remove all dots except the last one
+                $lastDotPos = strrpos($cleanAmount, '.');
+                $beforeLastDot = str_replace('.', '', substr($cleanAmount, 0, $lastDotPos));
+                $cleanAmount = $beforeLastDot . substr($cleanAmount, $lastDotPos);
             }
-            $update['amount'] = $cleanAmount === '' ? null : $cleanAmount;
+            // Ensure clean amount is a valid number
+            if ($cleanAmount === '' || $cleanAmount === '-' || $cleanAmount === '.') {
+                $update['amount'] = null;
+            } else {
+                $update['amount'] = is_numeric($cleanAmount) ? $cleanAmount : null;
+            }
         }
 
         $this->records->updateDecision($id, $update);
@@ -456,7 +461,8 @@ class DecisionController
 
         // 2. Filter target records covering the session
         $targets = array_filter($all, function($r) use ($maxSession) {
-            return $r->sessionId === $maxSession && $r->matchStatus !== 'approved';
+            // استخدام == بدلاً من === لتجنب مشاكل نوع البيانات (int vs string)
+            return $r->sessionId == $maxSession && $r->matchStatus !== 'approved';
         });
 
         $processed = 0;

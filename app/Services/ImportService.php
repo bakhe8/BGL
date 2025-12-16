@@ -50,6 +50,11 @@ class ImportService
     public function importExcel(string $filePath): array
     {
         $session = $this->sessions->create('excel');
+        
+        // التحقق من إنشاء الجلسة بنجاح
+        if (!$session || !$session->id) {
+            throw new RuntimeException('فشل إنشاء جلسة الاستيراد. يرجى المحاولة مرة أخرى.');
+        }
 
         $rows = $this->xlsxReader->read($filePath);
         
