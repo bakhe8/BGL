@@ -518,7 +518,11 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
             </section>
 
             <?php if ($currentRecord): 
-                // Auto-select 100% candidates if not already set
+                // Initialize names from current record or defaults
+                $supplierName = $currentRecord->supplierDisplayName ?? $currentRecord->rawSupplierName ?? 'المورد';
+                $bankName = $currentRecord->bankDisplay ?? $currentRecord->rawBankName ?? 'البنك';
+
+                // Auto-select 100% candidates OVERRIDE if not already set by ID
                 if (empty($currentRecord->supplierId) && !empty($supplierCandidates)) {
                     $bestSupplier = $supplierCandidates[0];
                     $score = $bestSupplier['score_raw'] ?? $bestSupplier['score'] ?? 0;
@@ -538,10 +542,10 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                         $currentRecord->bankDisplay = $bankName; // For input value
                     }
                 }
-
-                // Prepare letter data (re-run after auto-select)
-                $bankName = $currentRecord->bankDisplay ?? ($currentRecord->bankId ? $bankName : ($currentRecord->rawBankName ?? 'البنك'));
-                $supplierName = $currentRecord->supplierDisplayName ?? ($currentRecord->supplierId ? $supplierName : ($currentRecord->rawSupplierName ?? 'المورد'));
+                
+                // Re-ensure names are set (redundant but safe)
+                $bankName = $bankName ?? 'البنك';
+                $supplierName = $supplierName ?? 'المورد';
                 
                 // ... rest of data prep ...
                 $guaranteeNo = $currentRecord->guaranteeNumber ?? '-';
