@@ -865,13 +865,20 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                      const json = await res.json();
                      if (json.success) {
                           // Update suppliers list locally so checkMatch knows about it
-                          suppliers.push(json.data);
+                          // Note: The API returns a Supplier object with camelCase properties (officialName), but our local 
+                          // suppliers array (from PHP) uses snake_case (official_name). We need to adapt it.
+                          const newSupplier = {
+                              id: json.data.id,
+                              official_name: json.data.officialName, // Map API camelCase to local snake_case
+                              normalized_name: json.data.normalizedName
+                          };
+                          suppliers.push(newSupplier);
 
                           // Select the new supplier
-                          document.getElementById('supplierId').value = json.data.id;
-                          document.getElementById('supplierInput').value = json.data.official_name;
+                          document.getElementById('supplierId').value = newSupplier.id;
+                          document.getElementById('supplierInput').value = newSupplier.official_name;
                           if (document.getElementById('letterSupplier')) {
-                              document.getElementById('letterSupplier').textContent = json.data.official_name;
+                              document.getElementById('letterSupplier').textContent = newSupplier.official_name;
                           }
                           
                           // Hide the add button immediately
