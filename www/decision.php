@@ -826,6 +826,63 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
             });
         }
 
+        // Add Supplier Button Logic
+        const btnAddSupplier = document.getElementById('btnAddSupplier');
+        const supplierInput = document.getElementById('supplierInput');
+        const supplierNamePreview = document.getElementById('supplierNamePreview');
+
+        if (btnAddSupplier && supplierInput && supplierNamePreview) {
+            // 1. Dynamic Text Update
+            supplierInput.addEventListener('input', (e) => {
+                const val = e.target.value.trim();
+                supplierNamePreview.textContent = val || '...';
+            });
+
+            // 2. Add Action
+            btnAddSupplier.addEventListener('click', async () => {
+                const name = supplierInput.value.trim();
+                if (!name) return;
+                
+                if (!confirm(`هل أنت متأكد من إضافة "${name}" كمورد جديد؟`)) return;
+                
+                // Disable button
+                const OriginalText = btnAddSupplier.innerHTML;
+                btnAddSupplier.disabled = true;
+                btnAddSupplier.innerHTML = '⏳ جاري الإضافة...';
+                
+                try {
+                     const res = await fetch('/api/dictionary/suppliers', {
+                         method: 'POST',
+                         headers: {'Content-Type': 'application/json'},
+                         body: JSON.stringify({ official_name: name }) 
+                     });
+                     const json = await res.json();
+                     if (json.success) {
+                          // Select the new supplier
+                          document.getElementById('supplierId').value = json.data.id;
+                          document.getElementById('supplierInput').value = json.data.official_name;
+                          if (document.getElementById('letterSupplier')) {
+                              document.getElementById('letterSupplier').textContent = json.data.official_name;
+                          }
+                          
+                          // Hide the add button since we now have a match (technically we matched what we just created)
+                          btnAddSupplier.style.display = 'none';
+                          
+                          // Show success feedback
+                          alert('تم إضافة المورد بنجاح وتم تحديده.');
+                     } else {
+                          alert('خطأ: ' + (json.message || 'فشل إضافة المورد'));
+                          btnAddSupplier.innerHTML = OriginalText;
+                     }
+                } catch (e) {
+                     alert('خطأ في الاتصال');
+                     btnAddSupplier.innerHTML = OriginalText;
+                } finally {
+                     btnAddSupplier.disabled = false;
+                }
+            });
+        }
+
         setupAutocomplete('supplierInput', 'supplierSuggestions', 'supplierId', suppliers, 'official_name', 'letterSupplier');
         setupAutocomplete('bankInput', 'bankSuggestions', 'bankId', banks, 'official_name', 'letterBank');
 
