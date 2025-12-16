@@ -9,6 +9,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../app/Support/autoload.php';
 
+// Prevent browser caching to ensure fresh data (especially after adding suppliers/banks)
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
+
 use App\Repositories\ImportedRecordRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\BankRepository;
@@ -17,6 +22,8 @@ use App\Services\CandidateService;
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Support\Normalizer;
 
+// Dependencies
+$importSessionRepo = new \App\Repositories\ImportSessionRepository();
 $records = new ImportedRecordRepository();
 $suppliers = new SupplierRepository();
 $banks = new BankRepository();
@@ -473,6 +480,9 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                 <?php endforeach; ?>
                                             </div>
                                             <!-- Add Supplier Button - only show if no 100% match -->
+                                            <?php 
+                                            $hasExactMatch = !empty($supplierCandidates) && (($supplierCandidates[0]['score_raw'] ?? $supplierCandidates[0]['score'] ?? 0) >= 0.99);
+                                            ?>
                                             <!-- Add Supplier Button -->
                                             <button type="button" id="btnAddSupplier"
                                                 class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-all bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:scale-105 whitespace-nowrap"
