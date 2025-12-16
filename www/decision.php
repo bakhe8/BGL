@@ -942,6 +942,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            match_status: 'ready', // Required by backend
                             supplier_id: document.getElementById('supplierId').value || null,
                             bank_id: document.getElementById('bankId').value || null,
                             supplier_name: document.getElementById('supplierInput').value,
