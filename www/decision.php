@@ -851,8 +851,6 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 const name = supplierInput.value.trim();
                 if (!name) return;
                 
-                if (!confirm(`هل أنت متأكد من إضافة "${name}" كمورد جديد؟`)) return;
-                
                 // Disable button
                 const OriginalText = btnAddSupplier.innerHTML;
                 btnAddSupplier.disabled = true;
