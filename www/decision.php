@@ -880,13 +880,32 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                           btnAddSupplier.style.display = 'none';
                           
                           // Show success feedback
-                          alert('تم إضافة المورد بنجاح وتم تحديده.');
+                          const errorDiv = document.getElementById('supplierAddError');
+                          errorDiv.classList.remove('hidden', 'text-red-500');
+                          errorDiv.classList.add('text-green-600', 'font-bold');
+                          errorDiv.innerHTML = '✓ تمت الإضافة بنجاح';
+                          errorDiv.style.display = 'block';
+                          
+                          // Hide feedback after 3 seconds
+                          setTimeout(() => {
+                              errorDiv.style.display = 'none';
+                              errorDiv.innerHTML = '';
+                          }, 3000);
+
                      } else {
-                          alert('خطأ: ' + (json.message || 'فشل إضافة المورد'));
+                          const errorDiv = document.getElementById('supplierAddError');
+                          errorDiv.classList.remove('hidden', 'text-green-600');
+                          errorDiv.classList.add('text-red-500');
+                          errorDiv.textContent = 'خطأ: ' + (json.message || 'فشل إضافة المورد');
+                          errorDiv.style.display = 'block';
                           btnAddSupplier.innerHTML = OriginalText;
                      }
                 } catch (e) {
-                     alert('خطأ في الاتصال');
+                     const errorDiv = document.getElementById('supplierAddError');
+                     errorDiv.classList.remove('hidden', 'text-green-600');
+                     errorDiv.classList.add('text-red-500');
+                     errorDiv.textContent = 'خطأ في الاتصال';
+                     errorDiv.style.display = 'block';
                      btnAddSupplier.innerHTML = OriginalText;
                 } finally {
                      btnAddSupplier.disabled = false;
