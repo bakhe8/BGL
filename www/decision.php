@@ -89,11 +89,11 @@ if ($currentRecord) {
     $bankResult = $candidateService->bankCandidates($currentRecord->rawBankName ?? '');
     $bankCandidates = $bankResult['candidates'] ?? [];
     
-    // Auto-select 100% match candidates if not already linked
+    // Auto-select 100% match candidates if not already linked (Threshold 0.99 to catch rounding issues)
     if (empty($currentRecord->supplierId) && !empty($supplierCandidates)) {
         $bestSupplier = $supplierCandidates[0];
         $score = $bestSupplier['score_raw'] ?? $bestSupplier['score'] ?? 0;
-        if ($score >= 1.0) {
+        if ($score >= 0.99) {
             $currentRecord->supplierId = $bestSupplier['supplier_id'];
             $currentRecord->supplierDisplayName = $bestSupplier['name'];
         }
@@ -101,7 +101,7 @@ if ($currentRecord) {
     if (empty($currentRecord->bankId) && !empty($bankCandidates)) {
         $bestBank = $bankCandidates[0];
         $score = $bestBank['score_raw'] ?? $bestBank['score'] ?? 0;
-        if ($score >= 1.0) {
+        if ($score >= 0.99) {
             $currentRecord->bankId = $bestBank['bank_id'];
             $currentRecord->bankDisplay = $bestBank['name'];
         }
