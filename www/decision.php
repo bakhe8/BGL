@@ -238,20 +238,55 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
         }
         .record-meta span { display: flex; align-items: center; gap: 4px; }
 
-        .chip {
+        /* Chip styling - matches original gray style */
+        .chip-btn {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 2px 8px;
+            gap: 8px;
+            padding: 4px 12px;
             border-radius: 99px;
             font-size: 0.75rem;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
+            background: #f9fafb;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
         }
-        .chip-strong { background: #dcfce7; color: #166534; border: 1px solid #a7f3d0; }
-        .chip-weak { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-        .chip:hover { transform: scale(1.05); }
+        .chip-btn:hover { 
+            transform: scale(1.05); 
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        /* Record selector dropdown */
+        .record-selector {
+            position: relative;
+            display: inline-block;
+        }
+        .record-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            min-width: 200px;
+        }
+        .record-dropdown.open { display: block; }
+        .record-dropdown a {
+            display: block;
+            padding: 8px 12px;
+            color: #374151;
+            text-decoration: none;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .record-dropdown a:hover { background: #f0f9ff; }
+        .record-dropdown a.current { background: #dbeafe; font-weight: 600; }
     </style>
 </head>
 
@@ -353,15 +388,14 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
                                         <!-- Candidate Chips -->
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="supplierChips" class="flex flex-wrap gap-1">
-                                                <?php foreach (array_slice($supplierCandidates, 0, 5) as $cand): 
-                                                    $isStrong = ($cand['score_raw'] ?? $cand['score'] ?? 0) >= 0.9;
-                                                ?>
-                                                <span class="chip <?= $isStrong ? 'chip-strong' : 'chip-weak' ?>"
+                                                <?php foreach (array_slice($supplierCandidates, 0, 3) as $cand): ?>
+                                                <button type="button" class="chip-btn"
                                                       data-id="<?= $cand['supplier_id'] ?>"
-                                                      data-name="<?= htmlspecialchars($cand['name']) ?>">
-                                                    <?= htmlspecialchars($cand['name']) ?>
-                                                    <span class="text-[10px] opacity-70"><?= round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100) ?>%</span>
-                                                </span>
+                                                      data-name="<?= htmlspecialchars($cand['name']) ?>"
+                                                      data-type="supplier">
+                                                    <span><?= htmlspecialchars($cand['name']) ?></span>
+                                                    <span class="font-bold opacity-75"><?= round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100) ?>%</span>
+                                                </button>
                                                 <?php endforeach; ?>
                                             </div>
                                         </div>
@@ -386,15 +420,14 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
                                         <!-- Candidate Chips -->
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="bankChips" class="flex flex-wrap gap-1">
-                                                <?php foreach (array_slice($bankCandidates, 0, 5) as $cand): 
-                                                    $isStrong = ($cand['score_raw'] ?? $cand['score'] ?? 0) >= 0.9;
-                                                ?>
-                                                <span class="chip <?= $isStrong ? 'chip-strong' : 'chip-weak' ?>"
+                                                <?php foreach (array_slice($bankCandidates, 0, 3) as $cand): ?>
+                                                <button type="button" class="chip-btn"
                                                       data-id="<?= $cand['bank_id'] ?>"
-                                                      data-name="<?= htmlspecialchars($cand['name']) ?>">
-                                                    <?= htmlspecialchars($cand['name']) ?>
-                                                    <span class="text-[10px] opacity-70"><?= round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100) ?>%</span>
-                                                </span>
+                                                      data-name="<?= htmlspecialchars($cand['name']) ?>"
+                                                      data-type="bank">
+                                                    <span><?= htmlspecialchars($cand['name']) ?></span>
+                                                    <span class="font-bold opacity-75"><?= round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100) ?>%</span>
+                                                </button>
                                                 <?php endforeach; ?>
                                             </div>
                                         </div>
@@ -413,9 +446,23 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
 
                         <div class="flex items-center gap-4">
                             <span id="saveMessage" class="text-xs font-medium"></span>
+                            <?php 
+                            $filterText = 'سجل';
+                            if ($filter === 'approved') $filterText = 'سجل جاهز';
+                            elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
+                            ?>
                             <button class="save-btn py-1.5 px-6 text-sm shadow-md hover:shadow-lg" id="btnSaveNext">
                                 <span>✓</span>
-                                <span>إحفظ (<span id="currentIndex"><?= $currentIndex + 1 ?></span> من <span id="totalCount"><?= $totalRecords ?></span>) وانتقال</span>
+                                <span>إحفظ <?= $filterText ?> <span class="record-selector">
+                                    <a href="#" id="recordSelectorLink" class="underline"><?= $currentIndex + 1 ?></a>
+                                    <div class="record-dropdown" id="recordDropdown">
+                                        <?php foreach ($filteredRecords as $idx => $rec): ?>
+                                        <a href="<?= $buildUrl($rec->id) ?>" class="<?= $idx === $currentIndex ? 'current' : '' ?>">
+                                            <?= $idx + 1 ?>. #<?= $rec->id ?> - <?= htmlspecialchars(mb_substr($rec->rawSupplierName ?? '', 0, 30)) ?>
+                                        </a>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </span> من <?= $totalRecords ?>، وانتقل للتالي</span>
                             </button>
                         </div>
 
@@ -488,24 +535,44 @@ $buildUrl = function($newRecordId = null, $newFilter = null) use ($sessionId, $f
         const recordId = <?= $currentRecord?->id ?? 'null' ?>;
         const nextUrl = <?= $hasNext ? '"' . $buildUrl($nextId) . '"' : 'null' ?>;
 
-        // Chip Click Handler
-        document.querySelectorAll('.chip').forEach(chip => {
+        // Chip Click Handler (gray buttons)
+        document.querySelectorAll('.chip-btn').forEach(chip => {
             chip.addEventListener('click', () => {
-                const type = chip.closest('#supplierChips') ? 'supplier' : 'bank';
+                const type = chip.dataset.type;
                 const id = chip.dataset.id;
                 const name = chip.dataset.name;
                 
                 if (type === 'supplier') {
                     document.getElementById('supplierInput').value = name;
                     document.getElementById('supplierId').value = id;
-                    document.getElementById('letterSupplier').textContent = name;
+                    if (document.getElementById('letterSupplier')) {
+                        document.getElementById('letterSupplier').textContent = name;
+                    }
                 } else {
                     document.getElementById('bankInput').value = name;
                     document.getElementById('bankId').value = id;
-                    document.getElementById('letterBank').textContent = name;
+                    if (document.getElementById('letterBank')) {
+                        document.getElementById('letterBank').textContent = name;
+                    }
                 }
             });
         });
+
+        // Record Selector Dropdown
+        const selectorLink = document.getElementById('recordSelectorLink');
+        const dropdown = document.getElementById('recordDropdown');
+        if (selectorLink && dropdown) {
+            selectorLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+            });
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target) && e.target !== selectorLink) {
+                    dropdown.classList.remove('open');
+                }
+            });
+        }
 
         // Autocomplete Setup
         function setupAutocomplete(inputId, suggestionsId, hiddenId, data, nameKey, letterId) {
