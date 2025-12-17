@@ -10,6 +10,9 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 try {
+    // Connect to Database
+    $db = \App\Support\Database::connect();
+
     $guaranteeNumber = trim($_GET['number'] ?? '');
     
     if (empty($guaranteeNumber)) {
@@ -37,16 +40,13 @@ try {
             r.supplier_display_name,
             r.bank_display,
             r.created_at,
-            r.updated_at,
             s.official_name as supplier_name,
-            s.short_name as supplier_short_name,
-            b.official_name as bank_name,
-            b.short_name as bank_short_name
-        FROM records r
+            b.official_name as bank_name
+        FROM imported_records r
         LEFT JOIN suppliers s ON r.supplier_id = s.id
         LEFT JOIN banks b ON r.bank_id = b.id
         WHERE r.guarantee_number = :number
-        ORDER BY r.session_id DESC, r.updated_at DESC
+        ORDER BY r.session_id DESC, r.created_at DESC
     ");
     
     $stmt->execute(['number' => $guaranteeNumber]);
@@ -54,8 +54,10 @@ try {
     
     if (empty($records)) {
         echo json_encode([
-            'success' => false,
-            'error' => 'لم يتم العثور على سجلات لرقم الضمان: ' . $guaranteeNumber
+            'success' => true, // Return true but empty history to avoid error message in UI
+            'guarantee_number' => $guaranteeNumber,
+            'total_records' => 0,
+            'history' => []
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -64,6 +66,9 @@ try {
     $history = [];
     $previousRecord = null;
     
+    // Sort by session ASC (oldest first) to track changes naturally
+    usort($records, fn($a, $b) => ($a['session_id'] <=> $b['session_id']) ?: ($a['created_at'] <=> $b['created_at']));
+
     foreach ($records as $record) {
         $changes = [];
         
@@ -87,20 +92,29 @@ try {
             }
             
             // Track amount changes
-            if ($record['amount'] != $previousRecord['amount']) {
+            if ((float)$record['amount'] != (float)$previousRecord['amount']) {
                 $changes[] = [
                     'field' => 'المبلغ',
                     'from' => number_format((float)$previousRecord['amount'], 2),
                     'to' => number_format((float)$record['amount'], 2)
                 ];
             }
-            
+
+            // Track type changes (primary, final, etc.)
+            if ($record['type'] != $previousRecord['type']) {
+                $changes[] = [
+                    'field' => 'نوع الضمان',
+                    'from' => $previousRecord['type'] ?: 'غير محدد',
+                    'to' => $record['type'] ?: 'غير محدد'
+                ];
+            }
+
             // Track expiry date changes
             if ($record['expiry_date'] != $previousRecord['expiry_date']) {
                 $changes[] = [
                     'field' => 'تاريخ الانتهاء',
-                    'from' => $previousRecord['expiry_date'],
-                    'to' => $record['expiry_date']
+                    'from' => $previousRecord['expiry_date'] ?: '-',
+                    'to' => $record['expiry_date'] ?: '-'
                 ];
             }
         }
@@ -113,7 +127,7 @@ try {
         $history[] = [
             'record_id' => $record['id'],
             'session_id' => $record['session_id'],
-            'date' => $record['updated_at'] ?? $record['created_at'],
+            'date' => $record['created_at'],
             'supplier' => $record['supplier_name'] ?? $record['raw_supplier_name'],
             'supplier_id' => $record['supplier_id'],
             'bank' => $record['bank_name'] ?? $record['raw_bank_name'],
@@ -129,6 +143,9 @@ try {
         $previousRecord = $record;
     }
     
+    // Reverse history to show Newest First in UI
+    $history = array_reverse($history);
+    
     echo json_encode([
         'success' => true,
         'guarantee_number' => $guaranteeNumber,
@@ -137,6 +154,8 @@ try {
     ], JSON_UNESCAPED_UNICODE);
     
 } catch (Exception $e) {
+    // Log error securely if possible, here just return generic
+    http_response_code(500);
     echo json_encode([
         'success' => false,
         'error' => 'خطأ في الخادم: ' . $e->getMessage()
