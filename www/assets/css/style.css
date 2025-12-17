@@ -784,3 +784,35 @@ body.overlay-open {
   transform: translateY(-2px) !important;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4) !important;
 }
+
+/* 3-Star Chips - Heavily used (200+ points) */
+.chip-3star {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #f59e0b;
+  color: #92400e;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.chip-3star:hover {
+  background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+  border-color: #d97706;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.5);
+}
+
+/* 2-Star Chips - Sometimes used (120-199 points) */
+.chip-2star {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-color: #9ca3af;
+  color: #374151;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(156, 163, 175, 0.3);
+}
+
+.chip-2star:hover {
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  border-color: #6b7280;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(156, 163, 175, 0.4);
+}

@@ -684,15 +684,38 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                 <?php foreach (array_slice($supplierCandidates, 0, 5) as $cand): 
                                                     $isLearning = $cand['is_learning'] ?? false;
                                                     $score = round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100);
+                                                    $starRating = $cand['star_rating'] ?? 1;
+                                                    $usageCount = $cand['usage_count'] ?? 0;
                                                     
-                                                    // Learning chips: ALWAYS show (even if 100% or selected)
+                                                    // Determine chip class based on stars
+                                                    $chipClass = "chip-btn";
+                                                    if ($starRating >= 3) {
+                                                        $chipClass .= " chip-3star";
+                                                    } elseif ($starRating >= 2) {
+                                                        $chipClass .= " chip-2star";
+                                                    }
+                                                    if ($isLearning) {
+                                                        $chipClass .= " chip-learning";
+                                                    }
+                                                    
+                                                    // Generate stars
+                                                    $stars = str_repeat('⭐', $starRating);
+                                                    
+                                                    // Build tooltip
+                                                    $tooltip = "";
+                                                    if ($usageCount > 0) {
+                                                        $tooltip = "استخدمته {$usageCount} " . ($usageCount == 1 ? 'مرة' : 'مرات');
+                                                    }
+                                                    
+                                                    // Learning chips: ALWAYS show
                                                     if ($isLearning) {
                                                         ?>
-                                                        <button type="button" class="chip-btn chip-learning"
+                                                        <button type="button" class="<?= $chipClass ?>"
                                                               data-id="<?= $cand['supplier_id'] ?>"
                                                               data-name="<?= htmlspecialchars($cand['name']) ?>"
-                                                              data-type="supplier">
-                                                            <span>⭐ <?= htmlspecialchars($cand['name']) ?></span>
+                                                              data-type="supplier"
+                                                              title="<?= htmlspecialchars($tooltip) ?>">
+                                                            <span><?= $stars ?> <?= htmlspecialchars($cand['name']) ?></span>
                                                         </button>
                                                         <?php
                                                         continue;
@@ -700,14 +723,18 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                     
                                                     // Fuzzy chips: Show only if < 99% AND not selected
                                                     if (($currentRecord->supplierId ?? null) == $cand['supplier_id']) continue;
-                                                    if ($score >= 99) continue; // 100% match auto-selected, no need to show
+                                                    if ($score >= 99) continue;
                                                 ?>
-                                                <button type="button" class="chip-btn"
+                                                <button type="button" class="<?= $chipClass ?>"
                                                       data-id="<?= $cand['supplier_id'] ?>"
                                                       data-name="<?= htmlspecialchars($cand['name']) ?>"
-                                                      data-type="supplier">
-                                                    <span><?= htmlspecialchars($cand['name']) ?></span>
+                                                      data-type="supplier"
+                                                      title="<?= htmlspecialchars($tooltip) ?>">
+                                                    <span><?= $stars ?> <?= htmlspecialchars($cand['name']) ?></span>
+                                                    <!-- Only show % if no usage history -->
+                                                    <?php if ($usageCount == 0): ?>
                                                     <span class="font-bold opacity-75"><?= $score ?>%</span>
+                                                    <?php endif; ?>
                                                 </button>
                                                 <?php endforeach; ?>
                                             </div>
