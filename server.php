@@ -7,13 +7,9 @@ $file = __DIR__ . '/www' . $uri;
 if ($uri !== '/' && file_exists($file) && !is_dir($file)) {
     $ext = pathinfo($file, PATHINFO_EXTENSION);
     
-    // Enable standalone PHP scripts (Plugins) - except decision.php which is handled by index.php
+    
+    // Enable standalone PHP scripts (API endpoints, plugins, etc.)
     if ($ext === 'php') {
-        if (basename($file) === 'decision.php') {
-            // Forward to index.php for redirect handling
-            require __DIR__ . '/www/index.php';
-            exit;
-        }
         require $file;
         exit;
     }

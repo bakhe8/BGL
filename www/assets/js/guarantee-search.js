@@ -148,7 +148,7 @@
                             </div>
                         ` : ''}
                         
-                        <a href="/decision.php?id=${item.record_id}&session=${item.session_id}" class="view-record-btn">
+                        <a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn">
                             عرض السجل ←
                         </a>
                     </div>

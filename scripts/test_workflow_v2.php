@@ -49,7 +49,7 @@ try {
     
     // 3. Test Suggestion Generation (Decision Page Logic)
     echo "\n3. Testing Suggestions (Cache Logic)...\n";
-    // We simulate this by checking repository directly, as decision.php output is HTML/JSON mixed
+    // We simulate this by checking repository directly, as index.php (decision view) output is HTML/JSON mixed
     $suggestionRepo = new SupplierSuggestionRepository();
     $normName = (new \App\Support\Normalizer())->normalizeSupplierName('ABC TRADING TEST');
     

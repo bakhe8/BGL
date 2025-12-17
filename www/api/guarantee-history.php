@@ -4,7 +4,7 @@
  * Returns all records for a specific guarantee number across all sessions
  */
 
-require_once __DIR__ . '/../../app/bootstrap.php';
+require_once __DIR__ . '/../../app/Support/autoload.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
