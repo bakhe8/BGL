@@ -22,9 +22,9 @@ try {
     // 1. Create Test Session
     echo "1. Creating Test Session...\n";
     $sessionRepo = new ImportSessionRepository();
-    // Repository expects: create(string $fileName, int $recordsCount, int $suppliersCount)
+    // Repository expects: create(string $sessionType)
     // It returns an ImportSession object
-    $session = $sessionRepo->create('test_refactor_' . time() . '.xlsx', 0, 0);
+    $session = $sessionRepo->create('manual');
     echo "   Session ID: {$session->id}\n";
     
     // 2. Create Test Records (one main, one for propagation)
