@@ -759,7 +759,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                               data-name="<?= htmlspecialchars($cand['name']) ?>"
                                                               data-type="supplier"
                                                               title="<?= htmlspecialchars($tooltip) ?>">
-                                                            <span><?= $stars ?> <?= htmlspecialchars($cand['name']) ?></span>
+                                                            <span><?= $icon ?> <?= htmlspecialchars($cand['name']) ?></span>
                                                         </button>
                                                         <?php
                                                         continue;
@@ -774,7 +774,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                       data-name="<?= htmlspecialchars($cand['name']) ?>"
                                                       data-type="supplier"
                                                       title="<?= htmlspecialchars($tooltip) ?>">
-                                                    <span><?= $stars ?> <?= htmlspecialchars($cand['name']) ?></span>
+                                                    <span><?= $icon ?> <?= htmlspecialchars($cand['name']) ?></span>
                                                     <!-- Only show % if no usage history -->
                                                     <?php if ($usageCount == 0): ?>
                                                     <span class="font-bold opacity-75"><?= $score ?>%</span>
