@@ -774,8 +774,10 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                         continue;
                                                     }
                                                     
-                                                    // Fuzzy chips: Show only if < 99% AND not selected
-                                                    if (($currentRecord->supplierId ?? null) == $cand['supplier_id']) continue;
+                                                    // Skip if this is current selection (already shown above)
+                                                    if ($isCurrentSelection) continue;
+                                                    
+                                                    // Fuzzy chips: Show only if < 99%
                                                     if ($score >= 99) continue;
                                                 ?>
                                                 <button type="button" class="<?= $chipClass ?>"
