@@ -755,6 +755,27 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
              }
         }
 
+        // Font update helper
+        function updateLetterFont(name, elementOrId) {
+             const el = (typeof elementOrId === 'string') ? document.getElementById(elementOrId) : elementOrId;
+             if (!el) return;
+             
+             el.textContent = name;
+             
+             // Font Logic: If Arabic present, remove inline styles (revert to Al-Mohanad).
+             // If pure English, force Arial.
+             const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(name);
+             if (hasArabic) {
+                 el.style.removeProperty('font-family');
+                 el.style.removeProperty('direction');
+                 el.style.removeProperty('display');
+             } else {
+                 el.style.fontFamily = "'Arial', sans-serif";
+                 el.style.direction = "ltr";
+                 el.style.display = "inline-block";
+             }
+        }
+
         // Chip Click Handler (gray buttons)
         document.querySelectorAll('.chip-btn').forEach(chip => {
             chip.addEventListener('click', () => {
@@ -765,9 +786,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 if (type === 'supplier') {
                     document.getElementById('supplierInput').value = name;
                     document.getElementById('supplierId').value = id;
-                    if (document.getElementById('letterSupplier')) {
-                        document.getElementById('letterSupplier').textContent = name;
-                    }
+                    updateLetterFont(name, 'letterSupplier');
                 } else {
                     document.getElementById('bankInput').value = name;
                     document.getElementById('bankId').value = id;
@@ -819,7 +838,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                     hidden.value = id;
                     
                      if (inputId === 'supplierInput') {
-                        if (letter) letter.textContent = name;
+                        if (letter) updateLetterFont(name, letter);
                      } else if (inputId === 'bankInput') {
                          updateBankDetails(id, name);
                      }
@@ -890,7 +909,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                           document.getElementById('supplierId').value = newSupplier.id;
                           document.getElementById('supplierInput').value = newSupplier.official_name;
                           if (document.getElementById('letterSupplier')) {
-                              document.getElementById('letterSupplier').textContent = newSupplier.official_name;
+                              updateLetterFont(newSupplier.official_name, 'letterSupplier');
                           }
                           
                           // Hide the add button immediately
