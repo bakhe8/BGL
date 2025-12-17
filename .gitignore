@@ -34,3 +34,5 @@ scripts/dev/archived_tests/
 # Database files
 storage/database/*.sqlite
 storage/database/*.sqlite-*
+
+storage/uploads/*

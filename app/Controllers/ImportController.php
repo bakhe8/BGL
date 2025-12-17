@@ -50,18 +50,26 @@ class ImportController
             // حفظ نسخة من الملف في uploads
             $uploadDir = storage_path('uploads');
             if (!is_dir($uploadDir)) {
-                if (!mkdir($uploadDir, 0755, true)) {
-                    throw new \RuntimeException('فشل إنشاء مجلد الرفع');
-                }
+                 if (!mkdir($uploadDir, 0755, true)) {
+                     throw new \RuntimeException('فشل إنشاء مجلد الرفع');
+                 }
             }
             $destPath = $uploadDir . '/upload_' . date('Ymd_His') . '.xlsx';
             if (!move_uploaded_file($tmpPath, $destPath)) {
-                throw new \RuntimeException('فشل نقل الملف المرفوع إلى مسار التخزين');
+                 throw new \RuntimeException('فشل نقل الملف المرفوع إلى مسار التخزين');
             }
 
-            $result = $this->importService->importExcel($destPath);
+            try {
+                // Process the file
+                $result = $this->importService->importExcel($destPath);
+                echo json_encode(['success' => true, 'data' => $result]);
+            } finally {
+                // AUTO-CLEANUP: Delete the file immediately to save space
+                if (file_exists($destPath)) {
+                    @unlink($destPath);
+                }
+            }
 
-            echo json_encode(['success' => true, 'data' => $result]);
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode([
