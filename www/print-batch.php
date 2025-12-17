@@ -46,60 +46,20 @@ $allSuppliers = $suppliers->allNormalized();
 <head>
     <meta charset="UTF-8">
     <title>طباعة الكل - جلسة <?= $sessionId ?></title>
+    <link rel="stylesheet" href="/assets/css/letter.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Amiri:wght@400;700&display=swap');
-        
-        body {
-            background: #f3f4f6;
-            margin: 0;
-            padding: 20px;
-            font-family: 'Cairo', sans-serif;
-        }
-
-        .letter-paper {
-            width: 210mm;
-            min-height: 297mm;
-            background: white;
-            margin: 0 auto 20px auto;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            position: relative;
-            padding: 40mm 20mm 20mm 20mm; /* A4 Margins */
-            box-sizing: border-box;
-            page-break-after: always; /* Critical for batch printing */
-        }
-
-        .letter-paper:last-child {
-            page-break-after: auto;
-        }
-
-        /* Print Specifics */
+        body { margin: 0; background: #cccccc; }
+        .print-container { padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .letter-preview { background: transparent; padding: 0; width: auto; }
+        /* Override page-break for batch printing */
+        .letter-preview .letter-paper { margin-bottom: 20px; page-break-after: always; }
+        .letter-preview .letter-paper:last-child { page-break-after: auto; }
         @media print {
-            body { 
-                background: white; 
-                padding: 0; 
-                margin: 0;
-            }
-            .letter-paper {
-                box-shadow: none;
-                border: none;
-                margin: 0;
-                width: 100%;
-                min-height: 297mm;
-                page-break-after: always;
-            }
+            body { background: white; }
+            .print-container { padding: 0; display: block; }
             .no-print { display: none !important; }
+            .letter-preview .letter-paper { margin: 0; box-shadow: none; border: none; }
         }
-
-        /* Typography & Layout from decision.php */
-        .header-line { margin-bottom: 25px; font-size: 16pt; line-height: 1.6; color: #000; font-family: 'Times New Roman', Times, serif; }
-        .greeting { margin-top: 15px; margin-bottom: 15px; font-weight: bold; text-align: center; font-size: 16pt; }
-        .subject-line { font-weight: bold; text-decoration: underline; margin: 25px 0; text-align: center; font-size: 16pt; font-family: 'Times New Roman', Times, serif; }
-        .body-text { text-align: justify; line-height: 2.2; margin-bottom: 25px; font-size: 16pt; font-family: 'Times New Roman', Times, serif; font-weight: 500; }
-        .fw-800-sharp { font-weight: 900; -webkit-font-smoothing: antialiased; }
-        .closing { margin-top: 40px; float: left; text-align: center; font-size: 16pt; font-family: 'Times New Roman', Times, serif; margin-left: 20mm; font-weight: bold; }
-        
-        /* Helper for Hindi Digits */
         <?php
         $hindiDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
         $toHindi = fn($str) => preg_replace_callback('/[0-9]/', fn($m) => $hindiDigits[$m[0]], strval($str));
@@ -120,101 +80,111 @@ $allSuppliers = $suppliers->allNormalized();
 </head>
 <body onload="window.print()">
 
-    <div class="no-print" style="margin-bottom: 20px; text-align: center;">
-        <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; background: #000; color: #fff; border: none; border-radius: 5px; cursor: pointer;">🖨️ طباعة الكل (<?= count($approvedRecords) ?> خطاب)</button>
+    <div class="no-print" style="position: fixed; top: 20px; left: 20px; z-index: 9999;">
+        <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; background: #000; color: #fff; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🖨️ طباعة الكل (<?= count($approvedRecords) ?> خطاب)</button>
     </div>
 
-    <?php foreach ($approvedRecords as $record): 
-        // Data Prep Logic (Simulating decision.php)
-        
-        // 1. Resolve Supplier & Bank Names
-        $supplierName = $record->supplierDisplayName ?? $record->rawSupplierName;
-        // Search specific specific if missing
-        if (empty($record->supplierDisplayName) && !empty($record->supplierId)) {
-             foreach ($allSuppliers as $s) {
-                 if ($s['id'] == $record->supplierId) {
-                     $supplierName = $s['official_name']; break;
+    <div class="print-container">
+        <?php foreach ($approvedRecords as $record): 
+            // Data Prep Logic
+            $supplierName = $record->supplierDisplayName ?? $record->rawSupplierName;
+            if (empty($record->supplierDisplayName) && !empty($record->supplierId)) {
+                 foreach ($allSuppliers as $s) {
+                     if ($s['id'] == $record->supplierId) {
+                         $supplierName = $s['official_name']; break;
+                     }
                  }
-             }
-        }
-        
-        $bankName = $record->bankDisplay ?? $record->rawBankName;
-        $bankDetails = array_values(array_filter($allBanks, fn($b) => $b['id'] == $record->bankId))[0] ?? null;
-        if (!$bankDetails && !empty($record->bankId)) {
-             // Fallback lookup
-             foreach($allBanks as $b) {
-                 if ($b['id'] == $record->bankId) {
-                     $bankDetails = $b; break;
+            }
+            
+            $bankName = $record->bankDisplay ?? $record->rawBankName;
+            $bankDetails = array_values(array_filter($allBanks, fn($b) => $b['id'] == $record->bankId))[0] ?? null;
+            if (!$bankDetails && !empty($record->bankId)) {
+                 foreach($allBanks as $b) {
+                     if ($b['id'] == $record->bankId) {
+                         $bankDetails = $b; break;
+                     }
                  }
-             }
-        }
+            }
+    
+            // Bank Address Ops
+            $bankDept = $bankDetails['department'] ?? 'إدارة الضمانات';
+            $bankAddress = array_filter([
+                $bankDetails['address_line_1'] ?? 'المقر الرئيسي',
+                $bankDetails['address_line_2'] ?? null,
+            ]);
+            $bankEmail = $bankDetails['contact_email'] ?? null;
+            
+            // Formatting
+            $guaranteeNo = $record->guaranteeNumber ?? '-';
+            $contractNo = $record->contractNumber ?? '-';
+            $amount = number_format((float)($record->amount ?? 0), 2);
+            $amountHindi = $toHindi($amount);
 
-        // 2. Bank Address Ops
-        $bankDept = $bankDetails['department'] ?? 'إدارة الضمانات';
-        $bankAddress = array_filter([
-            $bankDetails['address_line_1'] ?? 'المقر الرئيسي',
-            $bankDetails['address_line_2'] ?? null,
-        ]);
+            $guaranteeDesc = 'خطاب ضمان';
+            if ($record->type) {
+                $t = strtoupper($record->type);
+                if ($t === 'FINAL') $guaranteeDesc = 'الضمان البنكي النهائي';
+                elseif ($t === 'ADVANCED') $guaranteeDesc = 'ضمان الدفعة المقدمة البنكي';
+            }
+            
+            // Font Logic
+            $hasArabic = preg_match('/\p{Arabic}/u', $supplierName);
+            $isEnglish = ($hasArabic === 0);
+            $supplierStyle = $isEnglish ? "font-family: 'Arial', sans-serif !important; direction: ltr; display: inline-block;" : "";
+    
+            // Renewal Date Logic
+            $renewalDate = '-';
+            if ($record->expiryDate) {
+                 try {
+                    $d = new DateTime($record->expiryDate);
+                    $d->modify('+1 year');
+                     $renewalDate = $formatDateHindi($d->format('Y-m-d')) . 'م';
+                 } catch(Exception $e) {}
+            }
+        ?>
         
-        // 3. Formatting
-        $guaranteeNo = $record->guaranteeNumber ?? '-';
-        $contractNo = $record->contractNumber ?? '-';
-        $amount = number_format((float)($record->amount ?? 0), 2);
-        
-        // 4. English Font Check
-        // Use \p{Arabic} for broader coverage and check === 0 to ensure errors don't force English
-        $hasArabic = preg_match('/\p{Arabic}/u', $supplierName);
-        $isEnglish = ($hasArabic === 0);
-        $supplierStyle = $isEnglish ? "font-family: 'Arial', sans-serif !important; direction: ltr; display: inline-block;" : "";
+        <!-- Exact Structure from decision.php -->
+        <div class="letter-preview">
+            <div class="letter-paper">
+                
+                <div class="header-line">
+                  <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">السادة / <span><?= htmlspecialchars($bankName) ?></span></div>
+                  <div class="greeting">المحترمين</div>
+                </div>
 
-        // 5. Renewal Date Logic
-        $renewalDate = '-';
-        if ($record->expiryDate) {
-             try {
-                $d = new DateTime($record->expiryDate);
-                $d->modify('+1 year');
-                 $renewalDate = $formatDateHindi($d->format('Y-m-d')) . 'م';
-             } catch(Exception $e) {}
-        }
-        
-    ?>
-    <div class="letter-paper">
-        <!-- Header -->
-        <div class="header-line">
-            <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">السادة / <span><?= htmlspecialchars($bankName) ?></span></div>
-            <div class="greeting">المحترمين</div>
+                <div>
+                   <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;"><?= htmlspecialchars($bankDept) ?></div>
+                   <?php foreach($bankAddress as $line): ?>
+                   <div style="text-shadow: 0 0 1px #333, 0 0 1px #333;"><?= $toHindi($line) ?></div>
+                   <?php endforeach; ?>
+                   <?php if($bankEmail): ?>
+                   <div><span style="text-shadow: 0 0 1px #333, 0 0 1px #333;">البريد الالكتروني:</span> <?= htmlspecialchars($bankEmail) ?></div>
+                   <?php endif; ?>
+                </div>
+
+                <div style="text-align:right; margin: 5px 0;">السَّلام عليكُم ورحمَة الله وبركاتِه</div>
+
+                <div class="subject">
+                    <span style="flex:0 0 70px;">الموضوع:</span>
+                    <span>
+                      طلب تمديد الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>) 
+                      <?php if ($contractNo !== '-'): ?>
+                      والعائد للعقد رقم (<?= htmlspecialchars($contractNo) ?>)
+                      <?php endif; ?>
+                    </span>
+                </div>
+
+                <div class="first-paragraph">
+                    إشارة الى <?= $guaranteeDesc ?> الموضح أعلاه، والصادر منكم لصالحنا على حساب 
+                    <span style="<?= $supplierStyle ?>"><?= htmlspecialchars($supplierName) ?></span> 
+                    بمبلغ قدره (<strong><?= $amountHindi ?></strong>) ريال، 
+                    نأمل منكم <span class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">تمديد فترة سريان الضمان حتى تاريخ <?= $renewalDate ?></span>، 
+                    مع بقاء الشروط الأخرى دون تغيير، وإفادتنا بذلك من خلال البريد الالكتروني المخصص للضمانات البنكية لدى مستشفى الملك فيصل التخصصي ومركز الأبحاث بالرياض (bgfinance@kfshrc.edu.sa)، كما نأمل منكم إرسال أصل تمديد الضمان الى:
+                </div>
+            </div>
         </div>
-
-        <div style="margin-bottom: 20px;">
-           <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;"><?= htmlspecialchars($bankDept) ?></div>
-           <?php foreach($bankAddress as $line): ?>
-           <div><?= $toHindi($line) ?></div>
-           <?php endforeach; ?>
-        </div>
-
-        <div class="subject-line">الموضوع: تجديد خطاب ضمان رقم (<?= $toHindi($guaranteeNo) ?>)</div>
-
-        <div class="body-text">
-            <p>
-                السلام عليكم ورحمة الله وبركاته،،،
-                <br><br>
-                بالإشارة إلى الموضوع أعلاه، وإلى خطاب الضمان رقم <strong>(<?= $toHindi($guaranteeNo) ?>)</strong>
-                الصادر من قبلكم لصالح / <strong style="<?= $supplierStyle ?>"><?= htmlspecialchars($supplierName) ?></strong>
-                بمبلغ وقدره <strong>(<?= $toHindi($amount) ?>)</strong> ريال سعودي،
-                والذي ينتهي في <strong><?= $formatDateHindi($record->expiryDate) ?>م</strong>
-                مقابل ضمان العقد رقم <strong>(<?= $toHindi($contractNo) ?>)</strong>.
-                <br><br>
-                نأمل منكم تجديد خطاب الضمان المذكور أعلاه لمدة سنة أخرى، ليكون تاريخ الانتهاء الجديد هو <strong><?= $renewalDate ?></strong>، وخصم المصاريف البنكية من حسابنا الجاري طرفكم.
-            </p>
-        </div>
-
-        <div class="closing">
-            وتقبلوا خالص تحياتنا،،،
-            <br><br><br>
-            <strong>شركة مشاريع باخيت العامة المحدودة</strong>
-        </div>
+        <?php endforeach; ?>
     </div>
-    <?php endforeach; ?>
 
 </body>
 </html>
