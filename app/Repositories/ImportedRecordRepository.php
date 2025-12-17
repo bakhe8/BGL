@@ -64,6 +64,55 @@ class ImportedRecordRepository
     }
 
     /**
+     * تحديث بيانات السجل (Update Full Record)
+     */
+    public function update(ImportedRecord $record): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE imported_records SET
+            raw_supplier_name = :raw_supplier_name,
+            raw_bank_name = :raw_bank_name,
+            amount = :amount,
+            guarantee_number = :guarantee_number,
+            contract_number = :contract_number,
+            contract_source = :contract_source,
+            issue_date = :issue_date,
+            expiry_date = :expiry_date,
+            type = :type,
+            comment = :comment,
+            normalized_supplier = :normalized_supplier,
+            normalized_bank = :normalized_bank,
+            match_status = :match_status,
+            supplier_id = :supplier_id,
+            bank_id = :bank_id,
+            bank_display = :bank_display,
+            supplier_display_name = :supplier_display_name
+            WHERE id = :id
+        ');
+
+        $stmt->execute([
+            'id' => $record->id,
+            'raw_supplier_name' => $record->rawSupplierName,
+            'raw_bank_name' => $record->rawBankName,
+            'amount' => $record->amount,
+            'guarantee_number' => $record->guaranteeNumber,
+            'contract_number' => $record->contractNumber,
+            'contract_source' => $record->contractSource,
+            'issue_date' => $record->issueDate,
+            'expiry_date' => $record->expiryDate,
+            'type' => $record->type,
+            'comment' => $record->comment,
+            'normalized_supplier' => $record->normalizedSupplier,
+            'normalized_bank' => $record->normalizedBank,
+            'match_status' => $record->matchStatus,
+            'supplier_id' => $record->supplierId,
+            'bank_id' => $record->bankId,
+            'bank_display' => $record->bankDisplay,
+            'supplier_display_name' => $record->supplierDisplayName,
+        ]);
+    }
+
+    /**
      * تحديث قرار المورد/البنك لسجل معين
      * 
      * @param int $id معرّف السجل

@@ -142,6 +142,23 @@ if (str_starts_with($uri, '/api/')) {
             $settingsController->importDictionary($payload);
             exit;
         }
+
+        // 6. Text Import API (Smart Paste)
+        if ($method === 'POST' && $uri === '/api/import/text') {
+            $textImportController = new \App\Controllers\TextImportController(
+                new \App\Services\TextParsingService(new Normalizer()),
+                $apiImportSessionRepo,
+                $apiRecords,
+                new \App\Services\MatchingService(
+                    new SupplierRepository(),
+                    new SupplierAlternativeNameRepository(),
+                    new BankRepository()
+                )
+            );
+            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+            $textImportController->handle($payload);
+            exit;
+        }
         
         // Fallback checks happen in server.php or fall through 404
         
@@ -2028,6 +2045,126 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
     })();
     </script>
     
+    <!-- Smart Paste Modal -->
+    <div id="smartPasteModal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center">
+        <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span>📋</span> استيراد نصي ذكي (Smart Paste)
+                </h3>
+                <button id="btnCloseSmartPaste" class="text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none">&times;</button>
+            </div>
+            
+            <div class="p-6">
+                <div class="mb-4 bg-blue-50 text-blue-800 p-3 rounded-lg text-sm flex gap-2">
+                    <span class="text-lg">💡</span>
+                    <div>
+                        قم بنسخ نص الإيميل أو الطلب ولصقه هنا. سيقوم النظام باستخراج البيانات تلقائياً.
+                    </div>
+                </div>
+
+                <textarea id="smartPasteInput" class="w-full h-48 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-blue-500 transition-all font-mono text-sm leading-relaxed" placeholder="مثال: يرجى إصدار ضمان بنكي بمبلغ 50,000 ريال لصالح شركة المراعي..."></textarea>
+                
+                <div id="smartPasteError" class="mt-3 text-red-600 text-sm hidden font-bold"></div>
+            </div>
+
+            <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+                <button id="btnCancelSmartPaste" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">إلغاء</button>
+                <button id="btnProcessSmartPaste" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
+                    <span>✨</span> تحليل وإضافة
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Injection for Smart Paste -->
+    <script>
+    (function(){
+        const modal = document.getElementById('smartPasteModal');
+        const btnOpen = document.getElementById('btnOpenSmartPaste'); // Need to add this button to header
+        const btnClose = document.getElementById('btnCloseSmartPaste');
+        const btnCancel = document.getElementById('btnCancelSmartPaste');
+        const btnProcess = document.getElementById('btnProcessSmartPaste');
+        const input = document.getElementById('smartPasteInput');
+        const errorDiv = document.getElementById('smartPasteError');
+
+        // Note: Creating the trigger button dynamically if it doesn't exist yet
+        // Ideally should be in the main toolbar HTML, but for now we inject it via JS to avoid messing up complex HTML structure blindly
+        if (!document.getElementById('btnOpenSmartPasteTrigger')) {
+            const toolbar = document.querySelector('.nav-btn')?.parentElement; 
+            // Or find a distinct header area. Let's try to append near the existing 'Import Excel' button logic
+            const importBtn = document.getElementById('btnToggleImport');
+            if (importBtn && importBtn.parentNode) {
+                 const btn = document.createElement('button');
+                 btn.id = 'btnOpenSmartPasteTrigger';
+                 btn.className = 'nav-btn';
+                 btn.innerHTML = '<span>📋</span> لصق نص';
+                 btn.onclick = () => {
+                     modal.classList.remove('hidden');
+                     input.focus();
+                 };
+                 importBtn.parentNode.insertBefore(btn, importBtn.nextSibling); // Add after import button
+                 
+                 // Add small margin/gap
+                 btn.style.marginRight = '8px';
+            }
+        }
+
+        const closeModal = () => {
+            modal.classList.add('hidden');
+            input.value = '';
+            errorDiv.classList.add('hidden');
+            btnProcess.disabled = false;
+            btnProcess.innerHTML = '<span>✨</span> تحليل وإضافة';
+        };
+
+        if(btnClose) btnClose.onclick = closeModal;
+        if(btnCancel) btnCancel.onclick = closeModal;
+        
+        // Close on outside click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        if(btnProcess) {
+            btnProcess.onclick = async () => {
+                const text = input.value.trim();
+                if (!text) {
+                    errorDiv.textContent = 'يرجى إدخال نص أولاً';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                btnProcess.disabled = true;
+                btnProcess.innerHTML = '⏳ جارِ التحليل...';
+                errorDiv.classList.add('hidden');
+
+                try {
+                    const res = await fetch('/api/import/text', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: text })
+                    });
+                    
+                    const json = await res.json();
+                    
+                    if (json.success) {
+                        // Redirect to the new session/record
+                        window.location.href = `/?session_id=${json.session_id}&record_id=${json.record_id}`;
+                    } else {
+                        throw new Error(json.error || 'فشلت العملية');
+                    }
+                } catch (err) {
+                    btnProcess.disabled = false;
+                    btnProcess.innerHTML = '<span>✨</span> تحليل وإضافة';
+                    errorDiv.textContent = 'خطأ: ' + err.message;
+                    errorDiv.classList.remove('hidden');
+                }
+            };
+        }
+    })();
+    </script>
+
     <!-- Guarantee Search Feature -->
     <script src="/assets/js/guarantee-search.js"></script>
 </body>
