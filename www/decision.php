@@ -1013,6 +1013,20 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
             });
         }
 
+        // Print All Button
+        const btnPrintAll = document.getElementById('btnPrintAll');
+        if (btnPrintAll) {
+             btnPrintAll.addEventListener('click', () => {
+                 const urlParams = new URLSearchParams(window.location.search);
+                 const sid = urlParams.get('session_id');
+                 if (sid) {
+                     window.open('/print-batch.php?session_id=' + sid, '_blank');
+                 } else {
+                     alert('لا يوجد رقم جلسة محدد');
+                 }
+             });
+        }
+
         // File Import
         const btnImport = document.getElementById('btnToggleImport');
         const fileInput = document.getElementById('hiddenFileInput');
