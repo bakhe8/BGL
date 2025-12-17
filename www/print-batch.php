@@ -46,20 +46,50 @@ $allSuppliers = $suppliers->allNormalized();
 <head>
     <meta charset="UTF-8">
     <title>طباعة الكل - جلسة <?= $sessionId ?></title>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>طباعة الكل - جلسة <?= $sessionId ?></title>
+    
+    <!-- Exact Dependencies from decision.php -->
+    <link rel="stylesheet" href="/assets/css/style.css">
     <link rel="stylesheet" href="/assets/css/letter.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
+        /* Print batch specifics */
         body { margin: 0; background: #cccccc; }
         .print-container { padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .letter-preview { background: transparent; padding: 0; width: auto; }
-        /* Override page-break for batch printing */
-        .letter-preview .letter-paper { margin-bottom: 20px; page-break-after: always; }
-        .letter-preview .letter-paper:last-child { page-break-after: auto; }
+        
+        /* Ensure distinct pages */
+        .letter-preview {
+             background: transparent; 
+             padding: 0; 
+             width: auto; 
+             margin-bottom: 20px;
+        }
+        
+        .letter-preview .letter-paper {
+            margin: 0;
+            page-break-after: always;
+        }
+        
+        .letter-preview:last-child .letter-paper {
+            page-break-after: auto;
+        }
+
         @media print {
-            body { background: white; }
+            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .print-container { padding: 0; display: block; }
             .no-print { display: none !important; }
-            .letter-preview .letter-paper { margin: 0; box-shadow: none; border: none; }
+            .letter-preview { margin: 0; }
+            .letter-preview .letter-paper { box-shadow: none; border: none; margin: 0; width: 100%; min-height: 297mm; }
         }
+
         <?php
         $hindiDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
         $toHindi = fn($str) => preg_replace_callback('/[0-9]/', fn($m) => $hindiDigits[$m[0]], strval($str));
@@ -141,11 +171,20 @@ $allSuppliers = $suppliers->allNormalized();
                      $renewalDate = $formatDateHindi($d->format('Y-m-d')) . 'م';
                  } catch(Exception $e) {}
             }
+
+            // Watermark Logic
+            $hasSupplier = !empty($record->supplierId);
+            $hasBank = !empty($record->bankId);
+            $watermarkText = ($hasSupplier && $hasBank) ? 'جاهز' : 'يحتاج قرار';
+            $watermarkClass = ($hasSupplier && $hasBank) ? 'status-ready' : 'status-draft';
         ?>
         
         <!-- Exact Structure from decision.php -->
         <div class="letter-preview">
             <div class="letter-paper">
+                
+                <!-- Watermark -->
+                <div class="watermark <?= $watermarkClass ?>"><?= $watermarkText ?></div>
                 
                 <div class="header-line">
                   <div class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">السادة / <span><?= htmlspecialchars($bankName) ?></span></div>
