@@ -44,16 +44,72 @@ class BankLearningRepository
     }
 
     /**
+     * INCREMENT USAGE COUNT (NEW - 2025-12-17)
+     * Tracks bank alias usage frequency
+     */
+    public function incrementUsage(string $normalized): bool
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("
+            UPDATE bank_aliases_learning 
+            SET usage_count = COALESCE(usage_count, 0) + 1,
+                last_used_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE normalized_input = ?
+        ");
+        
+        return $stmt->execute([$normalized]);
+    }
+    
+    /**
+     * GET USAGE STATISTICS (NEW - 2025-12-17)
+     * Returns learned bank names ordered by usage frequency
+     */
+    public function getUsageStats(int $bankId): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("
+            SELECT input_name, 
+                   COALESCE(usage_count, 1) as usage_count, 
+                   last_used_at
+            FROM bank_aliases_learning
+            WHERE bank_id = ?
+            AND status = 'alias'
+            ORDER BY usage_count DESC, last_used_at DESC
+        ");
+        
+        $stmt->execute([$bankId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * UPSERT (MODIFIED - 2025-12-17)
      * يحفظ آخر قرار للمستخدم (alias أو blocked) مع override تلقائي في حالة التكرار.
+     * CHANGE: Now increments usage_count when updating
      */
     public function upsert(string $normalized, string $inputName, string $status, ?int $bankId = null): void
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare(
-            'INSERT INTO bank_aliases_learning (normalized_input, input_name, status, bank_id, updated_at)
-             VALUES (:n, :r, :s, :bid, CURRENT_TIMESTAMP)
-             ON CONFLICT(normalized_input) DO UPDATE SET status=:s, bank_id=:bid, input_name=:r, updated_at=CURRENT_TIMESTAMP'
-        );
+        $stmt = $pdo->prepare("
+            INSERT INTO bank_aliases_learning (
+                normalized_input, 
+                input_name, 
+                status, 
+                bank_id,
+                usage_count,
+                last_used_at,
+                updated_at
+            )
+            VALUES (:n, :r, :s, :bid, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(normalized_input) 
+            DO UPDATE SET 
+                status = :s, 
+                bank_id = :bid, 
+                input_name = :r,
+                usage_count = COALESCE(bank_aliases_learning.usage_count, 0) + 1,
+                last_used_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        ");
         $stmt->execute([
             'n' => $normalized,
             'r' => $inputName,

@@ -42,19 +42,99 @@ class SupplierLearningRepository
         return $row ?: null;
     }
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * INCREMENT USAGE COUNT (NEW - 2025-12-17)
+     * ══════════════════════════════════════════════════════════════════════
+     * Called every time user saves a decision using a learned supplier name.
+     * Tracks user preferences by incrementing usage_count and updating last_used_at.
+     * 
+     * @param string $normalized Normalized supplier name to find the record
+     * @return bool True if successfully incremented
+     */
+    public function incrementUsage(string $normalized): bool
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("
+            UPDATE supplier_aliases_learning 
+            SET usage_count = COALESCE(usage_count, 0) + 1,
+                last_used_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE normalized_supplier_name = ?
+        ");
+        
+        return $stmt->execute([$normalized]);
+    }
+    
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * GET USAGE STATISTICS (NEW - 2025-12-17)
+     * ══════════════════════════════════════════════════════════════════════
+     * Returns all learned names for a supplier ordered by usage frequency.
+     * Used by CandidateService to prioritize user's preferred names.
+     * 
+     * @param int $supplierId Supplier ID
+     * @return array List of learned names with usage stats [
+     *     ['original_supplier_name' => string, 'usage_count' => int, 'last_used_at' => string],
+     *     ...
+     * ]
+     */
+    public function getUsageStats(int $supplierId): array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare("
+            SELECT original_supplier_name, 
+                   COALESCE(usage_count, 1) as usage_count, 
+                   last_used_at
+            FROM supplier_aliases_learning
+            WHERE linked_supplier_id = ?
+            AND learning_status = 'supplier_alias'
+            ORDER BY usage_count DESC, last_used_at DESC
+        ");
+        
+        $stmt->execute([$supplierId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * UPSERT (MODIFIED - 2025-12-17)
+     * ══════════════════════════════════════════════════════════════════════
+     * CHANGE: Now increments usage_count when updating existing records
+     */
     public function upsert(string $normalized, string $original, string $status, int $linkedSupplierId, string $source = 'review'): void
     {
         $pdo = Database::connection();
         $existing = $this->findByNormalized($normalized);
+        
+        // If exists with same status and supplier, increment usage
         if ($existing && $existing['learning_status'] === $status && (int)$existing['linked_supplier_id'] === $linkedSupplierId) {
+            $this->incrementUsage($normalized);  // ← NEW: Track usage
             return;
         }
-        $stmt = $pdo->prepare(
-            'INSERT INTO supplier_aliases_learning (normalized_supplier_name, original_supplier_name, learning_status, linked_supplier_id, learning_source, updated_at)
-             VALUES (:n, :o, :s, :sid, :src, CURRENT_TIMESTAMP)
-             ON CONFLICT(normalized_supplier_name)
-             DO UPDATE SET learning_status=:s, linked_supplier_id=:sid, original_supplier_name=:o, learning_source=:src, updated_at=CURRENT_TIMESTAMP'
-        );
+        // INSERT or UPDATE with usage tracking
+        $stmt = $pdo->prepare("
+            INSERT INTO supplier_aliases_learning (
+                normalized_supplier_name, 
+                original_supplier_name, 
+                learning_status, 
+                linked_supplier_id, 
+                learning_source, 
+                usage_count,
+                last_used_at,
+                updated_at
+            )
+            VALUES (:n, :o, :s, :sid, :src, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(normalized_supplier_name)
+            DO UPDATE SET 
+                learning_status = :s, 
+                linked_supplier_id = :sid, 
+                original_supplier_name = :o, 
+                learning_source = :src,
+                usage_count = COALESCE(supplier_aliases_learning.usage_count, 0) + 1,
+                last_used_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+        ");
         $stmt->execute([
             'n' => $normalized,
             'o' => $original,
