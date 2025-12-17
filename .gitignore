@@ -30,3 +30,7 @@ scripts/reset_record.php
 
 # Archived test scripts
 scripts/dev/archived_tests/
+
+# Database files
+storage/database/*.sqlite
+storage/database/*.sqlite-*
