@@ -20,6 +20,8 @@ use App\Repositories\BankRepository;
 use App\Repositories\ImportSessionRepository;
 use App\Services\CandidateService;
 use App\Repositories\SupplierAlternativeNameRepository;
+use App\Repositories\SupplierLearningRepository;
+use App\Repositories\BankLearningRepository;
 use App\Support\Normalizer;
 
 // Dependencies
@@ -28,7 +30,11 @@ $records = new ImportedRecordRepository();
 $suppliers = new SupplierRepository();
 $banks = new BankRepository();
 $sessions = new ImportSessionRepository();
-$candidateService = new CandidateService($suppliers, new SupplierAlternativeNameRepository(), new Normalizer(), $banks);
+$normalizer = new Normalizer();
+$supplierLearning = new SupplierLearningRepository();
+$bankLearning = new BankLearningRepository();
+$candidateService = new CandidateService($suppliers, new SupplierAlternativeNameRepository(), $normalizer, $banks);
+
 
 // Get parameters
 $sessionId = isset($_GET['session_id']) ? (int) $_GET['session_id'] : null;
