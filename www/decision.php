@@ -246,14 +246,9 @@ if ($currentRecord) {
             // Use stored decision source
             $selectionBadge = UserDecisionRepository::getSourceLabel($lastDecision['decision_source']);
         } else {
-            // Fallback to old method for existing records without decision history
+            // Fallback for existing records without decision history
+            // Note: Old SupplierLearningRepository was deprecated - use simple default
             $selectionBadge = 'الاختيار الحالي';
-            if (!empty($currentRecord->rawSupplierName)) {
-                $learned = $supplierLearning->findByNormalized($normalizedSupplierName);
-                if ($learned && $learned['linked_supplier_id'] == $currentRecord->supplierId) {
-                    $selectionBadge = 'من التعلم';
-                }
-            }
         }
         
         array_unshift($supplierCandidates, [
@@ -1320,10 +1315,49 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
 
         if (btnAddSupplier && supplierInput && supplierNamePreview) {
             // 1. Dynamic Text Update & Visibility
+            // 1. Dynamic Text Update & Visibility
+            // PORTS PHP App\Support\Normalizer::makeSupplierKey LOGIC TO JS
+            const makeSupplierKey = (val) => {
+                if (!val) return '';
+                let s = val.toLowerCase().trim();
+                
+                // Unify Arabic chars
+                s = s.replace(/[أإآ]/g, 'ا')
+                     .replace(/ة/g, 'ه')
+                     .replace(/[ىئ]/g, 'ي')
+                     .replace(/ؤ/g, 'و');
+                     
+                // Remove non-alphanumeric (keep spaces for splitting)
+                // Regex matches: NOT (LTR chars, Arabic chars, digits, whitespace)
+                s = s.replace(/[^a-z0-9\u0600-\u06FF\s]/g, '');
+                
+                // Stop words (same as PHP)
+                const stop = [
+                    'شركة', 'شركه', 'مؤسسة', 'مؤسسه', 'مكتب', 'مصنع', 'مقاولات',
+                    'trading', 'est', 'establishment', 'company', 'co', 'ltd', 
+                    'limited', 'llc', 'inc', 'international', 'global'
+                ];
+                
+                const parts = s.split(/\s+/).filter(p => p && !stop.includes(p));
+                return parts.join(''); // Join without spaces for key
+            };
+
             const checkMatch = (val) => {
-                // Check if name is in the suppliers list (exact match)
-                const exists = suppliers.some(s => s.official_name === val || s.official_name.toLowerCase() === val.toLowerCase());
-                if (exists || val.length === 0) {
+                const inputKey = makeSupplierKey(val);
+                if (!inputKey) {
+                    btnAddSupplier.style.display = 'none';
+                    return;
+                }
+
+                // Check against existing suppliers using the normalized key
+                // Note: We use the same normalization logic on the list just to be safe, 
+                // though server likely sends good data.
+                const exists = suppliers.some(s => {
+                    const sKey = makeSupplierKey(s.official_name); // Calculate key on fly to be safe
+                    return sKey === inputKey;
+                });
+                
+                if (exists) {
                     btnAddSupplier.style.display = 'none';
                 } else {
                     btnAddSupplier.style.display = 'flex'; // Restore flex display
@@ -1332,7 +1366,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
             };
             
             supplierInput.addEventListener('input', (e) => {
-                const val = e.target.value.trim();
+                const val = e.target.value; // Don't trim here to allow typing spaces
                 checkMatch(val);
             });
 

@@ -119,14 +119,28 @@ flowchart TD
 
 ---
 
+## 🔐 Client-Side Normalization (إضافة مورد جديد)
+
+لضمان عدم ظهور زر "إضافة كمورد جديد" عندما يكون المورد موجوداً بالفعل (مع اختلافات طفيفة)، تم تطبيق منطق التوحيد القياسي في الجافاسكربت:
+
+### `makeSupplierKey(val)`
+دالة JavaScript تقوم بمحاكاة منطق السيرفر في `App\Support\Normalizer`:
+1. **Unify Arabic**: `أإآ`->`ا`، `ة`->`ه`، `ى`->`ي`.
+2. **Remove Chars**: إزالة كل الرموز غير النصية.
+3. **Stop Words**: تجاهل كلمات (Company, Ltd, شركة, ...).
+4. **Compare**: مقارنة المفتاح الناتج مع مفاتيح الموردين الموجودين.
+
+---
+
 ## 💻 الكود الرئيسي
 
 ### decision.php - Backend Logic
 
 ```php
 // 1. Load dependencies
+// 1. Load dependencies
 $candidateService = new CandidateService(...);
-$supplierLearning = new SupplierLearningRepository();
+// $supplierLearning removed (using UserDecisionRepository)
 $normalizer = new Normalizer();
 
 // 2. Get current record
@@ -249,7 +263,7 @@ endforeach; ?>
 
 - [`www/decision.php`](../www/decision.php) - Main decision page (PHP)
 - [`app/Services/CandidateService.php`](../app/Services/CandidateService.php) - Scoring & enrichment
-- [`app/Repositories/SupplierLearningRepository.php`](../app/Repositories/SupplierLearningRepository.php) - Usage tracking
+- [`app/Repositories/UserDecisionRepository.php`](../app/Repositories/UserDecisionRepository.php) - Decision tracking
 - [`www/assets/css/style.css`](../www/assets/css/style.css) - Chip styles
 - [`docs/usage_tracking_system.md`](./usage_tracking_system.md) - Technical spec
 - [`docs/03-Matching-Engine.md`](./03-Matching-Engine.md) - Matching algorithms
