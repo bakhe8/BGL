@@ -1,4 +1,16 @@
 <?php
+declare(strict_types=1);
+
+// ═══════════════════════════════════════════════════════════════════
+// Security: Prevent Direct Access
+// ═══════════════════════════════════════════════════════════════════
+// This file should ONLY be accessed through index.php
+// Direct access via /decision.php is blocked for security
+if (!defined('APP_RUNNING')) {
+    header('Location: /', true, 301);
+    exit('Direct access not allowed. Redirecting...');
+}
+
 /**
  * Decision Page - PHP Version with Smart Features (v3.0)
  * ========================================================
@@ -60,7 +72,6 @@
  * @version 3.0
  * @date 2025-12-17
  */
-declare(strict_types=1);
 
 require_once __DIR__ . '/../app/Support/autoload.php';
 

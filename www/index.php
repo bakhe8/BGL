@@ -66,6 +66,8 @@ try {
     // ═══════════════════════════════════════════════════════════════════
     
     if ($method === 'GET' && $uri === '/') {
+        // Security: Define constant to prevent direct access to decision.php
+        define('APP_RUNNING', true);
         require __DIR__ . '/decision.php';
         exit;
     }
