@@ -243,10 +243,15 @@ if (isset($_GET['print_batch']) && $_GET['print_batch'] == '1') {
             }
             
             $bankName = $record->bankDisplay ?? $record->rawBankName;
-            $bankDetails = array_values(array_filter($allBanks, fn($b) => $b['id'] == $record->bankId))[0] ?? null;
-            if (!$bankDetails && !empty($record->bankId)) {
-                 $found = array_values(array_filter($allBanks, fn($b) => $b['id'] == $record->bankId))[0] ?? null;
-                 if ($found) $bankDetails = $found;
+            $bankDetails = null;
+            
+            // Strong lookup for Bank Details & Name
+            if (!empty($record->bankId)) {
+                $found = array_values(array_filter($allBanks, fn($b) => $b['id'] == $record->bankId))[0] ?? null;
+                if ($found) {
+                    $bankDetails = $found;
+                    $bankName = $found['official_name']; // FORCE ARABIC NAME
+                }
             }
 
             $bankDept = $bankDetails['department'] ?? 'إدارة الضمانات';
