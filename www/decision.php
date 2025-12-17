@@ -970,6 +970,11 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                     id="badgeSearch" title="بحث">
                                     🔍
                                 </button>
+                                <!-- Search Input Wrapper -->
+                                <div class="search-input-wrapper" id="searchInputWrapper">
+                                    <input type="text" id="guaranteeSearchInput" placeholder="رقم الضمان..." autocomplete="off">
+                                    <button id="btnSearchGo">بحث</button>
+                                </div>
                             </div>
                         </div>
 
@@ -1248,6 +1253,17 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                     <?php endif; ?>
                 </div>
             </section>
+
+            <!-- Guarantee History Panel (Hidden by default) -->
+            <div id="guaranteeHistoryPanel" class="hidden">
+                <div class="panel-header">
+                    <h3 id="historyTitle">📜 تاريخ الضمان</h3>
+                    <button onclick="document.getElementById('guaranteeHistoryPanel').classList.add('hidden'); document.getElementById('badgeSearch').classList.remove('search-active'); document.getElementById('searchInputWrapper').classList.remove('visible');">✕ إغلاق</button>
+                </div>
+                <div class="history-timeline" id="historyTimeline">
+                    <!-- Timeline content will be inserted here by JavaScript -->
+                </div>
+            </div>
 
             <?php if ($currentRecord): 
                 // Initialize names from current record or defaults
@@ -1866,5 +1882,8 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
         }
     })();
     </script>
+    
+    <!-- Guarantee Search Feature -->
+    <script src="/assets/js/guarantee-search.js"></script>
 </body>
 </html>
