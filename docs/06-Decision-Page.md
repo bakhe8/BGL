@@ -1,173 +1,278 @@
 # صفحة اتخاذ القرار (Decision Page)
 
-> **تاريخ الإنشاء**: 2025-12-13  
-> **المسار**: `/decision`  
-> **الملفات الرئيسية**: `www/decision.html`, `www/assets/js/decision/decision.js`
+> **آخر تحديث**: 2025-12-17  
+> **النسخة**: 3.0 (PHP Version + Phase 5)  
+> **المسار**: `/decision.php`  
+> **الملفات الرئيسية**: `www/decision.php`, `www/assets/js/decision.js`
 
 ---
 
 ## 📋 نظرة عامة
 
-صفحة اتخاذ القرار هي واجهة مُحسّنة لمراجعة واعتماد السجلات المستوردة. تعرض سجلاً واحداً في كل مرة مع إمكانية البحث والاختيار للمورد والبنك.
+صفحة at خاذ القرار انتقلت من **JavaScript SPA** إلى **PHP-First Architecture** مع تحسينات UX كبيرة.
 
-### لماذا هذا التصميم؟
+### ما الجديد في النسخة 3.0؟
 
-| المعيار | Inline Edit في الجدول | صفحة سجل واحد ✅ |
-|---------|----------------------|-----------------|
-| التعقيد التقني | عالي (Portal, Z-index) | منخفض |
-| الأداء | يتدهور مع 1000+ صف | ثابت |
-| تجربة المستخدم | مربكة | واضحة ومركزة |
-
----
-
-## 🔧 المكونات الرئيسية
-
-### 1. بنية الصفحة (`www/decision.html`)
-
-```
-┌─────────────────────────────────────────────┐
-│  شريط الإحصائيات: إجمالي | معتمد | قيد الانتظار  │
-├─────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────┐    │
-│  │  البنك: [Autocomplete Input]       │    │
-│  └─────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────┐    │
-│  │  المورد: [Autocomplete] [+ جديد]   │    │
-│  └─────────────────────────────────────┘    │
-├─────────────────────────────────────────────┤
-│  تفاصيل السجل (المبلغ، الضمان، التاريخ...)    │
-├─────────────────────────────────────────────┤
-│  [← السابق]  [حفظ والانتقال للتالي]  [التالي →] │
-└─────────────────────────────────────────────┘
-```
-
-### 2. منطق JavaScript (`www/assets/js/decision/decision.js`)
-
-#### الحالة الرئيسية (State)
-```javascript
-BGL.Decision = {
-    records: [],           // جميع السجلات
-    currentIndex: 0,       // الفهرس الحالي
-    selectedSupplierId: null,
-    selectedBankId: null,
-    supplierCandidates: [], // مرشحي المورد للسجل الحالي
-    bankCandidates: [],     // مرشحي البنك للسجل الحالي
-    _pendingNewSupplierName: null  // اسم المورد الجديد (إن وُجد)
-};
-```
-
-#### الدوال الرئيسية
-
-| الدالة | الوصف |
-|--------|-------|
-| `init()` | تهيئة الصفحة وتحميل البيانات |
-| `_loadData()` | جلب السجلات والقواميس من الـ API |
-| `_loadCandidates()` | جلب المرشحين للسجل الحالي |
-| `_displayCurrentRecord()` | عرض السجل الحالي |
-| `_handleSupplierInput()` | معالجة إدخال المورد + تفعيل زر "جديد" |
-| `_addNewSupplier()` | إنشاء مورد جديد عبر API |
-| `saveAndNext()` | حفظ القرار والانتقال للسجل التالي |
-| `_goToNextPending()` | الانتقال لأقرب سجل قيد الانتظار |
+1. **Server-Side Rendering**: كل البيانات تُعرض من PHP مباشرة
+2. **Usage Tracking & Scoring**: نظام نجوم ⭐⭐⭐ يظهر الأكثر استخداماً
+3. **Current Selection Indicator**: Chip أخضر + "📄 من الاكسل" label
+4. **Smart Deduplication**: لا تكرار في عرض الأسماء
+5. **Learning System Integration**: يحفظ ويتعلم من اختيارات المستخدم
 
 ---
 
-## ✨ الميزات
+## 🎯 الميزات الرئيسية
 
-### 1. التعبئة التلقائية (Auto-fill)
-- عند فتح سجل، إذا كان له `bankId` أو `supplierId` مسبقاً، يملأ الحقول تلقائياً
-- إذا كان هناك مرشح واحد بتطابق عالٍ، يُعرض كاقتراح أول
+### 1. عرض السجل الحالي
 
-### 2. Autocomplete للمورد والبنك
-- **المورد (Strict Search)**: 
-    - يتجاهل الكلمات الشائعة (Stop Words) مثل "Co", "Ltd", "شركة".
-    - يتطلب 3 أحرف "مفيدة" على الأقل للبحث.
-- **البنك (Smart Select)**:
-    - عند النقر (حقل فارغ) → يفتح قائمة كاملة (Select Menu).
-    - عند الكتابة → يعمل كبحث ذكي (En/Ar/Code).
-- يجمع بين **المرشحين الذكيين** (Chips) و **القاموس الكامل**.
-
-### 3. زر "إضافة مورد جديد" (Smart Add Button)
 ```
-┌────────────────────────────────────────────┐
-│ السلوك (v2):                                │
-│ 1. مخفي تماماً افتراضياً (Hidden)            │
-│ 2. يظهر فقط عند:                            │
-│    - كتابة اسم "فريد" (غير موجود)           │
-│    - تجاوز قواعد التطبيع الصارمة (≥ 5 حروف)  │
-│ 3. النص: "+ إضافة [الاسم المكتوب] كمورد جديد"│
-│ 4. عند النقر → يُنشئ فوراً ويختار المورد      │
-└────────────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│  إحصائيات الجلسة: 150 سجل | 120 معتمد | 30 pending │
+├────────────────────────────────────────────────┤
+│  📄 الاسم من الاكسل: "ABC TRADING CO."        │ ← جديد!
+│  المورد: [شركة ABC للتجارة المحدودة      ]   │
+│                                                │
+│  Chips:                                        │
+│  [✓ شركة ABC - من التعلم] ← Current selection │
+│  [⭐⭐⭐ الشركة العربية] ← Most used          │
+│  [⭐⭐ شركة ABC الدولية] ← Used before        │
+│  [⭐ ABC Trading] ← Dictionary match          │
+├────────────────────────────────────────────────┤
+│  البنك: [البنك الأهلي السعودي           ]     │
+│  Chips: [similar structure]                   │
+├────────────────────────────────────────────────┤
+│  تفاصيل: المبلغ | الضمان | التاريخ...         │
+├────────────────────────────────────────────────┤
+│  [← السابق] [حفظ والتالي →] [التالي →]       │
+└────────────────────────────────────────────────┘
 ```
 
-### 4. نشر القرار الفوري (Instant Propagation)
-عند حفظ قرار، يُطبق تلقائياً على السجلات الأخرى **في نفس الجلسة** بنفس `rawSupplierName`.
+### 2. نظام النجوم (Star Rating System)
 
+**⭐⭐⭐ ثلاث نجوم** (Score ≥ 200):
+- استخدمته من قبل
+- تطابق عالي
+- مستخدم بكثرة
+
+**⭐⭐ نجمتان** (Score 120-199):
+- استخدمته مرة
+- أو تطابق جيد
+
+**⭐ نجمة واحدة** (Score < 120):
+- اقتراح عادي من القاموس
+- Fuzzy match
+
+### 3. Current Selection Indicator (Phase 5)
+
+**الهدف**: إظهار ما تم اختياره مسبقاً vs ما في Excel
+
+#### Chip أخضر (Green Chip):
 ```php
-// في RecordsController.php
-$propagatedCount = $this->records->bulkUpdateSupplierByRawName(
-    $record->sessionId,
-    $record->rawSupplierName,
-    $id,  // استثناء السجل الحالي
-    $supplierId,
-    $supplierDisplayName
-);
+[✓ Selected Name - Badge]
+
+Badges:
+- "الاختيار الحالي" ← From dictionary
+- "من التعلم" ← From learning system
 ```
 
-**القيود:**
-- فقط داخل نفس `session_id` (لحماية البيانات التاريخية)
-- فقط للسجلات التي `supplier_id IS NULL`
+#### Excel Name Label:
+```html
+📄 من الاكسل: "Original Excel Name"
+```
+يظهر فقط إذا كان الاسم المختار مختلف عن Excel
+
+#### Smart Deduplication:
+```php
+if (selected_name === raw_excel_name) {
+    // Don't show duplicate green chip
+    // Only show Excel name once
+}
+```
 
 ---
 
-## 🔄 تدفق العمل
+## 🔄 تدفق العمل (Workflow)
 
 ```mermaid
 flowchart TD
-    A[فتح /decision] --> B[تحميل السجلات]
-    B --> C[الانتقال لأول pending]
-    C --> D[عرض السجل]
-    D --> E{هل المورد/البنك محددان؟}
-    E -->|نعم| F[تعبئة تلقائية]
-    E -->|لا| G[انتظار اختيار المستخدم]
-    F --> H[المستخدم يضغط حفظ]
-    G --> H
-    H --> I[POST /api/records/{id}/decision]
-    I --> J[نشر للسجلات المتشابهة]
-    J --> K[تحديث التعلم]
-    K --> L[الانتقال للسجل التالي]
-    L --> D
+    A[Page Load: decision.php?session_id=352&record_id=12030] --> B[PHP: Load Record]
+    B --> C{Has supplier_id?}
+    C -->|Yes| D[Populate display_name from suppliers table]
+    C -->|No| E[display_name = NULL]
+    D --> F[Generate Candidates via CandidateService]
+    E --> F
+    F --> G[Enrich with Usage Stats]
+    G --> H[Calculate Scores & Stars]
+    H --> I{Display_name ≠ raw_name?}
+    I -->|Yes| J[Create Current Selection Chip]
+    I -->|No| K[Skip duplicate chip]
+    J --> L[Render Page with Chips]
+    K --> L
+    L --> M[User selects supplier]
+    M --> N[POST to process_update.php]
+    N --> O[Save decision to DB]
+    O --> P[Increment usage_count]
+    P --> Q[Create/update learning alias]
+    Q --> R[Navigate to next record]
+    R --> B
 ```
 
 ---
 
-## 📡 نقاط الـ API المستخدمة
+## 💻 الكود الرئيسي
 
-| Method | Endpoint | الوصف |
-|--------|----------|-------|
-| GET | `/api/records` | جلب جميع السجلات |
-| GET | `/api/records/{id}/candidates` | جلب مرشحي المورد والبنك |
-| POST | `/api/records/{id}/decision` | حفظ القرار |
-| GET | `/api/dictionary/suppliers` | جلب قائمة الموردين |
-| GET | `/api/dictionary/banks` | جلب قائمة البنوك |
-| POST | `/api/dictionary/suppliers` | إنشاء مورد جديد |
+### decision.php - Backend Logic
+
+```php
+// 1. Load dependencies
+$candidateService = new CandidateService(...);
+$supplierLearning = new SupplierLearningRepository();
+$normalizer = new Normalizer();
+
+// 2. Get current record
+$currentRecord = $records->findById($recordId);
+
+// 3. Generate candidates
+$supplierResult = $candidateService->supplierCandidates($currentRecord->rawSupplierName);
+$supplierCandidates = $supplierResult['candidates'];
+
+// 4. CRITICAL: Populate display_name BEFORE creating chip
+if (!empty($currentRecord->supplierId) && empty($currentRecord->supplierDisplayName)) {
+    // Fetch from suppliers table
+    $currentRecord->supplierDisplayName = $suppliers->findById($id)['official_name'];
+}
+
+// 5. Create current selection chip (if different from Excel)
+if ($currentRecord->supplierDisplayName !== $currentRecord->rawSupplierName) {
+    array_unshift($supplierCandidates, [
+        'supplier_id' => $currentRecord->supplierId,
+        'name' => $currentRecord->supplierDisplayName,
+        'is_current_selection' => true,
+        'selection_badge' => 'من التعلم', // or 'الاختيار الحالي'
+        'star_rating' => 3,
+        'score' => 1.0,
+    ]);
+}
+```
+
+### Chip Rendering:
+
+```php
+<?php foreach (array_slice($supplierCandidates, 0, 6) as $cand): 
+    $isCurrentSelection = $cand['is_current_selection'] ?? false;
+    $isLearning = $cand['is_learning'] ?? false;
+    $starRating = $cand['star_rating'] ?? 1;
+    $icon = $isCurrentSelection ? '✓' : str_repeat('⭐', $starRating);
+    
+    // Current selection: disabled green chip
+    if ($isCurrentSelection): ?>
+        <button type="button" class="chip-btn chip-selected" disabled>
+            <span><?= $icon ?> <?= $cand['name'] ?></span>
+            <span class="selection-badge"><?= $cand['selection_badge'] ?></span>
+        </button>
+        <?php continue; endif;
+    
+    // Learning: always show
+    if ($isLearning): ?>
+        <button class="chip-btn chip-learning chip-3star" data-id="<?= $cand['supplier_id'] ?>">
+            <?= $icon ?> <?= $cand['name'] ?>
+        </button>
+        <?php continue; endif;
+    
+    // Fuzzy: show if < 99% score
+    if ($score < 99): ?>
+        <button class="chip-btn chip-<?= $starRating ?>star" data-id="<?= $cand['supplier_id'] ?>">
+            <?= $icon ?> <?= $cand['name'] ?> <span><?= $score ?>%</span>
+        </button>
+    <?php endif;
+endforeach; ?>
+```
 
 ---
 
-## ⌨️ اختصارات لوحة المفاتيح
+## 🎨 CSS Styles
 
-| المفتاح | الإجراء |
-|---------|--------|
-| `←` | السجل السابق |
-| `→` | السجل التالي |
-| `Ctrl+S` | حفظ والانتقال للتالي |
+```css
+/* Current Selection Chip - Green */
+.chip-selected {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border: 2px solid #16a34a;
+  color: #166534;
+  font-weight: 600;
+  cursor: not-allowed;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+}
+
+.selection-badge {
+  background: #22c55e;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  margin-left: 6px;
+}
+
+/* 3-Star Chips - Gold */
+.chip-3star {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #f59e0b;
+  color: #92400e;
+}
+
+/* Learning Chips - Special badge */
+.chip-learning::after {
+  content: "تعلم";
+  font-size: 9px;
+  background: #3b82f6;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+```
+
+---
+
+## 📡 API Endpoints
+
+| Method | Endpoint | الوصف |
+|--------|----------|-------|
+| GET | `/decision.php?session_id=X&record_id=Y` | Load decision page |
+| POST | `/process_update.php` | Save user decision |
+| GET | `/api/suppliers` | Get suppliers dictionary |
+| GET | `/api/banks` | Get banks dictionary |
+| POST | `/api/suppliers` | Add new supplier |
 
 ---
 
 ## 🔗 الملفات ذات الصلة
 
-- [`www/decision.html`](../www/decision.html) - بنية HTML
-- [`www/assets/js/decision/decision.js`](../www/assets/js/decision/decision.js) - منطق JavaScript
-- [`www/index.php`](../www/index.php) - تسجيل المسار `/decision`
-- [`app/Controllers/RecordsController.php`](../app/Controllers/RecordsController.php) - معالجة الحفظ والنشر
-- [`app/Repositories/ImportedRecordRepository.php`](../app/Repositories/ImportedRecordRepository.php) - التحديث الجماعي
-- [`docs/07-ChangeLog-Smart-Decision.md`](./07-ChangeLog-Smart-Decision.md) - **سجل التحديثات التفصيلي (v2)**
+- [`www/decision.php`](../www/decision.php) - Main decision page (PHP)
+- [`app/Services/CandidateService.php`](../app/Services/CandidateService.php) - Scoring & enrichment
+- [`app/Repositories/SupplierLearningRepository.php`](../app/Repositories/SupplierLearningRepository.php) - Usage tracking
+- [`www/assets/css/style.css`](../www/assets/css/style.css) - Chip styles
+- [`docs/usage_tracking_system.md`](./usage_tracking_system.md) - Technical spec
+- [`docs/03-Matching-Engine.md`](./03-Matching-Engine.md) - Matching algorithms
+
+---
+
+## 📝 سجل التغييرات
+
+### v3.0 (2025-12-17) - Phase 5: Current Selection
+- ✅ Added current selection indicator (green chip + badge)
+- ✅ Added Excel name display label
+- ✅ Smart deduplication (no duplicate chips)
+- ✅ Fixed bug: populate display_name before chip creation
+- ✅ Fixed bug: undefined $stars variable
+- ✅ Fixed bug: missing dependencies
+
+### v2.0 (2025-12-17) - Usage Tracking & Scoring
+- ✅ Star rating system (⭐⭐⭐)
+- ✅ Usage count tracking
+- ✅ Bonus points for frequently used
+- ✅ Learning system integration
+
+### v1.0 (2025-12-13) - PHP Migration
+- Initial PHP version
+- Server-side rendering
+- Autocomplete with chips

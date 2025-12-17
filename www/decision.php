@@ -1,9 +1,64 @@
 <?php
 /**
- * Decision Page - PHP Version (Exact Match to Original)
+ * Decision Page - PHP Version with Smart Features (v3.0)
+ * ========================================================
  * 
- * صفحة اتخاذ القرار - نسخة طبق الأصل من decision.html
- * PHP يعرض البيانات، JavaScript للـ Autocomplete والتفاعل
+ * صفحة اتخاذ القرار - نسخة PHP محسّنة مع نظام التعلم والتقييم
+ * 
+ * PURPOSE:
+ * Display one record at a time for user review and decision-making.
+ * User can select supplier/bank from smart suggestions or add new.
+ * 
+ * KEY FEATURES (v3.0):
+ * ====================
+ * 1. Server-Side Rendering (PHP)
+ *    - All data loaded and processed on server
+ *    - Reduces JavaScript complexity
+ *    - Better performance
+ * 
+ * 2. Usage Tracking & Scoring System
+ *    - Tracks how often each supplier/bank is used
+ *    - Calculates scores: Base Score (40-100) + Bonus Points (0-225)
+ *    - Star ratings: ⭐⭐⭐ (200+), ⭐⭐ (120-199), ⭐ (<120)
+ * 
+ * 3. Current Selection Indicator (Phase 5)
+ *    - Green chip shows what was previously selected
+ *    - "📄 من الاكسل" label shows original Excel data
+ *    - Smart deduplication (no duplicate chips)
+ * 
+ * 4. Learning System Integration
+ *    - Enriches candidates with usage statistics
+ *    - Prioritizes frequently-used suppliers
+ *    - Remembers recent selections (recency bonus)
+ * 
+ * DATA FLOW:
+ * ==========
+ * 1. Load current record by record_id
+ * 2. Generate supplier/bank candidates via CandidateService
+ * 3. CRITICAL: Populate display_name BEFORE creating current selection chip
+ * 4. Determine if current selection chip should be shown (avoid duplicates)
+ * 5. Enrich candidates with usage stats and calculate scores
+ * 6. Render chips in order: Current Selection → 3-star → 2-star → 1-star
+ * 7. User selects → POST to process_update.php → saves + increments usage
+ * 
+ * IMPORTANT ORDERING:
+ * ===================
+ * The order of operations matters! If display_name population happens AFTER
+ * current selection chip creation, chips won't appear (Bug fixed 2025-12-17).
+ * 
+ * Correct order:
+ *   1. Generate candidates
+ *   2. Populate display_name if empty ← MUST BE HERE!
+ *   3. Create current selection chip
+ *   4. Render chips
+ * 
+ * @see docs/06-Decision-Page.md - Full documentation
+ * @see docs/03-Matching-Engine.md - Scoring algorithm
+ * @see docs/usage_tracking_system.md - Technical spec
+ * 
+ * @author BGL Team
+ * @version 3.0
+ * @date 2025-12-17
  */
 declare(strict_types=1);
 
