@@ -1,0 +1,29 @@
+{
+  "name": "bgl",
+  "version": "1.0.0",
+  "description": "نظام ذكي لمطابقة الضمانات البنكية الواردة من ملفات Excel مع الموردين والبنوك في النظام، مع واجهة اتخاذ قرار متقدمة.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npx tailwindcss -i ./www/assets/css/input.css -o ./www/assets/css/output.css --watch",
+    "build": "npx tailwindcss -i ./www/assets/css/input.css -o ./www/assets/css/output.css --minify"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bakhe8/BGL.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bakhe8/BGL/issues"
+  },
+  "homepage": "https://github.com/bakhe8/BGL#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}

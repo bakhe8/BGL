@@ -48,8 +48,10 @@
 
         // Show loading
         historyPanel.classList.remove('hidden');
-        historyTimeline.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">⏳ جاري البحث...</div>';
-        historyTitle.textContent = `📜 جاري البحث عن الضمان رقم: ${guaranteeNumber}`;
+        historyPanel.classList.remove('hidden');
+        historyTimeline.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;"><div class="flex justify-center mb-2"><i data-lucide="loader-2" class="w-8 h-8 animate-spin"></i></div> جاري البحث...</div>';
+        historyTitle.innerHTML = `<span class="flex items-center gap-2"><i data-lucide="file-text" class="w-5 h-5"></i> جاري البحث عن الضمان رقم: ${guaranteeNumber}</span>`;
+        lucide.createIcons();
 
         try {
             const response = await fetch(`/api/guarantee-history.php?number=${encodeURIComponent(guaranteeNumber)}`);
@@ -60,18 +62,20 @@
             } else {
                 historyTimeline.innerHTML = `
                     <div style="text-align: center; padding: 40px;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+                        <div class="flex justify-center mb-4"><i data-lucide="search-x" class="w-12 h-12 text-red-500 opacity-50"></i></div>
                         <div style="color: #ef4444; font-weight: 600; font-size: 16px;">${data.error || 'لم يتم العثور على نتائج'}</div>
                     </div>
                 `;
+                lucide.createIcons();
             }
         } catch (error) {
             historyTimeline.innerHTML = `
                 <div style="text-align: center; padding: 40px;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                    <div class="flex justify-center mb-4"><i data-lucide="wifi-off" class="w-12 h-12 text-red-500 opacity-50"></i></div>
                     <div style="color: #ef4444; font-weight: 600;">خطأ في الاتصال بالخادم</div>
                 </div>
             `;
+            lucide.createIcons();
             console.error('Search error:', error);
         }
     }
@@ -80,7 +84,9 @@
     function displayHistory(data) {
         if (!historyPanel || !historyTimeline || !historyTitle) return;
 
-        historyTitle.textContent = `📜 تاريخ الضمان رقم: ${data.guarantee_number} (${data.total_records} سجل)`;
+        historyTitle.textContent = '';
+        historyTitle.innerHTML = `<span class="flex items-center gap-2"><i data-lucide="history" class="w-5 h-5"></i> تاريخ الضمان رقم: ${data.guarantee_number} (${data.total_records} سجل)</span>`;
+        lucide.createIcons();
 
         if (!data.history || data.history.length === 0) {
             historyTimeline.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">لا توجد سجلات</div>';
@@ -107,7 +113,7 @@
                     <div class="timeline-content">
                         <div class="timeline-header">
                             <div>
-                                <span class="session-badge">📑 جلسة #${item.session_id}</span>
+                                <span class="session-badge flex items-center gap-1"><i data-lucide="file-digit" class="w-3 h-3"></i> جلسة #${item.session_id}</span>
                                 <span class="status-badge-timeline ${statusClass}">${item.status}</span>
                             </div>
                         </div>
@@ -134,7 +140,9 @@
                         
                         ${item.changes && item.changes.length > 0 ? `
                             <div class="changes-list">
-                                <div style="font-weight: 600; font-size: 12px; color: #475569; margin-bottom: 8px;">📝 التغييرات:</div>
+                                <div style="font-weight: 600; font-size: 12px; color: #475569; margin-bottom: 8px; display: flex; items-center; gap: 4px;">
+                                    <i data-lucide="edit-3" class="w-3 h-3"></i> التغييرات:
+                                </div>
                                 ${item.changes.map(change => `
                                     <div class="change-item">
                                         <span style="font-weight: 600;">${change.field}:</span>

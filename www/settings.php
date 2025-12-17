@@ -115,6 +115,9 @@ $banksList = $banks->allNormalized();
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/assets/css/output.css">
     <style>
         .tabs-nav { display: flex; gap: 1rem; border-bottom: 2px solid var(--border-color); margin-bottom: 2rem; }
         .tab-link { padding: 0.75rem 1.5rem; font-weight: bold; color: var(--text-muted); text-decoration: none; border-bottom: 3px solid transparent; transition: all 0.2s; }
@@ -134,19 +137,8 @@ $banksList = $banks->allNormalized();
     </style>
 </head>
 <body class="app-shell">
-    <header class="app-header">
-        <div class="app-header-inner">
-            <div>
-                <span class="app-logo">BL</span>
-                <span class="app-title">نظام إدارة خطابات الضمان</span>
-            </div>
-            <nav class="app-nav">
-                <a href="/" class="app-nav-link">الرئيسية</a>
-                <a href="/stats" class="app-nav-link">الإحصائيات</a>
-                <a href="/settings.php" class="app-nav-link is-active">الإعدادات</a>
-            </nav>
-        </div>
-    </header>
+    <!-- Shared Header -->
+    <?php include __DIR__ . '/../app/Views/partials/subpage_header.php'; ?>
 
     <main class="app-main">
         <div class="app-container">

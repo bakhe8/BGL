@@ -39,6 +39,10 @@ $banksCount = count($banks->allNormalized());
     <title>الإحصائيات - نظام خطابات الضمان</title>
     <link rel="stylesheet" href="/assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/assets/css/output.css">
     <style>
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .stat-card { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
@@ -58,19 +62,8 @@ $banksCount = count($banks->allNormalized());
     </style>
 </head>
 <body class="app-shell">
-    <header class="app-header">
-        <div class="app-header-inner">
-            <div>
-                <span class="app-logo">BL</span>
-                <span class="app-title">نظام إدارة خطابات الضمان</span>
-            </div>
-            <nav class="app-nav">
-                <a href="/" class="app-nav-link">الرئيسية</a>
-                <a href="/stats.php" class="app-nav-link is-active">الإحصائيات</a>
-                <a href="/settings.php" class="app-nav-link">الإعدادات</a>
-            </nav>
-        </div>
-    </header>
+    <!-- Shared Header -->
+    <?php include __DIR__ . '/../app/Views/partials/subpage_header.php'; ?>
 
     <main class="app-main">
         <div class="app-container">
@@ -83,14 +76,18 @@ $banksCount = count($banks->allNormalized());
             <div class="stats-grid">
                 <!-- Card 1: Total -->
                 <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #dbeafe; color: #2563eb;">📋</div>
+                    <div class="stat-card-icon" style="background: #dbeafe; color: #2563eb;">
+                        <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                    </div>
                     <div class="stat-card-value"><?= number_format($totalRecords) ?></div>
                     <div class="stat-card-label">إجمالي الخطابات</div>
                 </div>
                 
                 <!-- Card 2: Completed -->
                 <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #d1fae5; color: #16a34a;">✓</div>
+                    <div class="stat-card-icon" style="background: #d1fae5; color: #16a34a;">
+                        <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                    </div>
                     <div class="stat-card-value" style="color: #16a34a;"><?= number_format($completed) ?></div>
                     <div class="stat-card-label">مكتملة (جاهزة/معتمدة)</div>
                     <div class="progress-bar">
@@ -100,28 +97,36 @@ $banksCount = count($banks->allNormalized());
                 
                 <!-- Card 3: Pending -->
                 <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #ffedd5; color: #ea580c;">!</div>
+                    <div class="stat-card-icon" style="background: #ffedd5; color: #ea580c;">
+                        <i data-lucide="alert-circle" class="w-6 h-6"></i>
+                    </div>
                     <div class="stat-card-value" style="color: #ea580c;"><?= number_format($pending) ?></div>
                     <div class="stat-card-label">معلقة (تحتاج مراجعة)</div>
                 </div>
                 
                 <!-- Card 4: Suppliers -->
                 <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #ede9fe; color: #7c3aed;">🏢</div>
+                    <div class="stat-card-icon" style="background: #ede9fe; color: #7c3aed;">
+                        <i data-lucide="building-2" class="w-6 h-6"></i>
+                    </div>
                     <div class="stat-card-value"><?= number_format($suppliersCount) ?></div>
                     <div class="stat-card-label">الموردين في القاموس</div>
                 </div>
                 
                 <!-- Card 5: Banks -->
                 <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #fce7f3; color: #db2777;">🏦</div>
+                    <div class="stat-card-icon" style="background: #fce7f3; color: #db2777;">
+                        <i data-lucide="landmark" class="w-6 h-6"></i>
+                    </div>
                     <div class="stat-card-value"><?= number_format($banksCount) ?></div>
                     <div class="stat-card-label">البنوك في القاموس</div>
                 </div>
                 
                 <!-- Card 6: Completion Rate -->
                 <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #ecfccb; color: #65a30d;">📊</div>
+                    <div class="stat-card-icon" style="background: #ecfccb; color: #65a30d;">
+                        <i data-lucide="pie-chart" class="w-6 h-6"></i>
+                    </div>
                     <div class="stat-card-value"><?= $completionRate ?>%</div>
                     <div class="stat-card-label">نسبة الإنجاز</div>
                 </div>
@@ -174,17 +179,17 @@ $banksCount = count($banks->allNormalized());
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; padding: 1rem 0;">
                     <div style="text-align: center; padding: 1rem;">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🟢</div>
+                        <div class="flex justify-center mb-2"><i data-lucide="check-circle" class="w-8 h-8 text-green-600"></i></div>
                         <div style="font-weight: bold; font-size: 1.25rem;"><?= $completed ?></div>
                         <div style="color: #6b7280; font-size: 0.875rem;">مكتملة</div>
                     </div>
                     <div style="text-align: center; padding: 1rem;">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🟠</div>
+                        <div class="flex justify-center mb-2"><i data-lucide="clock" class="w-8 h-8 text-orange-500"></i></div>
                         <div style="font-weight: bold; font-size: 1.25rem;"><?= $pending ?></div>
                         <div style="color: #6b7280; font-size: 0.875rem;">معلقة</div>
                     </div>
                     <div style="text-align: center; padding: 1rem;">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📈</div>
+                        <div class="flex justify-center mb-2"><i data-lucide="trending-up" class="w-8 h-8 text-blue-600"></i></div>
                         <div style="font-weight: bold; font-size: 1.25rem;"><?= $completionRate ?>%</div>
                         <div style="color: #6b7280; font-size: 0.875rem;">نسبة الإنجاز</div>
                     </div>
@@ -193,5 +198,8 @@ $banksCount = count($banks->allNormalized());
 
         </div>
     </main>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>
