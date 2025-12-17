@@ -100,6 +100,32 @@ if ($currentRecord) {
     $bankResult = $candidateService->bankCandidates($currentRecord->rawBankName ?? '');
     $bankCandidates = $bankResult['candidates'] ?? [];
     
+    // ═══════════════════════════════════════════════════════════════════
+    // CURRENT SELECTION INDICATOR (ADDED 2025-12-17): Show what's selected
+    // ═══════════════════════════════════════════════════════════════════
+    if (!empty($currentRecord->supplierId) && !empty($currentRecord->supplierDisplayName)) {
+        $selectionBadge = 'الاختيار الحالي';
+        $selectionSource = 'dictionary';
+        if (!empty($currentRecord->rawSupplierName)) {
+            $learned = $supplierLearning->findByNormalized(
+                $normalizer->normalizeSupplierName($currentRecord->rawSupplierName)
+            );
+            if ($learned && $learned['linked_supplier_id'] == $currentRecord->supplierId) {
+                $selectionSource = 'learning';
+                $selectionBadge = 'من التعلم';
+            }
+        }
+        array_unshift($supplierCandidates, [
+            'supplier_id' => $currentRecord->supplierId,
+            'name' => $currentRecord->supplierDisplayName,
+            'is_current_selection' => true,
+            'selection_badge' => $selectionBadge,
+            'star_rating' => 3,
+            'score' => 1.0,
+            'score_raw' => 1.0,
+        ]);
+    }
+    
     // Ensure Display Names are populated if ID exists
     if (!empty($currentRecord->supplierId) && empty($currentRecord->supplierDisplayName)) {
         foreach ($allSuppliers as $s) {
@@ -681,15 +707,19 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                         <!-- Candidate Chips -->
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="supplierChips" class="flex flex-wrap gap-1">
-                                                <?php foreach (array_slice($supplierCandidates, 0, 5) as $cand): 
+                                                <?php foreach (array_slice($supplierCandidates, 0, 6) as $cand): 
+                                                    $isCurrentSelection = $cand['is_current_selection'] ?? false;
                                                     $isLearning = $cand['is_learning'] ?? false;
                                                     $score = round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100);
                                                     $starRating = $cand['star_rating'] ?? 1;
                                                     $usageCount = $cand['usage_count'] ?? 0;
+                                                    $selectionBadge = $cand['selection_badge'] ?? '';
                                                     
-                                                    // Determine chip class based on stars
+                                                    // Determine chip class
                                                     $chipClass = "chip-btn";
-                                                    if ($starRating >= 3) {
+                                                    if ($isCurrentSelection) {
+                                                        $chipClass .= " chip-selected";
+                                                    } elseif ($starRating >= 3) {
                                                         $chipClass .= " chip-3star";
                                                     } elseif ($starRating >= 2) {
                                                         $chipClass .= " chip-2star";
@@ -698,13 +728,27 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                                         $chipClass .= " chip-learning";
                                                     }
                                                     
-                                                    // Generate stars
-                                                    $stars = str_repeat('⭐', $starRating);
+                                                    // Generate icon
+                                                    $icon = $isCurrentSelection ? '✓' : str_repeat('⭐', $starRating);
                                                     
                                                     // Build tooltip
                                                     $tooltip = "";
                                                     if ($usageCount > 0) {
                                                         $tooltip = "استخدمته {$usageCount} " . ($usageCount == 1 ? 'مرة' : 'مرات');
+                                                    }
+                                                    
+                                                    // Current selection: ALWAYS show (disabled)
+                                                    if ($isCurrentSelection) {
+                                                        ?>
+                                                        <button type="button" class="<?= $chipClass ?>" disabled
+                                                              title="<?= htmlspecialchars($tooltip) ?>">
+                                                            <span><?= $icon ?> <?= htmlspecialchars($cand['name']) ?></span>
+                                                            <?php if ($selectionBadge): ?>
+                                                            <span class="selection-badge"><?= $selectionBadge ?></span>
+                                                            <?php endif; ?>
+                                                        </button>
+                                                        <?php
+                                                        continue;
                                                     }
                                                     
                                                     // Learning chips: ALWAYS show

@@ -816,3 +816,36 @@ body.overlay-open {
   transform: translateY(-1px);
   box-shadow: 0 3px 10px rgba(156, 163, 175, 0.4);
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ * CURRENT SELECTION CHIP (ADDED 2025-12-17)
+ * ═══════════════════════════════════════════════════════════════════
+ * Shows what supplier/bank is currently selected for this record
+ * Helps user distinguish between Excel data vs system-applied data
+ */
+.chip-selected {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border: 2px solid #16a34a;
+  color: #166534;
+  font-weight: 600;
+  cursor: not-allowed;
+  opacity: 0.95;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+}
+
+.chip-selected:hover {
+  /* No transform - disabled state */
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+}
+
+.chip-selected .selection-badge {
+  display: inline-block;
+  background: #22c55e;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 8px;
+  margin-left: 6px;
+}
