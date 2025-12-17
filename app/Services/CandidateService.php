@@ -149,9 +149,10 @@ class CandidateService
                     'match_type' => 'exact',
                     'strength' => 'strong',
                     'supplier_id' => (int) $learned['linked_supplier_id'],
-                    'name' => $this->suppliers->find($learned['linked_supplier_id'])?->officialName ?? $rawSupplier,
+                    'name' => $learned['raw_name'] ?? $rawSupplier, // Use what user typed!
                     'score' => 1.0,
                     'score_raw' => 1.0,
+                    'is_learning' => true, // ← NEW: Mark as learning-based
                 ];
             }
             if ($learned['learning_status'] === 'supplier_blocked') {
@@ -183,6 +184,7 @@ class CandidateService
                 'name' => $ov['override_name'],
                 'score' => $scoreRaw * (float) $this->settings->get('WEIGHT_OFFICIAL', Config::WEIGHT_OFFICIAL),
                 'score_raw' => $scoreRaw,
+                'is_learning' => false,
             ];
         }
 
@@ -231,6 +233,7 @@ class CandidateService
                 'name' => $supplier['official_name'],
                 'score' => $scoreWeighted,
                 'score_raw' => $scoreRaw,
+                'is_learning' => false,
             ];
         }
 
@@ -259,6 +262,7 @@ class CandidateService
                 'matched_on' => $alt['raw_name'], // CONTEXT: What matched
                 'score' => 1.0 * (float) $this->settings->get('WEIGHT_ALT_CONFIRMED', Config::WEIGHT_ALT_CONFIRMED),
                 'score_raw' => 1.0,
+                'is_learning' => false,
             ];
         }
 
@@ -282,6 +286,7 @@ class CandidateService
                     'matched_on' => $alt['raw_name'], // CONTEXT
                     'score' => $score,
                     'score_raw' => $scoreRaw,
+                    'is_learning' => false,
                 ];
             }
         }

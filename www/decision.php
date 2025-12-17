@@ -681,16 +681,33 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                         <!-- Candidate Chips -->
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="supplierChips" class="flex flex-wrap gap-1">
-                                                <?php foreach (array_slice($supplierCandidates, 0, 3) as $cand): 
-                                                    // Hide chip if already selected
+                                                <?php foreach (array_slice($supplierCandidates, 0, 5) as $cand): 
+                                                    $isLearning = $cand['is_learning'] ?? false;
+                                                    $score = round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100);
+                                                    
+                                                    // Learning chips: ALWAYS show (even if 100% or selected)
+                                                    if ($isLearning) {
+                                                        ?>
+                                                        <button type="button" class="chip-btn chip-learning"
+                                                              data-id="<?= $cand['supplier_id'] ?>"
+                                                              data-name="<?= htmlspecialchars($cand['name']) ?>"
+                                                              data-type="supplier">
+                                                            <span>⭐ <?= htmlspecialchars($cand['name']) ?></span>
+                                                        </button>
+                                                        <?php
+                                                        continue;
+                                                    }
+                                                    
+                                                    // Fuzzy chips: Show only if < 99% AND not selected
                                                     if (($currentRecord->supplierId ?? null) == $cand['supplier_id']) continue;
+                                                    if ($score >= 99) continue; // 100% match auto-selected, no need to show
                                                 ?>
                                                 <button type="button" class="chip-btn"
                                                       data-id="<?= $cand['supplier_id'] ?>"
                                                       data-name="<?= htmlspecialchars($cand['name']) ?>"
                                                       data-type="supplier">
                                                     <span><?= htmlspecialchars($cand['name']) ?></span>
-                                                    <span class="font-bold opacity-75"><?= round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100) ?>%</span>
+                                                    <span class="font-bold opacity-75"><?= $score ?>%</span>
                                                 </button>
                                                 <?php endforeach; ?>
                                             </div>
@@ -728,9 +745,27 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                         <!-- Candidate Chips -->
                                         <div class="flex flex-wrap items-center gap-2 mt-1 min-h-[20px]">
                                             <div id="bankChips" class="flex flex-wrap gap-1">
-                                                <?php foreach (array_slice($bankCandidates, 0, 3) as $cand): 
-                                                    // Hide chip if already selected
+                                                <?php foreach (array_slice($bankCandidates, 0, 5) as $cand): 
+                                                    $isLearning = $cand['is_learning'] ?? false;
+                                                    $score = round(($cand['score_raw'] ?? $cand['score'] ?? 0) * 100);
+                                                    
+                                                    // Learning chips: ALWAYS show
+                                                    if ($isLearning) {
+                                                        ?>
+                                                        <button type="button" class="chip-btn chip-learning"
+                                                              data-id="<?= $cand['bank_id'] ?>"
+                                                              data-name="<?= htmlspecialchars($cand['name']) ?>"
+                                                              data-type="bank">
+                                                            <span>⭐ <?= htmlspecialchars($cand['name']) ?></span>
+                                                        </button>
+                                                        <?php
+                                                        continue;
+                                                    }
+                                                    
+                                                    // Fuzzy chips: Show only if < 99% AND not selected
                                                     if (($currentRecord->bankId ?? null) == $cand['bank_id']) continue;
+                                                    if ($score >= 99) continue;
+
                                                 ?>
                                                 <button type="button" class="chip-btn"
                                                       data-id="<?= $cand['bank_id'] ?>"
