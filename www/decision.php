@@ -202,10 +202,22 @@ if (isset($_GET['print_batch']) && $_GET['print_batch'] == '1') {
                 margin: 0;
             }
             @media print {
+                /* Reset global visibility since we are in a clean layout */
+                body, body * { visibility: visible !important; }
+                
                 body { background: white; margin: 0; padding: 0; }
                 .print-wrapper { display: block; padding: 0; }
                 .no-print { display: none !important; }
-                .letter-preview { margin: 0; page-break-after: always; }
+                
+                /* Override letter.css absolute positioning which causes stacking */
+                .letter-preview { 
+                    position: relative !important; 
+                    left: auto !important; 
+                    top: auto !important;
+                    margin: 0; 
+                    page-break-after: always; 
+                    width: 100% !important;
+                }
                 .letter-preview:last-child { page-break-after: auto; }
                 .letter-paper { box-shadow: none; border: none; margin: 0; }
             }
