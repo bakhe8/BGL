@@ -1,0 +1,19 @@
+# .gitattributes - GitHub Language Detection Configuration
+
+# Ignore vendor directory (Composer dependencies)
+vendor/** linguist-vendored
+
+# Ignore documentation from language stats
+*.md linguist-documentation
+
+# Ignore test files from language stats
+tests/** linguist-vendored
+test-data/** linguist-vendored
+
+# Mark main languages
+*.php linguist-language=PHP
+*.js linguist-language=JavaScript
+
+# Exclude archived or old files
+docs/archive/** linguist-vendored
+scripts/dev/archived_tests/** linguist-vendored
