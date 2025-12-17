@@ -95,6 +95,41 @@ class CandidateService
         $this->supplierLearning = $this->supplierLearning ?: new SupplierLearningRepository();
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // SCORING SYSTEM (NEW - 2025-12-17)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private function calculateBaseScore(float $fuzzyScore, string $matchType): int
+    {
+        if ($matchType === 'exact') return 100;
+        if ($fuzzyScore >= 0.90) return 80;
+        if ($fuzzyScore >= 0.80) return 60;
+        return 40;
+    }
+
+    private function calculateBonusPoints(?array $usageData): int
+    {
+        if (!$usageData || empty($usageData['usage_count'])) return 0;
+        
+        $bonus = 50;
+        $count = (int)$usageData['usage_count'];
+        $bonus += min(($count - 1) * 25, 150);
+        
+        if (isset($usageData['last_used_at'])) {
+            $daysSince = (new \DateTime())->diff(new \DateTime($usageData['last_used_at']))->days;
+            if ($daysSince <= 30) $bonus += 25;
+        }
+        
+        return $bonus;
+    }
+
+    private function assignStarRating(int $totalScore): int
+    {
+        if ($totalScore >= 200) return 3;
+        if ($totalScore >= 120) return 2;
+        return 1;
+    }
+
     /**
      * إرجاع قائمة المرشحين للاسم الخام من المصادر: official + alternative names، مع درجات أساسية (Exact/StartsWith/Contains/Distance/Token).
      * لا يوجد Auto-Accept هنا؛ النتائج للعرض.
