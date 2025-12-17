@@ -64,7 +64,7 @@ git clone git@github.com:bakhe8/BGL.git
 cd BGL
 
 # أو سحب آخر التحديثات
-git pull origin php-first-restructure
+git pull origin main
 ```
 
 ### 2. تثبيت التبعيات
@@ -292,5 +292,6 @@ php -d display_errors=1 -d error_reporting=E_ALL -S localhost:8000 server.php
 
 - **المستودع**: https://github.com/bakhe8/BGL
 - **النسخة الحالية**: v1.2-production
-- **الفرع الرئيسي**: php-first-restructure
+- **الفرع الرئيسي**: main
 - **آخر تحديث**: 2025-12-17
+

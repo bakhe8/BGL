@@ -14,7 +14,7 @@ status: active
 
 ### الفرع الرئيسي
 
-**`php-first-restructure`** - الفرع الرئيسي للإنتاج
+**`main`** - الفرع الرئيسي للإنتاج
 - ✅ دائماً مستقر وجاهز للنشر
 - ✅ يحتوي على آخر نسخة مختبرة
 - ❌ **لا تطور مباشرة عليه**
@@ -27,8 +27,8 @@ status: active
 
 ```bash
 # 1. تأكد أنك على آخر نسخة من الفرع الرئيسي
-git checkout php-first-restructure
-git pull origin php-first-restructure
+git checkout main
+git pull origin main
 
 # 2. أنشئ فرع جديد للميزة
 git checkout -b feature/اسم-الميزة
@@ -57,8 +57,8 @@ enhancement/performance-optimization
 
 ```bash
 # 1. تأكد أنك على آخر نسخة
-git checkout php-first-restructure
-git pull origin php-first-restructure
+git checkout main
+git pull origin main
 
 # 2. أنشئ فرع للإصلاح
 git checkout -b fix/وصف-المشكلة
@@ -128,16 +128,16 @@ git push
 
 ```bash
 # 1. ارجع للفرع الرئيسي
-git checkout php-first-restructure
+git checkout main
 
 # 2. اسحب آخر التحديثات
-git pull origin php-first-restructure
+git pull origin main
 
 # 3. ادمج فرع الميزة
 git merge feature/اسم-الميزة
 
 # 4. ادفع للمستودع البعيد
-git push origin php-first-restructure
+git push origin main
 
 # 5. احذف الفرع المحلي (اختياري)
 git branch -d feature/اسم-الميزة
@@ -205,8 +205,8 @@ git push origin v2.0.0
 
 ```bash
 # 1. البداية - تأكد من آخر نسخة
-git checkout php-first-restructure
-git pull origin php-first-restructure
+git checkout main
+git pull origin main
 
 # 2. أنشئ فرع الميزة
 git checkout -b feature/pdf-export
@@ -235,11 +235,11 @@ git commit -m "feat: Add print styles and documentation for PDF export"
 git push -u origin feature/pdf-export
 
 # 9. ارجع للفرع الرئيسي وادمج
-git checkout php-first-restructure
+git checkout main
 git merge feature/pdf-export
 
 # 10. ادفع التحديثات
-git push origin php-first-restructure
+git push origin main
 
 # 11. أنشئ علامة للإصدار الجديد
 git tag -a v1.3.0 -m "Feature release: PDF export functionality"
@@ -271,7 +271,7 @@ git push origin --delete feature/pdf-export
 
 3. **اسحب التحديثات بانتظام**
    ```bash
-   git pull origin php-first-restructure
+   git pull origin main
    ```
 
 4. **اختبر قبل الدمج**
@@ -282,7 +282,7 @@ git push origin --delete feature/pdf-export
 
 ### ❌ لا تفعل (Don't)
 
-1. **لا تطور مباشرة على `php-first-restructure`**
+1. **لا تطور مباشرة على `main`**
    - دائماً أنشئ فرع جديد
 
 2. **لا تدفع ملفات قاعدة البيانات**
@@ -307,8 +307,8 @@ git push origin --delete feature/pdf-export
 
 ```bash
 # يمكنك العمل مباشرة على الفرع الرئيسي
-git checkout php-first-restructure
-git pull origin php-first-restructure
+git checkout main
+git pull origin main
 
 # عدّل الملف
 # ...
@@ -316,7 +316,7 @@ git pull origin php-first-restructure
 # احفظ وادفع
 git add .
 git commit -m "docs: Fix typo in README"
-git push origin php-first-restructure
+git push origin main
 ```
 
 ⚠️ **فقط للتغييرات البسيطة جداً!**
@@ -339,7 +339,7 @@ git push origin php-first-restructure
 
 ## 🆘 حل المشاكل الشائعة
 
-### نسيت إنشاء فرع وطورت على `php-first-restructure`
+### نسيت إنشاء فرع وطورت على `main`
 
 ```bash
 # احفظ التغييرات الحالية في فرع جديد
@@ -350,7 +350,7 @@ git add .
 git commit -m "feat: Add feature"
 
 # ارجع للفرع الرئيسي
-git checkout php-first-restructure
+git checkout main
 
 # التغييرات الآن في الفرع الجديد فقط
 ```
@@ -399,4 +399,5 @@ git reset --hard HEAD~1
 5. 🏷️ أنشئ علامات للإصدارات المهمة
 6. 🧹 نظّف الفروع القديمة
 
-**تذكّر**: الهدف هو إبقاء `php-first-restructure` دائماً مستقر وجاهز للنشر! 🚀
+**تذكّر**: الهدف هو إبقاء `main` دائماً مستقر وجاهز للنشر! 🚀
+

@@ -4,7 +4,7 @@
 
 ```bash
 # 1. أنشئ فرع جديد
-git checkout php-first-restructure
+git checkout main
 git pull
 git checkout -b feature/اسم-الميزة
 
@@ -18,7 +18,7 @@ git push -u origin feature/اسم-الميزة
 # ... اختبر كل شيء ...
 
 # 4. ادمج
-git checkout php-first-restructure
+git checkout main
 git merge feature/اسم-الميزة
 git push
 
@@ -32,7 +32,7 @@ git branch -d feature/اسم-الميزة
 
 ```bash
 # 1. أنشئ فرع إصلاح
-git checkout php-first-restructure
+git checkout main
 git pull
 git checkout -b fix/وصف-المشكلة
 
@@ -42,7 +42,7 @@ git add .
 git commit -m "fix: وصف الإصلاح"
 
 # 3. ادمج
-git checkout php-first-restructure
+git checkout main
 git merge fix/وصف-المشكلة
 git push
 ```
@@ -67,9 +67,10 @@ git push origin v1.X.0
 - اختبر قبل الدمج
 
 ❌ **لا تفعل:**
-- لا تطور على `php-first-restructure` مباشرة (إلا للتغييرات البسيطة جداً)
+- لا تطور على `main` مباشرة (إلا للتغييرات البسيطة جداً)
 - لا تدفع ملفات قاعدة البيانات
 
 ---
 
 📚 **للتفاصيل الكاملة**: راجع [DEVELOPMENT-WORKFLOW.md](DEVELOPMENT-WORKFLOW.md)
+
