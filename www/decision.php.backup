@@ -1,4 +1,16 @@
 <?php
+declare(strict_types=1);
+
+// ═══════════════════════════════════════════════════════════════════
+// Security: Prevent Direct Access
+// ═══════════════════════════════════════════════════════════════════
+// This file should ONLY be accessed through index.php
+// Direct access via /decision.php is blocked for security
+if (!defined('APP_RUNNING')) {
+    header('Location: /', true, 301);
+    exit('Direct access not allowed. Redirecting...');
+}
+
 /**
  * Decision Page - PHP Version with Smart Features (v3.0)
  * ========================================================
@@ -60,7 +72,6 @@
  * @version 3.0
  * @date 2025-12-17
  */
-declare(strict_types=1);
 
 require_once __DIR__ . '/../app/Support/autoload.php';
 
@@ -703,6 +714,235 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
         }
         .record-dropdown a:hover { background: #f0f9ff; }
         .record-dropdown a.current { background: #dbeafe; font-weight: 600; }
+        
+        /* Guarantee Search Styles */
+        #badgeSearch {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #badgeSearch.search-active {
+           transform: translateX(-5px);
+            opacity: 0.7;
+        }
+        .search-input-wrapper {
+            position: absolute;
+            right: 34px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0;
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        }
+        .search-input-wrapper.visible {
+            opacity: 1;
+            transform: scaleX(1);
+            pointer-events: all;
+        }
+        #guaranteeSearchInput {
+            width: 160px;
+            height: 28px;
+            padding: 0 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        #guaranteeSearchInput:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        #btnSearchGo {
+            height: 28px;
+            padding: 0 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        #btnSearchGo:hover {
+            background: #2563eb;
+        }
+        
+        /* Guarantee History Panel */
+        #guaranteeHistoryPanel {
+            margin-top: 16px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        #guaranteeHistoryPanel .panel-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #guaranteeHistoryPanel .panel-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        #guaranteeHistoryPanel .panel-header button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        #guaranteeHistoryPanel .panel-header button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        /* Timeline Styles */
+        .history-timeline {
+            padding: 20px;
+            position: relative;
+        }
+        .timeline-item {
+            position: relative;
+            padding-right: 40px;
+            padding-bottom: 24px;
+            border-right: 2px solid #e2e8f0;
+        }
+        .timeline-item:last-child {
+            border-right-color: transparent;
+            padding-bottom: 0;
+        }
+        .timeline-dot {
+            position: absolute;
+            right: -9px;
+            top: 0;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #3b82f6;
+            z-index: 1;
+        }
+        .timeline-item.first-record .timeline-dot {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        .timeline-content {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-right: 20px;
+        }
+        .timeline-content:hover {
+            background: #f1f5f9;
+        }
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .session-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #3b82f6;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .status-badge-timeline {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-badge-timeline.ready {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .status-badge-timeline.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .timeline-date {
+           font-size: 11px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        .timeline-info {
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        .info-row {
+            display: flex;
+            align-items: center;
+            padding: 4px 0;
+            gap: 8px;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #475569;
+            min-width: 80px;
+        }
+        .info-value {
+            color: #1e293b;
+        }
+        .changes-list {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #cbd5e1;
+        }
+        .change-item {
+            display: flex;
+            align-items: center;
+   gap: 8px;
+            font-size: 12px;
+            padding: 4px 0;
+            color: #64748b;
+        }
+        .change-item .change-from {
+            color: #ef4444;
+            text-decoration: line-through;
+        }
+        .change-item .change-to {
+            color: #10b981;
+            font-weight: 600;
+        }
+        .view-record-btn {
+            margin-top: 12px;
+            display: inline-block;
+            padding: 6px 14px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .view-record-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+    
     </style>
 </head>
 
@@ -741,6 +981,11 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                     id="badgeSearch" title="بحث">
                                     🔍
                                 </button>
+                                <!-- Search Input Wrapper -->
+                                <div class="search-input-wrapper" id="searchInputWrapper">
+                                    <input type="text" id="guaranteeSearchInput" placeholder="رقم الضمان..." autocomplete="off">
+                                    <button id="btnSearchGo">بحث</button>
+                                </div>
                             </div>
                         </div>
 
@@ -1019,6 +1264,17 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                     <?php endif; ?>
                 </div>
             </section>
+
+            <!-- Guarantee History Panel (Hidden by default) -->
+            <div id="guaranteeHistoryPanel" class="hidden">
+                <div class="panel-header">
+                    <h3 id="historyTitle">📜 تاريخ الضمان</h3>
+                    <button onclick="document.getElementById('guaranteeHistoryPanel').classList.add('hidden'); document.getElementById('badgeSearch').classList.remove('search-active'); document.getElementById('searchInputWrapper').classList.remove('visible');">✕ إغلاق</button>
+                </div>
+                <div class="history-timeline" id="historyTimeline">
+                    <!-- Timeline content will be inserted here by JavaScript -->
+                </div>
+            </div>
 
             <?php if ($currentRecord): 
                 // Initialize names from current record or defaults
@@ -1637,5 +1893,8 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
         }
     })();
     </script>
+    
+    <!-- Guarantee Search Feature -->
+    <script src="/assets/js/guarantee-search.js"></script>
 </body>
 </html>
