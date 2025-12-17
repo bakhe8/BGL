@@ -101,6 +101,27 @@ if ($currentRecord) {
     $bankCandidates = $bankResult['candidates'] ?? [];
     
     // ═══════════════════════════════════════════════════════════════════
+    // POPULATE DISPLAY NAMES FIRST (CRITICAL ORDER)
+    // ═══════════════════════════════════════════════════════════════════
+    // Must happen BEFORE current selection chip logic
+    if (!empty($currentRecord->supplierId) && empty($currentRecord->supplierDisplayName)) {
+        foreach ($allSuppliers as $s) {
+            if ($s['id'] == $currentRecord->supplierId) {
+                $currentRecord->supplierDisplayName = $s['official_name'];
+                break;
+            }
+        }
+    }
+    if (!empty($currentRecord->bankId) && empty($currentRecord->bankDisplay)) {
+        foreach ($allBanks as $b) {
+            if ($b['id'] == $currentRecord->bankId) {
+                $currentRecord->bankDisplay = $b['official_name'];
+                break;
+            }
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
     // CURRENT SELECTION INDICATOR (ADDED 2025-12-17): Show what's selected
     // ═══════════════════════════════════════════════════════════════════
     if (!empty($currentRecord->supplierId) && !empty($currentRecord->supplierDisplayName)) {
@@ -124,24 +145,6 @@ if ($currentRecord) {
             'score' => 1.0,
             'score_raw' => 1.0,
         ]);
-    }
-    
-    // Ensure Display Names are populated if ID exists
-    if (!empty($currentRecord->supplierId) && empty($currentRecord->supplierDisplayName)) {
-        foreach ($allSuppliers as $s) {
-            if ($s['id'] == $currentRecord->supplierId) {
-                $currentRecord->supplierDisplayName = $s['official_name'];
-                break;
-            }
-        }
-    }
-    if (!empty($currentRecord->bankId) && empty($currentRecord->bankDisplay)) {
-        foreach ($allBanks as $b) {
-            if ($b['id'] == $currentRecord->bankId) {
-                $currentRecord->bankDisplay = $b['official_name'];
-                break;
-            }
-        }
     }
 
     // Auto-select 100% match candidates if not already linked (Threshold 0.99)
