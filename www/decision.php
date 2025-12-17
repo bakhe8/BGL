@@ -224,7 +224,10 @@ if (isset($_GET['print_batch']) && $_GET['print_batch'] == '1') {
         </style>
     </head>
     <body onload="window.print()">
-        <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
+        <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 10px;">
+            <button onclick="window.history.back()" class="bg-gray-600 text-white px-6 py-3 rounded-lg shadow-lg font-bold hover:bg-gray-700 transition-colors flex items-center gap-2">
+                <span>🔙</span> عودة
+            </button>
             <button onclick="window.print()" class="bg-black text-white px-6 py-3 rounded-lg shadow-lg font-bold hover:bg-gray-800 transition-colors flex items-center gap-2">
                 <span>🖨️</span> طباعة <?= count($approvedRecords) ?> خطاب
             </button>
@@ -1256,7 +1259,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                  const urlParams = new URLSearchParams(window.location.search);
                  const sid = urlParams.get('session_id');
                  if (sid) {
-                     window.open('/decision.php?session_id=' + sid + '&print_batch=1', '_blank');
+                     window.location.href = '/decision.php?session_id=' + sid + '&print_batch=1';
                  } else {
                      alert('لا يوجد رقم جلسة محدد');
                  }
