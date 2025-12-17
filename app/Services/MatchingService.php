@@ -54,8 +54,8 @@ class MatchingService
         private ?\App\Repositories\BankLearningRepository $bankLearning = null,
     ) {
         $this->candidates = $this->candidates ?: new CandidateService(
-            new \App\Repositories\SupplierRepository(),
-            new \App\Repositories\SupplierAlternativeNameRepository(),
+            new SupplierRepository(),
+            new SupplierAlternativeNameRepository(),
             new Normalizer(),
             $this->banks,
             new SupplierOverrideRepository(),

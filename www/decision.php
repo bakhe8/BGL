@@ -81,7 +81,7 @@ use App\Repositories\UserDecisionRepository;
 use App\Support\Normalizer;
 
 // Dependencies
-$importSessionRepo = new \App\Repositories\ImportSessionRepository();
+$importSessionRepo = new ImportSessionRepository();
 $records = new ImportedRecordRepository();
 $suppliers = new SupplierRepository();
 $banks = new BankRepository();
