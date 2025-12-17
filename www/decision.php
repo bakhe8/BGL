@@ -1338,7 +1338,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                     const json = await res.json();
                     if (json.success) {
                         alert('تمت إعادة المطابقة: ' + (json.data?.processed || 0) + ' سجل');
-                        window.location.reload();
+                        window.location.href = window.location.href; // Force reload with params
                     } else {
                         alert('خطأ: ' + (json.message || 'فشلت العملية'));
                     }
