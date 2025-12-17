@@ -723,3 +723,48 @@ body.overlay-open {
 .suggestion-item span {
   display: block;
 }
+
+/* Candidate Chips */
+.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.chip-btn[data-type="supplier"] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.chip-btn[data-type="supplier"]:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.chip-btn[data-type="bank"] {
+  border-color: #d9f99d;
+  background: #f7fee7;
+  color: #365314;
+}
+
+.chip-btn[data-type="bank"]:hover {
+  background: #ecfccb;
+  border-color: #bef264;
+}
