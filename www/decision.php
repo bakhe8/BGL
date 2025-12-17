@@ -322,6 +322,28 @@ if (isset($_GET['print_batch']) && $_GET['print_batch'] == '1') {
                         نأمل منكم <span class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">تمديد فترة سريان الضمان حتى تاريخ <?= $renewalDate ?></span>، 
                         مع بقاء الشروط الأخرى دون تغيير، وإفادتنا بذلك من خلال البريد الالكتروني المخصص للضمانات البنكية لدى مستشفى الملك فيصل التخصصي ومركز الأبحاث بالرياض (bgfinance@kfshrc.edu.sa)، كما نأمل منكم إرسال أصل تمديد الضمان الى:
                     </div>
+
+                    <div style="margin-top: 5px; margin-right: 50px;">
+                        <div>مستشفى الملك فيصل التخصصي ومركز الأبحاث – الرياض</div>
+                        <div>ص.ب ٣٣٥٤ الرياض ١١٢١١</div>
+                        <div>مكتب الخدمات الإدارية</div>
+                    </div>
+
+                    <div class="first-paragraph">
+                        علمًا بأنه في حال عدم تمكن البنك من تمديد الضمان المذكور قبل انتهاء مدة سريانه، فيجب على البنك دفع قيمة الضمان إلينا حسب النظام.
+                    </div>
+
+                    <div style="text-indent:5em; margin-top:5px;">وَتفضَّلوا بِقبُول خَالِص تحيَّاتِي</div>
+
+                    <div class="fw-800-sharp" style="text-align: center; margin-top: 5px; margin-right: 320px;">
+                        <div style="margin-bottom: 60px; text-shadow: 0 0 1px #333, 0 0 1px #333;">مُدير الإدارة العامَّة للعمليَّات المحاسبيَّة</div>
+                        <div style="text-shadow: 0 0 1px #333, 0 0 1px #333;">سَامِي بن عبَّاس الفايز</div>
+                    </div>
+
+                    <div style="position:absolute; left:1in; right:1in; bottom:0.7in; display:flex; justify-content:space-between; font-size:9pt;">
+                      <span>MBC:09-2</span>
+                      <span>BAMZ</span>
+                    </div>
                     <!-- Footer is part of background SVG -->
                 </div>
             </div>
