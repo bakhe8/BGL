@@ -143,19 +143,15 @@ class CandidateService
         $learned = $this->supplierLearning?->findByNormalized($normalized);
         if ($learned) {
             if ($learned['learning_status'] === 'supplier_alias') {
-                return [
-                    'normalized' => $normalized,
-                    'candidates' => [
-                        [
-                            'source' => 'learning',
-                            'match_type' => 'exact',
-                            'strength' => 'strong',
-                            'supplier_id' => (int) $learned['linked_supplier_id'],
-                            'name' => $this->suppliers->find($learned['linked_supplier_id'])?->officialName ?? $rawSupplier,
-                            'score' => 1.0,
-                            'score_raw' => 1.0,
-                        ]
-                    ],
+                // [MODIFIED] Do not return immediately. Add to candidates and continue.
+                $candidates[] = [
+                    'source' => 'learning',
+                    'match_type' => 'exact',
+                    'strength' => 'strong',
+                    'supplier_id' => (int) $learned['linked_supplier_id'],
+                    'name' => $this->suppliers->find($learned['linked_supplier_id'])?->officialName ?? $rawSupplier,
+                    'score' => 1.0,
+                    'score_raw' => 1.0,
                 ];
             }
             if ($learned['learning_status'] === 'supplier_blocked') {
