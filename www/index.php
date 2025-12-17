@@ -66,12 +66,12 @@ try {
     // ═══════════════════════════════════════════════════════════════════
     
     if ($method === 'GET' && $uri === '/') {
-        echo file_get_contents(__DIR__ . '/decision.html');
+        require __DIR__ . '/decision.php';
         exit;
     }
 
-    // Redirect /decision or /decision.html to /
-    if ($method === 'GET' && ($uri === '/decision' || $uri === '/decision.html')) {
+    // Redirect /decision, /decision.html, or /decision.php to /
+    if ($method === 'GET' && ($uri === '/decision' || $uri === '/decision.html' || $uri === '/decision.php')) {
         header('Location: /', true, 301);
         exit;
     }

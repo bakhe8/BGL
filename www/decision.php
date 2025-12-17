@@ -288,7 +288,7 @@ $buildUrl = function($newRecordId = null, $newFilter = null, $newSessionId = nul
     $params['session_id'] = $newSessionId ?? $sessionId;
     if ($newRecordId) $params['record_id'] = $newRecordId;
     $params['filter'] = $newFilter ?? $filter;
-    return '/decision.php?' . http_build_query($params);
+    return '/?' . http_build_query($params);
 };
 
 // =================================================================================
@@ -1549,7 +1549,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                      iframe.style.width = '0';
                      iframe.style.height = '0';
                      iframe.style.border = '0';
-                     iframe.src = '/decision.php?session_id=' + sid + '&print_batch=1';
+                     iframe.src = '/?session_id=' + sid + '&print_batch=1';
                      
                      // Helper to clean up
                      iframe.onload = function() {
@@ -1581,7 +1581,7 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                     const res = await fetch('/api/import/excel', { method: 'POST', body: formData });
                     const json = await res.json();
                     if (json.success && json.data && json.data.session_id) {
-                        window.location.href = '/decision.php?session_id=' + json.data.session_id;
+                        window.location.href = '/?session_id=' + json.data.session_id;
                     } else {
                         alert('خطأ: ' + (json.message || 'فشل الاستيراد'));
                     }
