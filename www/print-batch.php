@@ -162,7 +162,9 @@ $allSuppliers = $suppliers->allNormalized();
         $amount = number_format((float)($record->amount ?? 0), 2);
         
         // 4. English Font Check
-        $isEnglish = !preg_match('/[\x{0600}-\x{06FF}]/u', $supplierName);
+        // Use \p{Arabic} for broader coverage and check === 0 to ensure errors don't force English
+        $hasArabic = preg_match('/\p{Arabic}/u', $supplierName);
+        $isEnglish = ($hasArabic === 0);
         $supplierStyle = $isEnglish ? "font-family: 'Arial', sans-serif !important; direction: ltr; display: inline-block;" : "";
 
         // 5. Renewal Date Logic

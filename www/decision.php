@@ -615,7 +615,9 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                 }
                 
                 // Check if supplier name is English for styling
-                $isEnglish = !preg_match('/[\x{0600}-\x{06FF}]/u', $supplierName);
+                // Use \p{Arabic} for broader coverage and check === 0 to ensure errors don't force English
+                $hasArabic = preg_match('/\p{Arabic}/u', $supplierName);
+                $isEnglish = ($hasArabic === 0); 
                 $supplierStyle = $isEnglish ? "font-family: 'Arial', sans-serif !important; direction: ltr; display: inline-block;" : "";
 
                 // Bank Details
