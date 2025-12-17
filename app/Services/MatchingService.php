@@ -7,7 +7,7 @@ use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\BankRepository;
 use App\Repositories\SupplierOverrideRepository;
-use App\Repositories\SupplierLearningRepository;
+use App\Repositories\SupplierSuggestionRepository;
 use App\Support\Config;
 use App\Support\Normalizer;
 use App\Support\Settings;
@@ -52,7 +52,6 @@ class MatchingService
         private Settings $settings = new Settings(),
         private ?CandidateService $candidates = null,
         private ?\App\Repositories\BankLearningRepository $bankLearning = null,
-        private ?SupplierLearningRepository $supplierLearning = null,
     ) {
         $this->candidates = $this->candidates ?: new CandidateService(
             new \App\Repositories\SupplierRepository(),
@@ -63,7 +62,6 @@ class MatchingService
             $this->settings
         );
         $this->bankLearning = $this->bankLearning ?: new \App\Repositories\BankLearningRepository();
-        $this->supplierLearning = $this->supplierLearning ?: new SupplierLearningRepository();
     }
 
     /**
@@ -82,25 +80,34 @@ class MatchingService
             return $result;
         }
 
-        // التعلم أولاً
-        $learned = $this->supplierLearning->findByNormalized($normalized);
-        if ($learned) {
-            if ($learned['learning_status'] === 'supplier_alias') {
-                $result['supplier_id'] = (int) $learned['linked_supplier_id'];
+        // ═══════════════════════════════════════════════════════════════════
+        // CACHE-FIRST APPROACH (Updated 2025-12-17)
+        // Check supplier_suggestions cache for learning/blocking info
+        // ═══════════════════════════════════════════════════════════════════
+        $suggestionRepo = new SupplierSuggestionRepository();
+        $suggestions = $suggestionRepo->getSuggestions($normalized, 1);
+        $blockedIds = $suggestionRepo->getBlockedSupplierIds($normalized);
+        
+        // If we have a high-score suggestion, use it
+        if (!empty($suggestions)) {
+            $top = $suggestions[0];
+            if (($top['effective_score'] ?? $top['total_score']) >= 180) {
+                $result['supplier_id'] = (int) $top['supplier_id'];
                 $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
                 return $result;
             }
-            if ($learned['learning_status'] === 'supplier_blocked' && (int) $learned['linked_supplier_id'] > 0) {
-                // تجاهل المورد المحظور لهذا الاسم
-                $result['_blocked_supplier_id'] = (int) $learned['linked_supplier_id'];
-            }
+        }
+        
+        // Store blocked IDs for later filtering
+        if (!empty($blockedIds)) {
+            $result['_blocked_supplier_ids'] = $blockedIds;
         }
 
         // Overrides أولاً
         foreach ($this->overrides->allNormalized() as $ov) {
             $ovNorm = $this->normalizer->normalizeSupplierName($ov['override_name']);
             if ($ovNorm === $normalized) {
-                if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int) $ov['supplier_id']) {
+                if (!in_array((int) $ov['supplier_id'], $blockedIds, true)) {
                     $result['supplier_id'] = $ov['supplier_id'];
                     $result['match_status'] = 'ready';
                     return $result;
@@ -123,7 +130,7 @@ class MatchingService
             }
         }
 
-        if ($supplierKey && (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int) $supplierKey['id'])) {
+        if ($supplierKey && !in_array((int) $supplierKey['id'], $blockedIds, true)) {
             $result['supplier_id'] = (int) $supplierKey['id'];
             $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
             return $result;
@@ -139,7 +146,7 @@ class MatchingService
         }
 
         if ($supplierExact) {
-            if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== (int) $supplierExact['id']) {
+            if (!in_array((int) $supplierExact['id'], $blockedIds, true)) {
                 $result['supplier_id'] = (int) $supplierExact['id'];
                 $result['match_status'] = $autoTh >= 0.9 ? 'ready' : 'needs_review';
                 return $result;
@@ -151,9 +158,8 @@ class MatchingService
         // Can be optimized later if needed.
         $alt = $this->supplierAlts->findByNormalized($normalized);
         if ($alt) {
-            if (!isset($result['_blocked_supplier_id']) || $result['_blocked_supplier_id'] !== $alt->supplierId) {
+            if (!in_array($alt->supplierId, $blockedIds, true)) {
                 $result['supplier_id'] = $alt->supplierId;
-                // أقل ثقة -> يظل needs_review، يمكن رفعها لاحقاً
                 $result['match_status'] = 'needs_review';
                 return $result;
             }
@@ -167,7 +173,7 @@ class MatchingService
             if ($candNorm === '') {
                 continue;
             }
-            if (isset($result['_blocked_supplier_id']) && $result['_blocked_supplier_id'] === (int) $row['id']) {
+            if (in_array((int) $row['id'], $blockedIds, true)) {
                 continue;
             }
             // استخدام النسخة السريعة - آمن لأن النصوص من Excel (< 255 بايت)

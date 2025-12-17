@@ -75,8 +75,9 @@ use App\Repositories\BankRepository;
 use App\Repositories\ImportSessionRepository;
 use App\Services\CandidateService;
 use App\Repositories\SupplierAlternativeNameRepository;
-use App\Repositories\SupplierLearningRepository;
 use App\Repositories\BankLearningRepository;
+use App\Repositories\SupplierSuggestionRepository;
+use App\Repositories\UserDecisionRepository;
 use App\Support\Normalizer;
 
 // Dependencies
@@ -86,9 +87,12 @@ $suppliers = new SupplierRepository();
 $banks = new BankRepository();
 $sessions = new ImportSessionRepository();
 $normalizer = new Normalizer();
-$supplierLearning = new SupplierLearningRepository();
 $bankLearning = new BankLearningRepository();
 $candidateService = new CandidateService($suppliers, new SupplierAlternativeNameRepository(), $normalizer, $banks);
+
+// Repositories for refactored system
+$suggestionRepo = new SupplierSuggestionRepository();
+$decisionRepo = new UserDecisionRepository();
 
 
 // Get parameters
@@ -156,8 +160,52 @@ $allBanks = $banks->allNormalized();
 $supplierCandidates = [];
 $bankCandidates = [];
 if ($currentRecord) {
-    $supplierResult = $candidateService->supplierCandidates($currentRecord->rawSupplierName ?? '');
-    $supplierCandidates = $supplierResult['candidates'] ?? [];
+    // ═══════════════════════════════════════════════════════════════════
+    // SUPPLIER CANDIDATES: Use cache-first approach (Phase 3 Refactoring)
+    // ═══════════════════════════════════════════════════════════════════
+    $rawSupplierName = $currentRecord->rawSupplierName ?? '';
+    $normalizedSupplierName = $normalizer->normalizeSupplierName($rawSupplierName);
+    
+    if (!empty($normalizedSupplierName)) {
+        // Try cache first
+        if ($suggestionRepo->hasCachedSuggestions($normalizedSupplierName)) {
+            // Use cached suggestions
+            $cachedSuggestions = $suggestionRepo->getSuggestions($normalizedSupplierName);
+            foreach ($cachedSuggestions as $cs) {
+                $supplierCandidates[] = [
+                    'supplier_id' => $cs['supplier_id'],
+                    'name' => $cs['display_name'],
+                    'score' => $cs['total_score'] / 100, // Normalize for compatibility
+                    'score_raw' => $cs['fuzzy_score'],
+                    'star_rating' => $cs['star_rating'],
+                    'is_learning' => ($cs['source'] === 'learning'),
+                    'source' => $cs['source'],
+                    'usage_count' => $cs['usage_count'],
+                ];
+            }
+        } else {
+            // Generate from CandidateService and cache
+            $supplierResult = $candidateService->supplierCandidates($rawSupplierName);
+            $supplierCandidates = $supplierResult['candidates'] ?? [];
+            
+            // Save to cache for next time
+            $suggestionsToCache = [];
+            foreach ($supplierCandidates as $cand) {
+                $suggestionsToCache[] = [
+                    'supplier_id' => $cand['supplier_id'],
+                    'display_name' => $cand['name'],
+                    'source' => $cand['is_learning'] ?? false ? 'learning' : 'dictionary',
+                    'fuzzy_score' => $cand['score_raw'] ?? $cand['score'] ?? 0,
+                    'usage_count' => $cand['usage_count'] ?? 0,
+                ];
+            }
+            if (!empty($suggestionsToCache)) {
+                $suggestionRepo->saveSuggestions($normalizedSupplierName, $suggestionsToCache);
+            }
+        }
+    }
+    
+    // Bank candidates (still using old method - future phase)
     $bankResult = $candidateService->bankCandidates($currentRecord->rawBankName ?? '');
     $bankCandidates = $bankResult['candidates'] ?? [];
     
@@ -183,7 +231,7 @@ if ($currentRecord) {
     }
     
     // ═══════════════════════════════════════════════════════════════════
-    // CURRENT SELECTION INDICATOR (ADDED 2025-12-17): Show what's selected
+    // CURRENT SELECTION INDICATOR (Refactored with UserDecisionRepository)
     // ═══════════════════════════════════════════════════════════════════
     // OPTION 2: Don't create chip if selected name = raw Excel name (avoid duplication)
     $shouldShowSelectionChip = !empty($currentRecord->supplierId) && 
@@ -191,17 +239,23 @@ if ($currentRecord) {
                                ($currentRecord->supplierDisplayName !== $currentRecord->rawSupplierName);
     
     if ($shouldShowSelectionChip) {
-        $selectionBadge = 'الاختيار الحالي';
-        $selectionSource = 'dictionary';
-        if (!empty($currentRecord->rawSupplierName)) {
-            $learned = $supplierLearning->findByNormalized(
-                $normalizer->normalizeSupplierName($currentRecord->rawSupplierName)
-            );
-            if ($learned && $learned['linked_supplier_id'] == $currentRecord->supplierId) {
-                $selectionSource = 'learning';
-                $selectionBadge = 'من التعلم';
+        // Get decision source from history (NEW: using UserDecisionRepository)
+        $lastDecision = $decisionRepo->getLastDecision($currentRecord->id);
+        
+        if ($lastDecision) {
+            // Use stored decision source
+            $selectionBadge = UserDecisionRepository::getSourceLabel($lastDecision['decision_source']);
+        } else {
+            // Fallback to old method for existing records without decision history
+            $selectionBadge = 'الاختيار الحالي';
+            if (!empty($currentRecord->rawSupplierName)) {
+                $learned = $supplierLearning->findByNormalized($normalizedSupplierName);
+                if ($learned && $learned['linked_supplier_id'] == $currentRecord->supplierId) {
+                    $selectionBadge = 'من التعلم';
+                }
             }
         }
+        
         array_unshift($supplierCandidates, [
             'supplier_id' => $currentRecord->supplierId,
             'name' => $currentRecord->supplierDisplayName,
@@ -212,6 +266,7 @@ if ($currentRecord) {
             'score_raw' => 1.0,
         ]);
     }
+
 
     // Auto-select 100% match candidates if not already linked (Threshold 0.99)
     if (empty($currentRecord->supplierId) && !empty($supplierCandidates)) {
@@ -1295,7 +1350,14 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                      const res = await fetch('/api/dictionary/suppliers', {
                          method: 'POST',
                          headers: {'Content-Type': 'application/json'},
-                         body: JSON.stringify({ official_name: name }) 
+                         body: JSON.stringify({ 
+                             official_name: name,
+                             // WHY: We send the 'raw_name_context' of the current record.
+                             // This tells the backend: "This NEW supplier is being created specifically for THIS raw name."
+                             // The backend uses this to immediately link them and pre-calculate match scores,
+                             // so when the user returns to the list, this supplier appears as a high-score suggestion.
+                             raw_name_context: <?= json_encode($currentRecord->rawSupplierName ?? '') ?>
+                         }) 
                      });
                      const json = await res.json();
                      if (json.success) {

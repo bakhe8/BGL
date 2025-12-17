@@ -4,44 +4,45 @@
  * CandidateService - Supplier & Bank Matching Engine
  * =============================================================================
  * 
- * 📚 DOCUMENTATION: docs/matching-system-guide.md
+ * VERSION: 5.0 (2025-12-17) - Cache-First Architecture
+ * 
+ * 📚 DOCUMENTATION: docs/09-Supplier-System-Refactoring.md
  * 
  * PURPOSE:
  * --------
  * This service finds potential matches (candidates) for raw supplier/bank names
- * imported from Excel files. It uses fuzzy matching algorithms to suggest
- * the most likely official supplier/bank from the database.
+ * imported from Excel files. Uses fuzzy matching + cache-first approach.
+ * 
+ * ARCHITECTURE (v5.0):
+ * -------------------
+ * 1. Check supplier_suggestions cache FIRST
+ * 2. If cache miss, generate candidates and save to cache
+ * 3. Blocking handled via block_count (gradual penalty)
  * 
  * KEY BUSINESS RULES:
  * -------------------
- * 1. EMPTY CANDIDATES IS VALID: If no supplier/bank scores >= 70%, the array
- *    is intentionally empty. This is NOT a bug.
- * 
+ * 1. EMPTY CANDIDATES IS VALID: If no supplier scores >= 70%
  * 2. THRESHOLDS:
- *    - MATCH_AUTO_THRESHOLD (90%): Auto-accept without user review
- *    - MATCH_REVIEW_THRESHOLD (70%): Minimum score to appear in suggestions
- *    - Scores below 70% are REJECTED to avoid misleading suggestions
+ *    - MATCH_AUTO_THRESHOLD (90%): Auto-accept
+ *    - MATCH_REVIEW_THRESHOLD (70%): Minimum to appear
+ * 3. STAR RATINGS (UNIFIED):
+ *    - >=200 points = 3 stars ⭐⭐⭐
+ *    - >=120 points = 2 stars ⭐⭐
+ *    - <120 points = 1 star ⭐
  * 
- * 3. SCORING ALGORITHMS (max score wins):
- *    - Exact match: 1.0
- *    - Starts with: 0.85
- *    - Contains: 0.75
- *    - Levenshtein ratio: 1 - (distance / max_length)
- *    - Token Jaccard: intersection / union of words
+ * SCORING FORMULA:
+ * ---------------
+ * total_score = (fuzzy × 100) + source_weight + min(usage × 15, 75)
+ * effective_score = total_score - (block_count × 50)
  * 
- * 4. DATA SOURCES (checked in order):
- *    - Learning table (cached user decisions)
- *    - Overrides table (manual mappings)
- *    - Official suppliers/banks
- *    - Alternative names
+ * DATA SOURCES:
+ * ------------
+ * 1. supplier_suggestions cache (PRIMARY)
+ * 2. suppliers (official dictionary)
+ * 3. supplier_alternative_names
+ * 4. supplier_overrides
  * 
- * DEBUGGING:
- * ----------
- * Run: php debug_supplier_match.php
- * This shows all suppliers and their similarity scores to help diagnose
- * why a particular name returns no candidates.
- * 
- * @see docs/matching-system-guide.md for full documentation
+ * @see docs/09-Supplier-System-Refactoring.md
  * =============================================================================
  */
 declare(strict_types=1);
@@ -50,11 +51,11 @@ namespace App\Services;
 
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\SupplierRepository;
+use App\Repositories\SupplierSuggestionRepository;
 use App\Support\Normalizer;
 use App\Support\Settings;
 use App\Support\Config;
 use App\Support\SimilarityCalculator;
-use App\Repositories\SupplierLearningRepository;
 
 /**
  * =============================================================================
@@ -89,10 +90,8 @@ class CandidateService
         private \App\Repositories\SupplierOverrideRepository $overrides = new \App\Repositories\SupplierOverrideRepository(),
         private Settings $settings = new Settings(),
         private ?\App\Repositories\BankLearningRepository $bankLearning = null,
-        private ?SupplierLearningRepository $supplierLearning = null,
     ) {
         $this->bankLearning = $this->bankLearning ?: new \App\Repositories\BankLearningRepository();
-        $this->supplierLearning = $this->supplierLearning ?: new SupplierLearningRepository();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -172,28 +171,42 @@ class CandidateService
         }
 
         $candidates = [];
-        $blockedId = null;
-
-        // التعلم أولاً
-        $learned = $this->supplierLearning?->findByNormalized($normalized);
-        if ($learned) {
-            if ($learned['learning_status'] === 'supplier_alias') {
-                // [MODIFIED] Do not return immediately. Add to candidates and continue.
-                $candidates[] = [
-                    'source' => 'learning',
-                    'match_type' => 'exact',
-                    'strength' => 'strong',
-                    'supplier_id' => (int) $learned['linked_supplier_id'],
-                    'name' => $learned['raw_name'] ?? $rawSupplier, // Use what user typed!
-                    'score' => 1.0,
-                    'score_raw' => 1.0,
-                    'is_learning' => true, // ← NEW: Mark as learning-based
-                ];
-            }
-            if ($learned['learning_status'] === 'supplier_blocked') {
-                $blockedId = (int) $learned['linked_supplier_id'];
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // CACHE-FIRST APPROACH (Updated 2025-12-17)
+        // ═══════════════════════════════════════════════════════════════════
+        // 1. Check NEW cache (supplier_suggestions) for learning-based matches
+        // 2. Blocking is now handled via block_count in the cache (gradual penalty)
+        //    - getSuggestions() filters out suppliers with negative effective_score
+        //    - getBlockedSupplierIds() returns IDs with negative score for filtering
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Get blocked supplier IDs from cache (used for filtering dictionary/alternatives)
+        $suggestionRepo = new SupplierSuggestionRepository();
+        $blockedIds = $suggestionRepo->getBlockedSupplierIds($normalized);
+        $cachedSuggestions = $suggestionRepo->getSuggestions($normalized, 10);
+        
+        if (!empty($cachedSuggestions)) {
+            // Use cached suggestions as primary source for learning matches
+            foreach ($cachedSuggestions as $cached) {
+                // Only add 'learning' source items (skip dictionary matches - they'll be re-added below)
+                if ($cached['source'] === 'learning' || $cached['source'] === 'user_history') {
+                    $candidates[] = [
+                        'source' => 'learning',
+                        'match_type' => 'exact',
+                        'strength' => 'strong',
+                        'supplier_id' => (int) $cached['supplier_id'],
+                        'name' => $cached['display_name'],
+                        'score' => 1.0,
+                        'score_raw' => (float) $cached['fuzzy_score'],
+                        'is_learning' => true,
+                        'usage_count' => (int) ($cached['usage_count'] ?? 0),
+                        'star_rating' => (int) ($cached['star_rating'] ?? 1),
+                    ];
+                }
             }
         }
+        // NOTE: Old fallback to supplier_aliases_learning removed (table deleted 2025-12-17)
 
         // Cache ONCE
         if ($this->cachedSuppliers === null) {
@@ -208,7 +221,7 @@ class CandidateService
             if ($scoreRaw < $reviewThreshold) {
                 continue;
             }
-            if ($blockedId && (int) $ov['supplier_id'] === $blockedId) {
+            if (in_array((int) $ov['supplier_id'], $blockedIds, true)) {
                 continue;
             }
             $candidates[] = [
@@ -243,7 +256,7 @@ class CandidateService
                 continue;
             }
 
-            if ($blockedId && (int) $supplier['id'] === $blockedId) {
+            if (in_array((int) $supplier['id'], $blockedIds, true)) {
                 continue;
             }
 
@@ -281,7 +294,7 @@ class CandidateService
         // تطابق أسماء بديلة (Direct DB still required unless cached)
         foreach ($this->supplierAlts->findAllByNormalized($normalized) as $alt) {
             // ... [Logic kept same but wrapped for blockedId]
-            if ($blockedId && (int) $alt['supplier_id'] === $blockedId)
+            if (in_array((int) $alt['supplier_id'], $blockedIds, true))
                 continue;
 
             // Resolve Official Name
@@ -303,7 +316,7 @@ class CandidateService
 
         // Fuzzy Alts
         foreach ($this->supplierAlts->allNormalized() as $alt) {
-            if ($blockedId && (int) $alt['supplier_id'] === $blockedId) {
+            if (in_array((int) $alt['supplier_id'], $blockedIds, true)) {
                 continue;
             }
             $candNorm = $this->normalizer->normalizeSupplierName($alt['normalized_raw_name'] ?? $alt['raw_name']);

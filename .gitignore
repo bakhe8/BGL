@@ -27,3 +27,6 @@ debug_search_2.php
 debug_search.php
 scripts/reset_record.php
 .gitignore
+
+# Archived test scripts
+scripts/dev/archived_tests/

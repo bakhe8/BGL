@@ -1,19 +1,20 @@
 # نظام إدارة أسماء الموردين - توثيق شامل
 
 > **آخر تحديث**: 2025-12-17  
-> **الإصدار**: 4.0 (قبل التبسيط)  
-> **الحالة**: 🔄 قيد التحديث - Refactoring in Progress
+> **الإصدار**: 5.0 (Cache-First Architecture)  
+> **الحالة**: ✅ مكتمل ومستقر
 
 ---
 
 ## 📋 الفهرس
 
 1. [نظرة عامة](#نظرة-عامة)
-2. [الوضع الحالي (Before)](#الوضع-الحالي-before)
-3. [المشاكل والتعقيدات](#المشاكل-والتعقيدات)
-4. [الحل المقترح (After)](#الحل-المقترح-after)
-5. [خطة التنفيذ التفصيلية](#خطة-التنفيذ-التفصيلية)
-6. [مرجع التراجع](#مرجع-التراجع)
+2. [البنية الحالية](#البنية-الحالية)
+3. [خوارزمية التقييم](#خوارزمية-التقييم)
+4. [خوارزمية الحظر التدريجي](#خوارزمية-الحظر-التدريجي)
+5. [تدفق العمل](#تدفق-العمل)
+6. [الملفات الرئيسية](#الملفات-الرئيسية)
+7. [سجل التغييرات](#سجل-التغييرات)
 
 ---
 
@@ -21,488 +22,282 @@
 
 ### ما هذا النظام؟
 
-نظام يتعامل مع أسماء الموردين في عدة مراحل:
+نظام ذكي للتعامل مع أسماء الموردين:
 1. **استيراد** أسماء من ملفات Excel
-2. **مطابقة** مع القواميس الرسمية
-3. **تعلم** من اختيارات المستخدم
-4. **اقتراح** أسماء ذكية للسجلات الجديدة
-5. **نشر** القرارات على سجلات مشابهة
+2. **مطابقة** مع القواميس الرسمية (fuzzy matching)
+3. **تعلم** من اختيارات المستخدم (usage tracking)
+4. **اقتراح** ذكي بناءً على الوزن والتاريخ
+5. **حظر تدريجي** للموردين غير المناسبين
 
-### لماذا التغيير؟
+### المميزات الرئيسية
 
-| المشكلة | التأثير |
-|---------|---------|
-| المنطق معقد جداً | صعوبة الصيانة والتطوير |
-| الحسابات تتكرر | بطء في الأداء |
-| الجداول متداخلة | صعوبة التتبع والفهم |
-| لا سجل للقرارات | لا نعرف مصدر كل اسم |
+| الميزة | الوصف |
+|--------|-------|
+| **Cache-First** | الاقتراحات محسوبة مسبقاً - لا تكرار |
+| **تقييم النجوم** | ⭐⭐⭐ نظام من 1-3 نجوم |
+| **الحظر التدريجي** | حظر واحد لا يُخفي المورد فوراً |
+| **سجل القرارات** | كل قرار مُسجّل بمصدره |
 
 ---
 
-## 📊 الوضع الحالي (Before)
+## 📊 البنية الحالية
 
-### الجداول المستخدمة حالياً:
+### الجداول النشطة
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    الهيكل الحالي                            │
+│                    ACTIVE TABLES (v5.0)                      │
 ├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  1. suppliers                                               │
-│     └─ id, official_name                                    │
-│     └─ القاموس الرسمي للموردين                              │
-│                                                             │
-│  2. supplier_alternative_names                              │
-│     └─ supplier_id, alternative_name                        │
-│     └─ أسماء بديلة يدوية                                    │
-│                                                             │
-│  3. supplier_aliases_learning                               │
-│     └─ original_supplier_name                               │
-│     └─ normalized_supplier_name                             │
-│     └─ linked_supplier_id                                   │
-│     └─ usage_count, last_used_at                            │
-│     └─ التعلم الآلي من اختيارات المستخدم                    │
-│                                                             │
-│  4. imported_records                                        │
-│     └─ raw_supplier_name (من Excel)                         │
-│     └─ supplier_id (المختار)                                │
-│     └─ supplier_display_name (للعرض)                        │
-│                                                             │
+│                                                              │
+│  1. supplier_suggestions  ⭐ الجدول الرئيسي للتعلم          │
+│     ├─ normalized_input    (الاسم المُطبّع من Excel)        │
+│     ├─ supplier_id         (المورد المقترح)                 │
+│     ├─ display_name        (الاسم للعرض)                    │
+│     ├─ source              (dictionary/learning/user_history)│
+│     ├─ fuzzy_score         (0.0 - 1.0)                      │
+│     ├─ source_weight       (40-100)                         │
+│     ├─ usage_count         (عدد مرات الاختيار)              │
+│     ├─ block_count         (عدد مرات الحظر) ⭐ NEW          │
+│     ├─ total_score         (النقاط الإجمالية)               │
+│     └─ star_rating         (1-3 نجوم)                       │
+│                                                              │
+│  2. user_decisions  (سجل كل القرارات)                       │
+│     ├─ record_id, session_id                                │
+│     ├─ raw_name, normalized_name                            │
+│     ├─ chosen_supplier_id, chosen_display_name              │
+│     ├─ decision_source (user_click/propagation/auto)        │
+│     └─ decided_at                                           │
+│                                                              │
+│  3. suppliers (القاموس الرسمي)                               │
+│  4. supplier_alternative_names (الأسماء البديلة اليدوية)    │
+│  5. imported_records (السجلات المستوردة)                     │
+│                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### تدفق العمل الحالي:
+### الجداول المحذوفة (v5.0)
 
-#### 1. عند الاستيراد:
 ```
-Excel → import.php
-  │
-  ▼
-INSERT INTO imported_records (
-    raw_supplier_name = "ABC TRADING CO",
-    supplier_id = NULL,
-    supplier_display_name = NULL
-)
+❌ supplier_aliases_learning  → تم ترحيل البيانات إلى supplier_suggestions
+❌ SupplierLearningRepository.php  → تم حذف الملف
 ```
 
-#### 2. عند فتح صفحة القرار:
+---
+
+## 📈 خوارزمية التقييم
+
+### الصيغة الأساسية
+
+```
+total_score = (fuzzy_score × 100) + source_weight + usage_bonus
+```
+
+### القيم
+
+| المكون | النطاق | الوصف |
+|--------|--------|-------|
+| `fuzzy_score × 100` | 0-100 | درجة التشابه النصي |
+| `source_weight` | 40-100 | وزن حسب المصدر |
+| `usage_bonus` | 0-75 | min(usage_count × 15, 75) |
+
+### أوزان المصادر
+
+```php
+'learning'     => 100   // من التعلم السابق
+'user_history' => 80    // من قرار مستخدم  
+'alternatives' => 60    // من الأسماء البديلة
+'dictionary'   => 40    // من القاموس الرسمي
+```
+
+### تصنيف النجوم
+
+```php
+if ($totalScore >= 200) return 3;  // ⭐⭐⭐
+if ($totalScore >= 120) return 2;  // ⭐⭐
+return 1;                           // ⭐
+```
+
+---
+
+## 🚫 خوارزمية الحظر التدريجي
+
+### المشكلة القديمة
+```
+حظر واحد = إخفاء فوري ودائم ❌
+```
+
+### الحل الجديد (v5.0)
+
+```
+effective_score = total_score - (block_count × 50)
+```
+
+### السلوك
+
+| block_count | العقوبة | التأثير |
+|-------------|---------|---------|
+| 0 | 0 | يظهر عادي |
+| 1 | -50 | يظهر (مرتبة أقل) |
+| 2 | -100 | يظهر (منخفض جداً) |
+| 3+ | -150+ | يختفي (score ≤ 0) |
+
+### التعافي
+
+إذا اختار المستخدم المورد "المحظور":
+- `usage_count++` → `+15 نقطة`
+- يُعيد التوازن تدريجياً
+
+---
+
+## 🔄 تدفق العمل
+
+### عند فتح صفحة القرار
+
 ```
 decision.php?record_id=123
         │
         ▼
 ┌───────────────────────────────────────┐
-│ CandidateService->supplierCandidates()│
+│ Check supplier_suggestions cache      │
+│ WHERE normalized_input = ?            │
+│ AND effective_score > 0               │
 └───────────────────────────────────────┘
         │
-        ├── Query 1: SELECT FROM suppliers WHERE name LIKE...
-        ├── Query 2: SELECT FROM supplier_alternative_names WHERE...
-        ├── Query 3: SELECT FROM supplier_aliases_learning WHERE...
+        ├── Found? → استخدم النتائج المخزّنة ✓
         │
-        ▼
-┌───────────────────────────────────────┐
-│ لكل نتيجة:                            │
-│   - Calculate Levenshtein distance    │
-│   - Calculate base score              │
-│   - Get usage stats                   │
-│   - Calculate bonus points            │
-│   - Assign star rating                │
-└───────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────┐
-│ Sort by total_score DESC              │
-│ Return top 6 candidates               │
-└───────────────────────────────────────┘
+        └── Not found? → توليد + حفظ في الكاش
 ```
 
-**المشكلة**: كل هذا يحدث **في كل مرة** يفتح فيها المستخدم سجل!
+### عند الحفظ
 
-#### 3. عند الحفظ:
-```
-User clicks Save → process_update.php
-        │
-        ├── UPDATE imported_records SET supplier_id = X
-        │
-        ├── INSERT/UPDATE supplier_aliases_learning
-        │   (create or increment usage)
-        │
-        └── UPDATE imported_records 
-            WHERE session_id = same AND raw_name = same
-            AND supplier_id IS NULL
-            (propagation)
-```
-
-### الملفات المعنية:
-
-| الملف | الدور |
-|-------|------|
-| `www/decision.php` | عرض الصفحة + توليد Candidates |
-| `www/process_update.php` | حفظ القرار + التعلم + النشر |
-| `app/Services/CandidateService.php` | خوارزمية المطابقة والتقييم |
-| `app/Repositories/SupplierLearningRepository.php` | التعلم وتتبع الاستخدام |
-| `app/Repositories/SupplierRepository.php` | القاموس الرسمي |
-| `app/Repositories/SupplierAlternativeNameRepository.php` | الأسماء البديلة |
-
----
-
-## ⚠️ المشاكل والتعقيدات
-
-### المشكلة 1: الحسابات المتكررة
-
-```
-السجل 12028 يُفتح 5 مرات = 5 × (3 queries + fuzzy matching + scoring)
-
-لو كان لدينا 100 سجل بنفس الاسم:
-  = 100 × نفس الحسابات!
-```
-
-**الحل**: Cache النتائج في جدول.
-
----
-
-### المشكلة 2: التعلم والـ Scoring متداخلان
-
-```
-supplier_aliases_learning يحتوي:
-  - original_name → linked_supplier_id (للتعلم)
-  - usage_count, last_used_at (للـ Scoring)
-
-جدول واحد = غرضان مختلفان = صعوبة الصيانة
-```
-
-**الحل**: فصلهما في جدولين.
-
----
-
-### المشكلة 3: لا سجل للقرارات
-
-```
-السؤال: هذا السجل، من أين جاء اسم المورد فيه؟
-- من Excel؟
-- من اختيار المستخدم؟
-- من Propagation؟
-- من التعلم؟
-
-الجواب: لا نعرف! لا يوجد سجل.
-```
-
-**الحل**: جدول `user_decisions` يسجل كل قرار.
-
----
-
-### المشكلة 4: Current Selection معقد
-
-```
-لعرض "الاختيار الحالي" نحتاج:
-  1. Check if supplier_id exists
-  2. Fetch official_name from suppliers
-  3. Compare with raw_supplier_name
-  4. Check if from learning or dictionary
-  5. Determine badge text
-  
-5 خطوات لمجرد badge!
-```
-
-**الحل**: حقل `decision_source` يخزّن المصدر مباشرة.
-
----
-
-## ✅ الحل المقترح (After)
-
-### الجداول الجديدة:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    الهيكل الجديد                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  [الجداول الحالية تبقى كما هي]                              │
-│                                                             │
-│  + جدول جديد: supplier_suggestions                         │
-│    └─ normalized_input (from Excel)                        │
-│    └─ supplier_id                                          │
-│    └─ display_name                                         │
-│    └─ source (dictionary/learning/alternatives/history)    │
-│    └─ fuzzy_score, source_weight, usage_count              │
-│    └─ total_score, star_rating                             │
-│    └─ = Cache للاقتراحات المحسوبة                          │
-│                                                             │
-│  + جدول جديد: user_decisions                               │
-│    └─ record_id, session_id                                │
-│    └─ raw_name, normalized_name                            │
-│    └─ chosen_supplier_id, chosen_display_name              │
-│    └─ decision_source (user_click/propagation/auto)        │
-│    └─ decided_at                                           │
-│    └─ = سجل كل القرارات                                    │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### التدفق الجديد:
-
-#### عند فتح صفحة القرار:
-```
-decision.php?record_id=123
-        │
-        ▼
-SELECT * FROM supplier_suggestions
-WHERE normalized_input = ?
-ORDER BY total_score DESC
-LIMIT 6
-        │
-        ├── Found? → Use cached suggestions ✓
-        │
-        └── Not found? → Generate once → Save to cache
-```
-
-**الفرق**: Query واحد بسيط بدلاً من 3 queries + matching!
-
-#### عند الحفظ:
 ```
 User clicks Save
         │
-        ├── 1. UPDATE imported_records
+        ├── 1. UPDATE imported_records (supplier_id, supplier_display_name)
         │
         ├── 2. INSERT INTO user_decisions (مع decision_source)
         │
         ├── 3. UPDATE supplier_suggestions SET usage_count++
-        │       (تحديث فوري للـ cache)
+        │       (OR increment block_count if blocking)
         │
-        └── 4. Propagate + INSERT user_decisions لكل propagated
+        ├── 4. Sync to supplier_alternative_names (visible alias)
+        │
+        └── 5. Propagate to same session records
+```
+
+### عند الحظر
+
+```
+User blocks supplier X
+        │
+        ▼
+UPDATE supplier_suggestions
+SET block_count = block_count + 1
+WHERE normalized_input = ? AND supplier_id = X
+        │
+        ▼
+effective_score = total_score - (block_count × 50)
+        │
+        ├── score > 0 → still visible, lower rank
+        └── score ≤ 0 → hidden from suggestions
 ```
 
 ---
 
-## 📋 خطة التنفيذ التفصيلية
+## 📁 الملفات الرئيسية
 
-### Phase 1: Database (الجداول)
+### الـ Repositories
 
-**الملف**: `storage/migrations/add_suggestion_tables.sql`
+| الملف | الدور |
+|-------|------|
+| `SupplierSuggestionRepository.php` | إدارة كاش الاقتراحات |
+| `UserDecisionRepository.php` | سجل القرارات |
+| `SupplierRepository.php` | القاموس الرسمي |
+| `SupplierAlternativeNameRepository.php` | الأسماء البديلة |
 
+### الـ Services
+
+| الملف | الدور |
+|-------|------|
+| `CandidateService.php` | خوارزمية المطابقة (cache-first) |
+| `MatchingService.php` | المطابقة أثناء الاستيراد |
+
+### الـ Controllers
+
+| الملف | الدور |
+|-------|------|
+| `DecisionController.php` | حفظ القرارات + التعلم + الحظر |
+| `DictionaryController.php` | إدارة الموردين + إضافة جديد |
+
+### الواجهة
+
+| الملف | الدور |
+|-------|------|
+| `www/decision.php` | صفحة اتخاذ القرار |
+
+---
+
+## 📝 سجل التغييرات
+
+### v5.0 (2025-12-17) - تحديث شامل
+
+#### الإضافات
+- ✅ خوارزمية الحظر التدريجي (`block_count`)
+- ✅ ترحيل من `supplier_aliases_learning` إلى `supplier_suggestions`
+- ✅ جدول `user_decisions` لسجل القرارات
+- ✅ تحديث الكاش عند تعديل اسم المورد
+
+#### التحسينات
+- ✅ توحيد عتبات النجوم (200/120) عبر كل الملفات
+- ✅ إصلاح bug: `supplier_display_name` لم يكن يُحفظ
+- ✅ Cache-First في `CandidateService` و `MatchingService`
+
+#### الحذف
+- ❌ حذف `supplier_aliases_learning` table
+- ❌ حذف `SupplierLearningRepository.php`
+- ❌ إزالة fallback للجدول القديم
+
+### v4.0 (2025-12-16) - بداية التبسيط
+- إنشاء `supplier_suggestions` table
+- إنشاء `user_decisions` table
+- بداية Cache-First approach
+
+### v3.0 (2025-12-15) - Phase 5: Current Selection
+- Usage tracking
+- Star ratings
+- Current selection indicator
+
+---
+
+## ✅ Checklist الحالي
+
+- [x] **Database**: الجداول الجديدة مُنشأة
+- [x] **Repositories**: مُنفذة ومختبرة
+- [x] **CandidateService**: Cache-First
+- [x] **MatchingService**: Cache-First
+- [x] **DecisionController**: التعلم + الحظر التدريجي
+- [x] **Migration**: بيانات مرحّلة
+- [x] **Cleanup**: الكود القديم محذوف
+- [x] **Documentation**: مُحدثة
+
+---
+
+## 🔧 الصيانة
+
+### إضافة مورد جديد
+يتم تلقائياً في `DictionaryController::createSupplier`:
+1. إنشاء المورد في `suppliers`
+2. إضافة إلى `supplier_suggestions` مع `usage_count=1`
+
+### إعادة حساب الكاش
+```php
+$suggestionRepo->clearCache($normalizedInput);
+// سيُعاد الحساب تلقائياً عند الطلب التالي
+```
+
+### عرض السجلات المحظورة
 ```sql
--- 1. جدول الاقتراحات المُخزّنة
-CREATE TABLE IF NOT EXISTS supplier_suggestions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    normalized_input VARCHAR(500) NOT NULL,
-    supplier_id INTEGER NOT NULL,
-    display_name VARCHAR(500) NOT NULL,
-    source VARCHAR(50) NOT NULL,
-    fuzzy_score REAL DEFAULT 0.0,
-    source_weight INTEGER DEFAULT 0,
-    usage_count INTEGER DEFAULT 0,
-    total_score REAL DEFAULT 0.0,
-    star_rating INTEGER DEFAULT 1,
-    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(normalized_input, supplier_id, source)
-);
-
-CREATE INDEX idx_suggestions_input ON supplier_suggestions(normalized_input);
-CREATE INDEX idx_suggestions_score ON supplier_suggestions(total_score DESC);
-
--- 2. جدول سجل القرارات
-CREATE TABLE IF NOT EXISTS user_decisions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    record_id INTEGER NOT NULL,
-    session_id INTEGER NOT NULL,
-    raw_name VARCHAR(500) NOT NULL,
-    normalized_name VARCHAR(500) NOT NULL,
-    chosen_supplier_id INTEGER NOT NULL,
-    chosen_display_name VARCHAR(500),
-    decision_source VARCHAR(50) NOT NULL,
-    decided_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (chosen_supplier_id) REFERENCES suppliers(id),
-    FOREIGN KEY (record_id) REFERENCES imported_records(id)
-);
-
-CREATE INDEX idx_decisions_normalized ON user_decisions(normalized_name);
-CREATE INDEX idx_decisions_supplier ON user_decisions(chosen_supplier_id);
-CREATE INDEX idx_decisions_record ON user_decisions(record_id);
+SELECT * FROM supplier_suggestions 
+WHERE block_count > 0
+ORDER BY block_count DESC;
 ```
-
-**الخطوات**:
-1. [ ] إنشاء ملف migration
-2. [ ] تشغيل SQL على database.sqlite
-3. [ ] التحقق من الجداول
-
----
-
-### Phase 2: Repositories (الكود)
-
-**ملفات جديدة**:
-
-#### 2.1. `app/Repositories/SupplierSuggestionRepository.php`
-
-```php
-class SupplierSuggestionRepository {
-    
-    // جلب الاقتراحات من الـ cache
-    public function getSuggestions(string $normalizedInput, int $limit = 6): array;
-    
-    // إضافة اقتراحات جديدة للـ cache
-    public function saveSuggestions(string $normalizedInput, array $suggestions): void;
-    
-    // تحديث usage و score
-    public function incrementUsage(string $normalizedInput, int $supplierId): void;
-    
-    // إعادة حساب الـ scores
-    public function recalculateScore(string $normalizedInput, int $supplierId): void;
-    
-    // التحقق من وجود cache
-    public function hasCachedSuggestions(string $normalizedInput): bool;
-}
-```
-
-#### 2.2. `app/Repositories/UserDecisionRepository.php`
-
-```php
-class UserDecisionRepository {
-    
-    // تسجيل قرار جديد
-    public function logDecision(
-        int $recordId,
-        int $sessionId,
-        string $rawName,
-        string $normalizedName,
-        int $supplierId,
-        string $displayName,
-        string $source  // 'user_click', 'user_typed', 'propagation', 'auto_select'
-    ): int;
-    
-    // جلب آخر قرار لسجل معين
-    public function getLastDecision(int $recordId): ?array;
-    
-    // جلب أكثر الموردين اختياراً لاسم معين
-    public function getMostChosenSuppliers(string $normalizedName, int $limit = 5): array;
-}
-```
-
-**الخطوات**:
-1. [ ] إنشاء `SupplierSuggestionRepository.php`
-2. [ ] إنشاء `UserDecisionRepository.php`
-3. [ ] اختبار كل method
-
----
-
-### Phase 3: decision.php (العرض)
-
-**التغييرات**:
-
-```php
-// الكود القديم (معقد):
-$supplierCandidates = $candidateService->supplierCandidates($rawName)['candidates'];
-// + enrichment + scoring + sorting + ...
-
-// الكود الجديد (بسيط):
-$suggestionRepo = new SupplierSuggestionRepository();
-$normalized = $normalizer->normalizeSupplierName($rawName);
-
-if ($suggestionRepo->hasCachedSuggestions($normalized)) {
-    $supplierCandidates = $suggestionRepo->getSuggestions($normalized);
-} else {
-    // Generate once and cache
-    $candidates = $candidateService->generateAndScore($rawName);
-    $suggestionRepo->saveSuggestions($normalized, $candidates);
-    $supplierCandidates = $candidates;
-}
-
-// Current selection from decisions table
-$decisionRepo = new UserDecisionRepository();
-$lastDecision = $decisionRepo->getLastDecision($recordId);
-$decisionSource = $lastDecision['decision_source'] ?? null;
-```
-
-**الخطوات**:
-1. [ ] إضافة imports للـ repositories الجديدة
-2. [ ] تعديل قسم توليد الـ candidates
-3. [ ] تعديل قسم Current Selection
-4. [ ] اختبار العرض
-
----
-
-### Phase 4: process_update.php (الحفظ)
-
-**التغييرات**:
-
-```php
-// بعد تحديث السجل:
-
-// 1. تسجيل القرار
-$decisionRepo = new UserDecisionRepository();
-$decisionRepo->logDecision(
-    $recordId,
-    $sessionId,
-    $rawName,
-    $normalizedName,
-    $supplierId,
-    $displayName,
-    'user_click' // or 'user_typed'
-);
-
-// 2. تحديث الـ cache
-$suggestionRepo = new SupplierSuggestionRepository();
-$suggestionRepo->incrementUsage($normalizedName, $supplierId);
-
-// 3. Propagation مع تسجيل
-$propagated = $records->propagateToSession($sessionId, $rawName, $supplierId);
-foreach ($propagated as $propagatedRecordId) {
-    $decisionRepo->logDecision(
-        $propagatedRecordId,
-        $sessionId,
-        $rawName,
-        $normalizedName,
-        $supplierId,
-        $displayName,
-        'propagation'  // ← نوع مختلف!
-    );
-}
-```
-
-**الخطوات**:
-1. [ ] إضافة logging للقرارات
-2. [ ] إضافة تحديث الـ cache
-3. [ ] تعديل propagation ليسجل
-4. [ ] اختبار الحفظ
-
----
-
-### Phase 5: Migration & Cleanup
-
-**الخطوات**:
-1. [ ] نقل بيانات learning الحالية إلى suggestions
-2. [ ] التحقق من backward compatibility
-3. [ ] اختبار شامل لكل السيناريوهات
-4. [ ] تنظيف الكود القديم (لاحقاً)
-
----
-
-## 🔙 مرجع التراجع
-
-### إذا حدثت مشكلة:
-
-**الـ Tag للتراجع**:
-```bash
-git checkout v3.0-pre-refactor
-```
-
-**أو من الـ Branch**:
-```bash
-git log --oneline
-git checkout b6f634b  # آخر commit قبل التغييرات
-```
-
-**الوضع الآمن**:
-- كل الجداول الحالية **لن تُحذف**
-- الكود القديم **لن يُزال** حتى الاختبار الكامل
-- الجداول الجديدة **إضافية** فقط
-
----
-
-## ✅ Checklist التنفيذ
-
-- [ ] **Phase 1**: Database tables created
-- [ ] **Phase 2**: Repositories implemented
-- [ ] **Phase 3**: decision.php updated
-- [ ] **Phase 4**: process_update.php updated
-- [ ] **Phase 5**: Migration complete
-- [ ] **Testing**: All scenarios verified
-- [ ] **Cleanup**: Old code removed (optional)

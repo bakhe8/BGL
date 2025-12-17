@@ -230,7 +230,7 @@ class ImportedRecordRepository
      * تحديث جماعي لجميع السجلات بنفس اسم المورد الخام في نفس الجلسة
      * يُستخدم لنشر القرار فورياً على السجلات المتشابهة
      * 
-     * @return int عدد السجلات المُحدّثة
+     * @return array قائمة بمعرّفات السجلات التي تم تحديثها
      */
     public function bulkUpdateSupplierByRawName(
         int $sessionId,
@@ -238,53 +238,70 @@ class ImportedRecordRepository
         int $excludeId,
         int $supplierId,
         ?string $supplierDisplayName = null
-    ): int {
+    ): array {
         $pdo = Database::connection();
+        $updatedIds = [];
 
-        // تحديث السجلات التي لديها bank_id إلى 'ready'
-        $sqlReady = 'UPDATE imported_records 
-                SET supplier_id = :sid, 
-                    supplier_display_name = :sdn,
-                    match_status = :status
+        // 1. Find records to be updated (Ready status)
+        $sqlFindReady = 'SELECT id FROM imported_records 
                 WHERE session_id = :sess 
                   AND raw_supplier_name = :raw 
                   AND id != :ex 
                   AND (supplier_id IS NULL OR supplier_id = 0)
                   AND bank_id IS NOT NULL AND bank_id > 0';
-
-        $stmtReady = $pdo->prepare($sqlReady);
-        $stmtReady->execute([
-            'sid' => $supplierId,
-            'sdn' => $supplierDisplayName,
-            'status' => 'ready',
+        
+        $stmtFindReady = $pdo->prepare($sqlFindReady);
+        $stmtFindReady->execute([
             'sess' => $sessionId,
             'raw' => $rawSupplierName,
             'ex' => $excludeId,
         ]);
-        $readyCount = $stmtReady->rowCount();
+        $idsReady = $stmtFindReady->fetchAll(PDO::FETCH_COLUMN);
 
-        // تحديث السجلات التي ليس لديها bank_id إلى 'needs_review'
-        $sqlReview = 'UPDATE imported_records 
-                SET supplier_id = :sid, 
-                    supplier_display_name = :sdn,
-                    match_status = :status
+        // 2. Find records to be updated (Review status)
+        $sqlFindReview = 'SELECT id FROM imported_records 
                 WHERE session_id = :sess 
                   AND raw_supplier_name = :raw 
                   AND id != :ex 
                   AND (supplier_id IS NULL OR supplier_id = 0)
                   AND (bank_id IS NULL OR bank_id = 0)';
-
-        $stmtReview = $pdo->prepare($sqlReview);
-        $stmtReview->execute([
-            'sid' => $supplierId,
-            'sdn' => $supplierDisplayName,
-            'status' => 'needs_review',
+        
+        $stmtFindReview = $pdo->prepare($sqlFindReview);
+        $stmtFindReview->execute([
             'sess' => $sessionId,
             'raw' => $rawSupplierName,
             'ex' => $excludeId,
         ]);
+        $idsReview = $stmtFindReview->fetchAll(PDO::FETCH_COLUMN);
 
-        return $readyCount + $stmtReview->rowCount();
+        // Merge all IDs
+        $updatedIds = array_merge($idsReady, $idsReview);
+
+        if (empty($updatedIds)) {
+            return [];
+        }
+
+        // 3. Update 'Ready' records
+        if (!empty($idsReady)) {
+            $inQueryReady = implode(',', array_map('intval', $idsReady));
+            $pdo->exec("UPDATE imported_records 
+                       SET supplier_id = $supplierId, 
+                           supplier_display_name = " . ($supplierDisplayName ? $pdo->quote($supplierDisplayName) : 'NULL') . ",
+                           match_status = 'ready'
+                       WHERE id IN ($inQueryReady)");
+        }
+
+        // 4. Update 'Review' records
+        if (!empty($idsReview)) {
+            $inQueryReview = implode(',', array_map('intval', $idsReview));
+            $pdo->exec("UPDATE imported_records 
+                       SET supplier_id = $supplierId, 
+                           supplier_display_name = " . ($supplierDisplayName ? $pdo->quote($supplierDisplayName) : 'NULL') . ",
+                           match_status = 'needs_review'
+                       WHERE id IN ($inQueryReview)");
+        }
+
+        return $updatedIds;
     }
 
 

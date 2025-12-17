@@ -1,11 +1,37 @@
 <?php
 /**
- * Supplier Suggestion Repository
+ * =============================================================================
+ * SupplierSuggestionRepository - الجدول الرئيسي للتعلم والاقتراحات
+ * =============================================================================
  * 
- * Manages the supplier_suggestions cache table.
- * This table stores pre-computed suggestions to avoid runtime calculations.
+ * VERSION: 5.0 (2025-12-17)
+ * 
+ * الوظائف الرئيسية:
+ * ─────────────────
+ * 1. تخزين الاقتراحات المحسوبة (Cache-First)
+ * 2. تتبع الاستخدام (usage_count)
+ * 3. الحظر التدريجي (block_count)
+ * 4. حساب النقاط والنجوم
+ * 
+ * خوارزمية التقييم:
+ * ────────────────
+ * total_score = (fuzzy_score × 100) + source_weight + min(usage × 15, 75)
+ * effective_score = total_score - (block_count × 50)
+ * 
+ * النجوم:
+ * ──────
+ * - ≥200 = 3 نجوم ⭐⭐⭐
+ * - ≥120 = 2 نجوم ⭐⭐
+ * - < 120 = 1 نجمة ⭐
+ * 
+ * الحظر التدريجي:
+ * ──────────────
+ * - كل حظر = -50 نقطة
+ * - المورد يختفي عندما effective_score ≤ 0
+ * - يمكن التعافي بالاستخدام (+15 لكل اختيار)
  * 
  * @see docs/09-Supplier-System-Refactoring.md
+ * =============================================================================
  */
 
 namespace App\Repositories;
@@ -24,6 +50,9 @@ class SupplierSuggestionRepository
         'alternatives' => 60,   // من الأسماء البديلة
         'dictionary' => 40,     // من القاموس الرسمي
     ];
+    
+    // Block penalty per block count (gradual blocking)
+    private const BLOCK_PENALTY = 50;
     
     public function __construct()
     {
@@ -45,8 +74,9 @@ class SupplierSuggestionRepository
     
     /**
      * Get cached suggestions for a normalized input
+     * UPDATED: Includes block_count and applies penalty, filters negative scores
      * 
-     * @return array Suggestions ordered by total_score DESC
+     * @return array Suggestions ordered by effective_score DESC (only positive scores)
      */
     public function getSuggestions(string $normalizedInput, int $limit = 6): array
     {
@@ -59,10 +89,13 @@ class SupplierSuggestionRepository
                 source_weight,
                 usage_count,
                 total_score,
-                star_rating
+                star_rating,
+                COALESCE(block_count, 0) as block_count,
+                (total_score - COALESCE(block_count, 0) * " . self::BLOCK_PENALTY . ") as effective_score
             FROM supplier_suggestions
             WHERE normalized_input = ?
-            ORDER BY total_score DESC
+            AND (total_score - COALESCE(block_count, 0) * " . self::BLOCK_PENALTY . ") > 0
+            ORDER BY effective_score DESC
             LIMIT ?
         ");
         $stmt->execute([$normalizedInput, $limit]);
@@ -196,7 +229,7 @@ class SupplierSuggestionRepository
     }
     
     /**
-     * Calculate total score
+     * Calculate total score (without block penalty - that's applied at query time)
      * Formula: (fuzzy × 100) + source_weight + min(usage × 15, 75)
      */
     private function calculateScore(float $fuzzyScore, int $sourceWeight, int $usageCount): float
@@ -207,14 +240,101 @@ class SupplierSuggestionRepository
     }
     
     /**
+     * ═══════════════════════════════════════════════════════════════════
+     * GRADUAL BLOCKING (NEW - 2025-12-17)
+     * ═══════════════════════════════════════════════════════════════════
+     * Increment block count for a suggestion.
+     * Each block adds a -50 penalty to effective score.
+     * Supplier only disappears when effective score goes negative.
+     * 
+     * @param string $normalizedInput Normalized raw name
+     * @param int $supplierId Supplier to block
+     * @return bool Success
+     */
+    public function incrementBlock(string $normalizedInput, int $supplierId): bool
+    {
+        // Check if exists
+        $stmt = $this->db->prepare("
+            SELECT id, block_count FROM supplier_suggestions
+            WHERE normalized_input = ? AND supplier_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$normalizedInput, $supplierId]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$existing) {
+            // Create a new entry with block_count = 1 and low score
+            return $this->createBlockedEntry($normalizedInput, $supplierId);
+        }
+        
+        // Increment block count
+        $updateStmt = $this->db->prepare("
+            UPDATE supplier_suggestions
+            SET block_count = COALESCE(block_count, 0) + 1,
+                last_updated = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        
+        return $updateStmt->execute([$existing['id']]);
+    }
+    
+    /**
+     * Create a blocked entry for a supplier that wasn't in suggestions
+     */
+    private function createBlockedEntry(string $normalizedInput, int $supplierId): bool
+    {
+        $supplierStmt = $this->db->prepare("SELECT official_name FROM suppliers WHERE id = ?");
+        $supplierStmt->execute([$supplierId]);
+        $supplier = $supplierStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$supplier) {
+            return false;
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO supplier_suggestions (
+                normalized_input, supplier_id, display_name, source,
+                fuzzy_score, source_weight, usage_count, block_count,
+                total_score, star_rating, last_updated
+            ) VALUES (?, ?, ?, 'dictionary', 0.5, 40, 0, 1, 90, 1, CURRENT_TIMESTAMP)
+        ");
+        
+        return $stmt->execute([
+            $normalizedInput,
+            $supplierId,
+            $supplier['official_name'],
+        ]);
+    }
+    
+    /**
      * Assign star rating based on total score
-     * >=220 = 3 stars, >=160 = 2 stars, else = 1 star
+     * UNIFIED THRESHOLDS (2025-12-17):
+     * >=200 = 3 stars, >=120 = 2 stars, else = 1 star
+     * (Matches CandidateService::assignStarRating)
      */
     private function assignStarRating(float $totalScore): int
     {
-        if ($totalScore >= 220) return 3;
-        if ($totalScore >= 160) return 2;
+        if ($totalScore >= 200) return 3;
+        if ($totalScore >= 120) return 2;
         return 1;
+    }
+    
+    /**
+     * Get supplier IDs that are effectively blocked (negative effective_score)
+     * Used by CandidateService to filter dictionary/alternatives searches
+     * 
+     * @return array<int> Array of blocked supplier IDs
+     */
+    public function getBlockedSupplierIds(string $normalizedInput): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT supplier_id
+            FROM supplier_suggestions
+            WHERE normalized_input = ?
+            AND (total_score - COALESCE(block_count, 0) * " . self::BLOCK_PENALTY . ") <= 0
+        ");
+        $stmt->execute([$normalizedInput]);
+        return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'supplier_id');
     }
     
     /**

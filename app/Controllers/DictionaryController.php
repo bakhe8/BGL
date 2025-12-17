@@ -6,8 +6,8 @@ namespace App\Controllers;
 use App\Repositories\SupplierRepository;
 use App\Repositories\BankRepository;
 use App\Repositories\SupplierAlternativeNameRepository;
+use App\Repositories\SupplierSuggestionRepository;
 use App\Support\Normalizer;
-use App\Support\Config;
 use App\Support\SimilarityCalculator;
 
 /**
@@ -92,6 +92,44 @@ class DictionaryController
             'supplier_normalized_key' => $key,
             'is_confirmed' => 1,
         ]);
+
+        // -----------------------------------------------------------
+        // FIX: Link new supplier to current raw name context immediately
+        //      AND Recalculate Scoring properly (User Feedback)
+        // -----------------------------------------------------------
+        if (!empty($payload['raw_name_context'])) {
+            try {
+                $rawContext = trim((string)$payload['raw_name_context']);
+                $normContext = $this->normalizer->normalizeSupplierName($rawContext);
+                
+                if (!empty($normContext)) {
+                    // ═══════════════════════════════════════════════════════════════════
+                    // ADD NEW SUPPLIER TO CACHE (Updated 2025-12-17)
+                    // ═══════════════════════════════════════════════════════════════════
+                    // 1. Run CandidateService to get all possible matches (including new supplier)
+                    // 2. Save results to supplier_suggestions cache
+                    // 3. Force usage_count=1 for immediate visibility
+                    // ═══════════════════════════════════════════════════════════════════
+                    
+                    // 1. Create suggestion entry directly (no need for CandidateService for new supplier)
+                    $suggestionRepo = new SupplierSuggestionRepository();
+                    $suggestionRepo->saveSuggestions($normContext, [[
+                        'supplier_id' => (int)$supplier->id,
+                        'display_name' => $supplier->officialName ?? $name,
+                        'source' => 'user_history',
+                        'fuzzy_score' => 1.0,
+                        'usage_count' => 1,
+                    ]]);
+                    
+                    // Also increment usage to ensure visibility
+                    $suggestionRepo->incrementUsage($normContext, (int)$supplier->id);
+                }
+            } catch (\Throwable $e) {
+                // Log but don't fail the creation
+                \App\Support\Logger::error('Failed to recalculate suggestions for new supplier', ['error' => $e->getMessage()]);
+            }
+        }
+
         echo json_encode(['success' => true, 'data' => $supplier]);
     }
 
@@ -129,6 +167,30 @@ class DictionaryController
             'normalized_name' => $normalized,
             'supplier_normalized_key' => $key,
         ]);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // CACHE INVALIDATION (Stabilization Fix - 2025-12-17)
+        // ═══════════════════════════════════════════════════════════════════
+        // WHY: When a supplier's name changes, the cached suggestions still
+        // contain the OLD display_name. We must refresh all cache entries
+        // that reference this supplier_id to reflect the new name.
+        // ═══════════════════════════════════════════════════════════════════
+        try {
+            $db = \App\Support\Database::connection();
+            // Update all cache entries for this supplier with the new display_name
+            $stmt = $db->prepare("
+                UPDATE supplier_suggestions 
+                SET display_name = ?, last_updated = CURRENT_TIMESTAMP
+                WHERE supplier_id = ?
+            ");
+            $stmt->execute([$name, $id]);
+        } catch (\Throwable $e) {
+            \App\Support\Logger::error('Failed to invalidate supplier cache', [
+                'supplier_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+        }
+        
         echo json_encode(['success' => true]);
     }
 

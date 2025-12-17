@@ -13,7 +13,8 @@ use App\Repositories\LearningLogRepository;
 use App\Repositories\BankLearningRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\SupplierOverrideRepository;
-use App\Repositories\SupplierLearningRepository;
+use App\Repositories\SupplierSuggestionRepository;
+use App\Repositories\UserDecisionRepository;
 use App\Support\Settings;
 use App\Services\MatchingService;
 use App\Services\AutoAcceptService;
@@ -35,7 +36,6 @@ class DecisionController
     private $normalizer;
     private $learningLog;
     private $bankLearning;
-    private $supplierLearning;
     private $matchingService;
 
     /**
@@ -66,7 +66,6 @@ class DecisionController
         $this->normalizer = $normalizer ?: new Normalizer();
         $this->learningLog = $learningLog ?: new LearningLogRepository();
         $this->bankLearning = new BankLearningRepository();
-        $this->supplierLearning = new SupplierLearningRepository();
         $this->matchingService = new MatchingService(
             new SupplierRepository(),
             new SupplierAlternativeNameRepository(),
@@ -272,12 +271,17 @@ class DecisionController
 
         $this->records->updateDecision($id, $update);
 
-        // Learning: Supplier
+        // ═══════════════════════════════════════════════════════════════════
+        // SUPPLIER LEARNING & DISPLAY NAME (Cleanup 2025-12-17)
+        // ═══════════════════════════════════════════════════════════════════
+        // BUG FIX: Use $record->rawSupplierName instead of $update['raw_supplier_name']
+        // because the frontend rarely sends raw_supplier_name in the payload
         try {
-            if (!empty($update['supplier_id']) && !empty($update['raw_supplier_name'])) {
-                $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
+            $rawSupplierName = $record->rawSupplierName ?? $update['raw_supplier_name'] ?? null;
+            if (!empty($update['supplier_id']) && !empty($rawSupplierName)) {
+                $norm = $this->normalizer->normalizeSupplierName($rawSupplierName);
 
-                // Refresh supplier name for display freeze
+                // 1. Refresh supplier name for display freeze
                 try {
                     $supplierName = (new SupplierRepository())->find((int) $update['supplier_id'])?->officialName;
                     if ($supplierName) {
@@ -287,40 +291,43 @@ class DecisionController
                     // Ignore display name fetch error
                 }
 
-                // تسجيل التعلم alias
-                $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_alias', (int) $update['supplier_id'], 'review');
-
-                // Sync to Dictionary (Visible Alias)
+                // 2. Sync to Dictionary (Visible Alias)
+                // This creates an official alternative name in supplier_alternative_names table
                 try {
                     $this->supplierAlts->create(
                         (int) $update['supplier_id'],
-                        $update['raw_supplier_name'],
+                        $rawSupplierName,
                         $norm,
                         'manual_review'
                     );
                 } catch (\Throwable $e) {
                     // Ignore if exists
                 }
-            } elseif (!empty($payload['supplier_blocked_id']) && !empty($update['raw_supplier_name'])) {
-                /**
-                 * Blocking Mechanism (آلية الحظر):
-                 * CRITICAL UPDATE [User Feedback]:
-                 * The logic must be: Block a specific CANDIDATE (supplier_blocked_id) from being suggested 
-                 * for this specific Raw Name. It should NOT block the Raw Name itself globally.
-                 * 
-                 * Current Impl: Accepts supplier_blocked_id.
-                 * Requirement: Ensure MatcherService respects this 'blocked' relationship.
-                 *
-                 * When user REJECTS a suggested supplier and chooses a different one:
-                 * - Save 'supplier_blocked' in supplier_learning table with the ID of the BAD suggestion.
-                 * - Future imports will skip this supplier_id for this normalized name.
-                 */
-                $norm = $this->normalizer->normalizeSupplierName($update['raw_supplier_name']);
+                
+                // NOTE (Cleanup): Removed OLD learning write to supplier_aliases_learning
+                // Alias learning is now handled by supplier_suggestions cache (Phase 4)
+                
+            } elseif (!empty($payload['supplier_blocked_id']) && !empty($rawSupplierName)) {
+                // ═══════════════════════════════════════════════════════════════════
+                // GRADUAL BLOCKING (Migrated 2025-12-17)
+                // ═══════════════════════════════════════════════════════════════════
+                // Instead of immediate hide, we increment block_count in supplier_suggestions.
+                // Each block adds -50 penalty. Supplier only disappears when score goes negative.
+                // This allows recovery if user selects it again (usage_count adds +15 per use).
+                // ═══════════════════════════════════════════════════════════════════
+                $norm = $this->normalizer->normalizeSupplierName($rawSupplierName);
                 $blockedId = (int) $payload['supplier_blocked_id'];
-                $this->supplierLearning->upsert($norm, $update['raw_supplier_name'], 'supplier_blocked', $blockedId, 'review');
+                
+                // Use NEW gradual blocking system
+                $suggestionRepo = new SupplierSuggestionRepository();
+                $suggestionRepo->incrementBlock($norm, $blockedId);
+                
+                \App\Support\Logger::info('Supplier blocked (gradual)', [
+                    'normalized_input' => $norm,
+                    'blocked_supplier_id' => $blockedId,
+                ]);
             }
         } catch (\Throwable $e) {
-            // Log supplier learning errors to storage/logs/app.log
             \App\Support\Logger::error('Supplier Learning Error', [
                 'message' => $e->getMessage(),
                 'record_id' => $id,
@@ -349,6 +356,48 @@ class DecisionController
             ]);
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // NEW: Log decision and update cache (Phase 4 Refactoring)
+        // ═══════════════════════════════════════════════════════════════════
+        try {
+            if (!empty($update['supplier_id']) && !empty($record->rawSupplierName)) {
+                $decisionRepo = new UserDecisionRepository();
+                $suggestionRepo = new SupplierSuggestionRepository();
+                $norm = $this->normalizer->normalizeSupplierName($record->rawSupplierName);
+                
+                // Get supplier display name
+                $supplierDisplayName = null;
+                try {
+                    $supplierDisplayName = (new SupplierRepository())->find((int) $update['supplier_id'])?->officialName;
+                } catch (\Throwable $e) { /* ignore */ }
+                
+                // Log the decision
+                $decisionRepo->logDecision(
+                    $id,
+                    $record->sessionId,
+                    $record->rawSupplierName,
+                    $norm,
+                    (int) $update['supplier_id'],
+                    $supplierDisplayName ?? '',
+                    UserDecisionRepository::SOURCE_USER_CLICK
+                );
+                
+                // Update suggestion cache (increment usage)
+                $suggestionRepo->incrementUsage($norm, (int) $update['supplier_id']);
+                
+                \App\Support\Logger::info('Decision logged', [
+                    'record_id' => $id,
+                    'supplier_id' => $update['supplier_id'],
+                    'source' => 'user_click',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \App\Support\Logger::error('Decision logging failed', [
+                'message' => $e->getMessage(),
+                'record_id' => $id,
+            ]);
+        }
+
         // نشر القرار فوراً على السجلات الأخرى بنفس اسم المورد في نفس الجلسة
         $propagatedCount = 0;
         try {
@@ -360,15 +409,30 @@ class DecisionController
                     // Ignore
                 }
 
-                $propagatedCount = $this->records->bulkUpdateSupplierByRawName(
+                $propagatedIds = $this->records->bulkUpdateSupplierByRawName(
                     $record->sessionId,
                     $record->rawSupplierName,
                     $id,
                     (int) $update['supplier_id'],
                     $supplierDisplayName
                 );
+                
+                $propagatedCount = count($propagatedIds);
 
                 if ($propagatedCount > 0) {
+                    // NEW: Log propagated decisions (Phase 4)
+                    try {
+                        $norm = $this->normalizer->normalizeSupplierName($record->rawSupplierName);
+                        $decisionRepo->logPropagation(
+                            $propagatedIds,
+                            $record->sessionId,
+                            $record->rawSupplierName,
+                            $norm,
+                            (int) $update['supplier_id'],
+                            $supplierDisplayName ?? ''
+                        );
+                    } catch (\Throwable $e) { /* ignore propagation logging errors */ }
+                    
                     \App\Support\Logger::info('Decision propagated', [
                         'record_id' => $id,
                         'supplier_id' => $update['supplier_id'],
