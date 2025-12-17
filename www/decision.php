@@ -130,7 +130,12 @@ if ($currentRecord) {
     // ═══════════════════════════════════════════════════════════════════
     // CURRENT SELECTION INDICATOR (ADDED 2025-12-17): Show what's selected
     // ═══════════════════════════════════════════════════════════════════
-    if (!empty($currentRecord->supplierId) && !empty($currentRecord->supplierDisplayName)) {
+    // OPTION 2: Don't create chip if selected name = raw Excel name (avoid duplication)
+    $shouldShowSelectionChip = !empty($currentRecord->supplierId) && 
+                               !empty($currentRecord->supplierDisplayName) &&
+                               ($currentRecord->supplierDisplayName !== $currentRecord->rawSupplierName);
+    
+    if ($shouldShowSelectionChip) {
         $selectionBadge = 'الاختيار الحالي';
         $selectionSource = 'dictionary';
         if (!empty($currentRecord->rawSupplierName)) {
@@ -711,6 +716,18 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
                                             placeholder="<?= htmlspecialchars($currentRecord->rawSupplierName ?? 'ابحث عن المورد...') ?>" autocomplete="off"
                                             value="<?= htmlspecialchars($currentRecord->supplierDisplayName ?? $currentRecord->rawSupplierName ?? '') ?>">
                                         <input type="hidden" id="supplierId" value="<?= $currentRecord->supplierId ?? '' ?>">
+                                        
+                                        <!-- OPTION 1: Show raw Excel name if different from selection -->
+                                        <?php if (!empty($currentRecord->rawSupplierName) && 
+                                                  !empty($currentRecord->supplierDisplayName) &&
+                                                  $currentRecord->rawSupplierName !== $currentRecord->supplierDisplayName): ?>
+                                        <div class="text-xs text-gray-500 mt-1 flex items-center gap-1 px-1">
+                                            <span>📄</span>
+                                            <span class="opacity-75">من الاكسل:</span>
+                                            <strong class="text-gray-700">"<?= htmlspecialchars($currentRecord->rawSupplierName) ?>"</strong>
+                                        </div>
+                                        <?php endif; ?>
+                                        
                                         <ul class="suggestions-list" id="supplierSuggestions"></ul>
 
                                         <!-- Candidate Chips -->
