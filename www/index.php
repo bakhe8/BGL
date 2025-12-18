@@ -89,8 +89,8 @@ use App\Support\Normalizer;
 // ═══════════════════════════════════════════════════════════════════
 // API ROUTER (Restored Logic)
 // ═══════════════════════════════════════════════════════════════════
-$uri = $_SERVER['REQUEST_URI'];
-$method = $_SERVER['REQUEST_METHOD'];
+$uri = $_SERVER['REQUEST_URI'] ?? '/';
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if (str_starts_with($uri, '/api/')) {
     // Ensure JSON header for all API responses
@@ -1213,7 +1213,8 @@ elseif ($filter === 'pending') $filterText = 'سجل يحتاج قرار';
             banks: <?= json_encode($allBanks) ?>,
             recordId: <?= $currentRecord?->id ?? 'null' ?>,
             nextUrl: <?= $hasNext ? '"' . $buildUrl($nextId) . '"' : 'null' ?>,
-            rawSupplierName: <?= json_encode($currentRecord->rawSupplierName ?? '') ?>
+            rawSupplierName: <?= json_encode($currentRecord->rawSupplierName ?? '') ?>,
+            sessionId: <?= $sessionId ?? 'null' ?>
         };
     </script>
     

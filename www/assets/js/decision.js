@@ -381,9 +381,24 @@
     const btnPrintAll = document.getElementById('btnPrintAll');
     if (btnPrintAll) {
         btnPrintAll.addEventListener('click', () => {
+            // Try to get session_id from URL params first, then from config
             const urlParams = new URLSearchParams(window.location.search);
-            const sid = urlParams.get('session_id');
-            if (sid) {
+            let sid = urlParams.get('session_id');
+            
+            // If not in URL, try to get from config (which PHP sets)
+            if (!sid && config.sessionId) {
+                sid = config.sessionId;
+            }
+            
+            // If still no session_id, try to read from meta display
+            if (!sid) {
+                const metaElem = document.getElementById('metaSessionId');
+                if (metaElem) {
+                    sid = metaElem.textContent.trim();
+                }
+            }
+            
+            if (sid && sid !== '-') {
                 // Create hidden iframe for printing without leaving page
                 const iframe = document.createElement('iframe');
                 iframe.style.position = 'fixed';
@@ -403,7 +418,7 @@
 
                 document.body.appendChild(iframe);
             } else {
-                alert('لا يوجد رقم جلسة محدد');
+                alert('لا يوجد رقم جلسة محدد. الرجاء اختيار جلسة أولاً أو استيراد ملف.');
             }
         });
     }
