@@ -71,7 +71,17 @@ if ($recordId) {
     }
 }
 if (!$currentRecord && !empty($filteredRecords)) {
-    $currentRecord = $filteredRecords[0];
+    // Smart Jump: Find the first pending record to save user time
+    foreach ($filteredRecords as $r) {
+        if (!in_array($r->matchStatus, ['ready', 'approved'])) {
+            $currentRecord = $r;
+            break;
+        }
+    }
+    // Fallback: If all are ready, just show the first one
+    if (!$currentRecord) {
+        $currentRecord = $filteredRecords[0];
+    }
 }
 
 // Calculate navigation
@@ -80,6 +90,20 @@ $hasPrev = $currentIndex > 0;
 $hasNext = $currentIndex < $totalRecords - 1;
 $prevId = $hasPrev ? $filteredRecords[$currentIndex - 1]->id : null;
 $nextId = $hasNext ? $filteredRecords[$currentIndex + 1]->id : null;
+
+// Smart Skip Logic: Find next pending record for the "Save & Next" action
+$nextPendingId = null;
+for ($i = $currentIndex + 1; $i < $totalRecords; $i++) {
+    $r = $filteredRecords[$i];
+    if (!in_array($r->matchStatus, ['ready', 'approved'])) {
+        $nextPendingId = $r->id;
+        break;
+    }
+}
+// Fallback: If no pending records ahead, standard next behavior
+if (!$nextPendingId && $hasNext) {
+    $nextPendingId = $nextId;
+}
 
 // Stats for current session (filtered)
 $stats = [

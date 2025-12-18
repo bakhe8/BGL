@@ -540,7 +540,7 @@
             suppliers: <?= json_encode($allSuppliers) ?>,
             banks: <?= json_encode($allBanks) ?>,
             recordId: <?= $currentRecord?->id ?? 'null' ?>,
-            nextUrl: <?= $hasNext ? '"' . $buildUrl($nextId) . '"' : 'null' ?>,
+            nextUrl: <?= $nextPendingId ? '"' . $buildUrl($nextPendingId) . '"' : ($hasNext ? '"' . $buildUrl($nextId) . '"' : 'null') ?>,
             rawSupplierName: <?= json_encode($currentRecord->rawSupplierName ?? '') ?>,
             sessionId: <?= $sessionId ?? 'null' ?>
         };
