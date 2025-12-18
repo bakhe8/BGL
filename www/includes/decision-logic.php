@@ -72,9 +72,10 @@ if ($recordId) {
 }
 if (!$currentRecord && !empty($filteredRecords)) {
     // Smart Jump: Find the first pending record to save user time
-    foreach ($filteredRecords as $r) {
+    foreach ($filteredRecords as $index => $r) {
         if (!in_array($r->matchStatus, ['ready', 'approved'])) {
             $currentRecord = $r;
+            $currentIndex = $index;
             break;
         }
     }

@@ -79,7 +79,7 @@
   transform: rotate(-25deg);
   font-size: 48pt;
   font-weight: bold;
-  opacity: 0.15;
+  opacity: 0.35;
   pointer-events: none;
   z-index: 10;
   white-space: nowrap;
