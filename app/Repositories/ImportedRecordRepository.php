@@ -244,6 +244,7 @@ class ImportedRecordRepository
             $row['guarantee_number'] ?? null,
             $row['contract_number'] ?? null,
             $row['contract_source'] ?? null,
+            $row['related_to'] ?? null,           // FIXED: Was missing, caused column shift
             $row['issue_date'] ?? null,
             $row['expiry_date'] ?? null,
             $row['type'] ?? null,
