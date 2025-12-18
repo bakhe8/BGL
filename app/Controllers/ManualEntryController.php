@@ -89,13 +89,12 @@ class ManualEntryController
                 amount: $this->normalizeAmount($input['amount']),
                 guaranteeNumber: trim($input['guarantee_number']),
                 contractNumber: trim($input['contract_number']),
-                contractSource: null,  // deprecated
-                relatedTo: $input['related_to'] ?? 'contract',  // Now from UI input
+                relatedTo: $input['related_to'] ?? 'contract',
                 expiryDate: !empty($input['expiry_date']) ? $this->normalizeDate($input['expiry_date']) : null,
                 issueDate: !empty($input['issue_date']) ? $this->normalizeDate($input['issue_date']) : null,
                 type: !empty($input['type']) ? strtoupper(trim($input['type'])) : null,
                 comment: !empty($input['comment']) ? trim($input['comment']) : 'إدخال يدوي',
-                matchStatus: 'needs_review', // Default
+                matchStatus: 'needs_review',
                 supplierId: null,
                 bankId: null,
                 normalizedSupplier: null,

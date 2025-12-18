@@ -199,7 +199,6 @@ class ImportService
                     amount: $amount ?: null,
                     guaranteeNumber: $guarantee ?: null,
                     contractNumber: $finalContract,
-                    contractSource: null,  // deprecated
                     relatedTo: $relatedTo,
                     expiryDate: $expiry ?: null,
                     issueDate: $issue ?: null,

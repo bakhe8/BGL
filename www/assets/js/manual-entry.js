@@ -32,7 +32,6 @@
     };
 
     if (!modal || !btnOpen) {
-        console.error('Manual Entry: Required elements not found');
         return;
     }
 

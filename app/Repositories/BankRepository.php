@@ -66,7 +66,6 @@ class BankRepository
     }
 
     /** @return array<int, array{id:int, official_name:string, official_name_en:?string, normalized_key:?string, short_code:?string, is_confirmed:int, created_at:?string, updated_at:?string}> */
-    /** @return array<int, array{id:int, official_name:string, official_name_en:?string, normalized_key:?string, short_code:?string, is_confirmed:int, created_at:?string, updated_at:?string}> */
     public function search(string $normalizedLike): array
     {
         $pdo = Database::connection();

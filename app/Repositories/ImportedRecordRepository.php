@@ -20,10 +20,10 @@ class ImportedRecordRepository
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('INSERT INTO imported_records (
-            session_id, raw_supplier_name, raw_bank_name, amount, guarantee_number, contract_number, contract_source, issue_date, expiry_date, type, comment,
+            session_id, raw_supplier_name, raw_bank_name, amount, guarantee_number, contract_number, related_to, issue_date, expiry_date, type, comment,
             normalized_supplier, normalized_bank, match_status, supplier_id, bank_id, bank_display, supplier_display_name, created_at
         ) VALUES (
-            :session_id, :raw_supplier_name, :raw_bank_name, :amount, :guarantee_number, :contract_number, :contract_source, :issue_date, :expiry_date, :type, :comment,
+            :session_id, :raw_supplier_name, :raw_bank_name, :amount, :guarantee_number, :contract_number, :related_to, :issue_date, :expiry_date, :type, :comment,
             :normalized_supplier, :normalized_bank, :match_status, :supplier_id, :bank_id, :bank_display, :supplier_display_name, :created_at
         )');
 
@@ -34,7 +34,6 @@ class ImportedRecordRepository
             'amount' => $record->amount,
             'guarantee_number' => $record->guaranteeNumber,
             'contract_number' => $record->contractNumber,
-            'contract_source' => $record->contractSource,
             'related_to' => $record->relatedTo,
             'issue_date' => $record->issueDate,
             'expiry_date' => $record->expiryDate,
@@ -76,7 +75,7 @@ class ImportedRecordRepository
             amount = :amount,
             guarantee_number = :guarantee_number,
             contract_number = :contract_number,
-            contract_source = :contract_source,
+            related_to = :related_to,
             issue_date = :issue_date,
             expiry_date = :expiry_date,
             type = :type,
@@ -98,7 +97,7 @@ class ImportedRecordRepository
             'amount' => $record->amount,
             'guarantee_number' => $record->guaranteeNumber,
             'contract_number' => $record->contractNumber,
-            'contract_source' => $record->contractSource,
+            'related_to' => $record->relatedTo,
             'issue_date' => $record->issueDate,
             'expiry_date' => $record->expiryDate,
             'type' => $record->type,
@@ -133,7 +132,7 @@ class ImportedRecordRepository
             'amount' => 'amount',
             'guarantee_number' => 'guarantee_number',
             'contract_number' => 'contract_number',
-            'contract_source' => 'contract_source',
+            'related_to' => 'related_to',
             'issue_date' => 'issue_date',
             'expiry_date' => 'expiry_date',
             'type' => 'type',
@@ -243,8 +242,7 @@ class ImportedRecordRepository
             $row['amount'] ?? null,
             $row['guarantee_number'] ?? null,
             $row['contract_number'] ?? null,
-            $row['contract_source'] ?? null,
-            $row['related_to'] ?? null,           // FIXED: Was missing, caused column shift
+            $row['related_to'] ?? null,
             $row['issue_date'] ?? null,
             $row['expiry_date'] ?? null,
             $row['type'] ?? null,

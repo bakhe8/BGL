@@ -5,7 +5,6 @@
 
 const Stats = {
     init() {
-        console.log('Stats module initializing...');
         this.loadStats();
     },
 

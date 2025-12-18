@@ -76,7 +76,7 @@ class TextImportController
         }
 
         // 3. Create Session (Once)
-        $session = $this->sessions->create('excel');
+        $session = $this->sessions->create('smart_paste');
         $firstRecordId = null;
         $count = 0;
         
@@ -124,13 +124,12 @@ class TextImportController
             amount: isset($data['amount']) ? (string)$data['amount'] : null,
             guaranteeNumber: $data['guarantee_number'],
             contractNumber: $data['contract_number'] ?? null,
-            contractSource: null,
-            relatedTo: $relatedTo,  // FIXED: Was missing, now with auto-detection
+            relatedTo: $relatedTo,
             issueDate: null,
             expiryDate: $data['expiry_date'],
             type: $data['type'],
             comment: 'Smart Paste Import',
-            matchStatus: 'needs_review', // Default
+            matchStatus: 'needs_review',
             supplierId: null,
             bankId: null,
             bankDisplay: null,

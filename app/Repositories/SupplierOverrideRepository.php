@@ -18,32 +18,6 @@ class SupplierOverrideRepository
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Create a new supplier override
-     * 
-     * @deprecated Planned for future Override Management UI
-     * Currently not called by production code - prepared for when user wants
-     * to manually add overrides through a future dictionary management interface
-     */
-    public function create(int $supplierId, string $overrideName, string $normalized): void
-    {
-        $this->ensureTable();
-        $pdo = Database::connection();
-        // منع التكرار
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM supplier_overrides WHERE supplier_id = :sid AND normalized_override = :n');
-        $stmt->execute(['sid' => $supplierId, 'n' => $normalized]);
-        if ((int) $stmt->fetchColumn() > 0) {
-            return;
-        }
-
-        $stmt = $pdo->prepare('INSERT INTO supplier_overrides (supplier_id, override_name, normalized_override) VALUES (:sid, :o, :n)');
-        $stmt->execute([
-            'sid' => $supplierId,
-            'o' => $overrideName,
-            'n' => $normalized,
-        ]);
-    }
-
     private function ensureTable(): void
     {
         static $created = false;

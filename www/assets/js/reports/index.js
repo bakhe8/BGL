@@ -4,17 +4,13 @@
  */
 
 async function init() {
-    console.log('[Reports] Initializing...');
-
     try {
         await Promise.all([
             loadEfficiency(),
             loadBanks(),
             loadSuppliers()
         ]);
-        console.log('[Reports] Ready');
     } catch (e) {
-        console.error('[Reports] Error:', e);
         alert('Data load error: ' + e.message);
     }
 }
