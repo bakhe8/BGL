@@ -14,6 +14,7 @@ class ImportedRecord
         public ?string $guaranteeNumber = null,
         public ?string $contractNumber = null,
         public ?string $contractSource = null,
+        public ?string $relatedTo = null,  // NEW: replaces contract_source
         public ?string $issueDate = null,
         public ?string $expiryDate = null,
         public ?string $type = null,

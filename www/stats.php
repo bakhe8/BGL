@@ -54,6 +54,48 @@ foreach ($advancedStats['top_banks_value'] as $row) {
     $bankValueLabels[] = ($row['name'] ?? 'غير معروف');
     $bankValueData[] = $row['total_value'];
 }
+
+// 6. NEW: Import Methods Stats
+$importMethodsStats = $records->getImportMethodStats();
+$importMethodLabels = [];
+$importMethodCounts = [];
+$importMethodColors = ['#3b82f6', '#10b981', '#f59e0b']; // Blue, Green, Orange
+foreach ($importMethodsStats as $row) {
+    $sourceName = match($row['source']) {
+        'excel' => '📥 Excel',
+        'paste' => '📋 Smart Paste',
+        'manual' => '✍️ إدخال يدوي',
+        default => $row['source']
+    };
+    $importMethodLabels[] = $sourceName;
+    $importMethodCounts[] = $row['count'];
+}
+
+// 7. NEW: Guarantee Types Stats
+$guaranteeTypesStats = $records->getGuaranteeTypeStats();
+
+// 8. NEW: Top Suppliers
+$topSuppliersByCount = $records->getTopSuppliersByCount(10);
+$topSuppliersByValue = $records->getTopSuppliersByValue(10);
+
+// 9. NEW: Alerts
+$expiringGuarantees = $records->getExpiringGuarantees(30);
+// User requested simpler logic: just oldest pending, no specific age limit
+$oldIncompleteRecords = $records->getOldIncompleteRecords(20);
+
+// 10. NEW: Temporal Trends
+$temporalTrends = $records->getTemporalTrends(6);
+$trendLabels = [];
+$trendCounts = [];
+foreach ($temporalTrends as $row) {
+    $dateObj = DateTime::createFromFormat('Y-m', $row['month']);
+    $trendLabels[] = $dateObj ? $dateObj->format('M Y') : $row['month'];
+    $trendCounts[] = $row['count'];
+}
+
+// 11. NEW: Contract vs PO Stats
+$contractVsPoStats = $records->getContractVsPOStats();
+
 ?>
 <!doctype html>
 <html lang="ar" dir="rtl">
@@ -167,15 +209,25 @@ foreach ($advancedStats['top_banks_value'] as $row) {
                 </div>
             </div>
 
-            <!-- Dictionary Size -->
+            <!-- Suppliers Count -->
             <div class="metric-card">
                 <div class="flex justify-between items-start">
                     <div>
-                        <div class="metric-value text-xl"><?= number_format($suppliersCount) ?> <span class="text-sm font-normal text-gray-400">مورد</span></div>
-                        <div class="metric-value text-xl"><?= number_format($banksCount) ?> <span class="text-sm font-normal text-gray-400">بنك</span></div>
-                        <div class="metric-label mt-1">حجم القاموس</div>
+                        <div class="metric-value"><?= number_format($suppliersCount) ?></div>
+                        <div class="metric-label">مورد مسجل</div>
                     </div>
-                    <div class="metric-icon bg-purple-50 text-purple-600"><i data-lucide="book"></i></div>
+                    <div class="metric-icon bg-purple-50 text-purple-600"><i data-lucide="building-2"></i></div>
+                </div>
+            </div>
+
+            <!-- Banks Count -->
+            <div class="metric-card">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="metric-value"><?= number_format($banksCount) ?></div>
+                        <div class="metric-label">بنك معتمد</div>
+                    </div>
+                    <div class="metric-icon bg-indigo-50 text-indigo-600"><i data-lucide="landmark"></i></div>
                 </div>
             </div>
         </div>
@@ -301,12 +353,240 @@ foreach ($advancedStats['top_banks_value'] as $row) {
 
         </div>
 
+        <!-- SECTION 5: NEW - Import Methods & Guarantee Types -->
+        <div class="section-divider"></div>
+        <h2 class="text-lg font-bold mb-3 text-gray-700 mt-8">📊 تحليل طرق الإدخال و الأنواع</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Import Methods Pie Chart -->
+            <div class="card-box">
+                <div class="card-header flex justify-between items-center">
+                    <span>طرق إدخال البيانات</span>
+                    <i data-lucide="pie-chart" class="w-4 h-4 text-gray-400"></i>
+                </div>
+               <div class="p-4" style="height: 280px;">
+                    <canvas id="importMethodsChart"></canvas>
+                </div>
+                <div class="p-4 bg-gray-50 border-t">
+                    <div class="grid grid-cols-3 gap-2 text-xs">
+                        <?php foreach ($importMethodsStats as $idx => $row): ?>
+                        <div class="text-center">
+                            <div class="font-bold text-gray-800"><?= number_format($row['count']) ?></div>
+                            <div class="text-gray-500">
+                                <?php 
+                                echo match($row['source']) {
+                                    'excel' => '📥 Excel',
+                                    'paste' => '📋 Smart Paste',
+                                    'manual' => '✍️ يدوي',
+                                    default => $row['source']
+                                };
+                                ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guarantee Types Table -->
+            <div class="card-box">
+                <div class="card-header">أنواع الضمانات</div>
+                <table class="smart-table">
+                    <thead><tr><th>النوع</th><th>العدد</th><th>القيمة</th><th>المتوسط</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($guaranteeTypesStats as $row): ?>
+                        <tr>
+                            <td class="font-bold"><?= htmlspecialchars($row['type_name']) ?></td>
+                            <td><?= number_format($row['count']) ?></td>
+                            <td><?= number_format($row['total_value']) ?></td>
+                            <td class="text-xs text-gray-500"><?= number_format($row['avg_value'] ?? 0) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($guaranteeTypesStats)): ?><tr><td colspan="4" class="text-center text-gray-400">لا توجد بيانات</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SECTION: Contracts vs Purchase Orders -->
+        <div class="section-divider"></div>
+        <h2 class="text-lg font-bold mb-3 text-gray-700 mt-8">📜 العقود مقابل أوامر الشراء</h2>
+        <!-- Binary Comparison Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <?php 
+                $contractStats = array_filter($contractVsPoStats, fn($r) => $r['doc_type'] === 'contract');
+                $contractStats = reset($contractStats) ?: ['count' => 0, 'total_value' => 0];
+                
+                $poStats = array_filter($contractVsPoStats, fn($r) => $r['doc_type'] === 'purchase_order');
+                $poStats = reset($poStats) ?: ['count' => 0, 'total_value' => 0];
+                
+                $totalVal = ($contractStats['total_value'] ?? 0) + ($poStats['total_value'] ?? 0);
+                $contractPerc = $totalVal > 0 ? round(($contractStats['total_value'] ?? 0) / $totalVal * 100, 1) : 0;
+                $poPerc = $totalVal > 0 ? round(($poStats['total_value'] ?? 0) / $totalVal * 100, 1) : 0;
+            ?>
+            
+            <!-- Contracts Card -->
+            <div class="metric-card border-l-4 border-l-blue-600 bg-white shadow-sm p-6 rounded-lg relative overflow-hidden">
+                <div class="flex justify-between items-start z-10 relative">
+                    <div>
+                        <div class="text-gray-500 font-medium mb-1">عقود (Contracts)</div>
+                        <div class="text-3xl font-bold text-gray-800 mb-2"><?= number_format($contractStats['count']) ?></div>
+                        <div class="text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block">
+                            <?= number_format($contractStats['total_value'] ?? 0) ?> ريال
+                        </div>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full text-blue-600">
+                        <i data-lucide="file-text" class="w-8 h-8"></i>
+                    </div>
+                </div>
+                <!-- Percentage Bar -->
+                <div class="mt-4">
+                    <div class="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>النسبة من إجمالي القيمة</span>
+                        <span><?= $contractPerc ?>%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-blue-600 h-2 rounded-full" style="width: <?= $contractPerc ?>%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PO Card -->
+            <div class="metric-card border-l-4 border-l-green-600 bg-white shadow-sm p-6 rounded-lg relative overflow-hidden">
+                <div class="flex justify-between items-start z-10 relative">
+                    <div>
+                        <div class="text-gray-500 font-medium mb-1">أوامر شراء (Purchase Orders)</div>
+                        <div class="text-3xl font-bold text-gray-800 mb-2"><?= number_format($poStats['count']) ?></div>
+                        <div class="text-sm font-semibold text-green-600 bg-green-50 px-2 py-1 rounded inline-block">
+                            <?= number_format($poStats['total_value'] ?? 0) ?> ريال
+                        </div>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full text-green-600">
+                        <i data-lucide="shopping-cart" class="w-8 h-8"></i>
+                    </div>
+                </div>
+                <!-- Percentage Bar -->
+                <div class="mt-4">
+                    <div class="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>النسبة من إجمالي القيمة</span>
+                        <span><?= $poPerc ?>%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-green-600 h-2 rounded-full" style="width: <?= $poPerc ?>%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 6: NEW - Top Suppliers Analysis -->
+        <div class="section-divider"></div>
+        <h2 class="text-lg font-bold mb-3 text-gray-700 mt-8">🏢 تحليل الموردين</h2>
+        <div class="insights-grid">
+            <!-- Top Suppliers by Count -->
+            <div class="card-box">
+                <div class="card-header border-b-purple-500 border-b-2">أكثر 10 موردين نشاطاً (بالعدد)</div>
+                <table class="smart-table">
+                    <thead><tr><th>المورد</th><th>العدد</th><th>النسبة</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($topSuppliersByCount as $row): ?>
+                        <tr>
+                            <td class="font-bold"><?= htmlspecialchars(mb_substr($row['name'], 0, 30)) ?></td>
+                            <td class="text-center font-bold text-purple-600"><?= number_format($row['count']) ?></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="progress-bar w-20">
+                                        <div class="progress-fill bg-purple-500" style="width: <?= min(100, $row['percentage']) ?>%"></div>
+                                    </div>
+                                    <span class="text-xs"><?= $row['percentage'] ?>%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($topSuppliersByCount)): ?><tr><td colspan="3" class="text-center text-gray-400">لا توجد بيانات</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Top Suppliers by Value -->
+            <div class="card-box">
+                <div class="card-header border-b-green-500 border-b-2">أكثر 10 موردين بالقيمة المالية</div>
+                <table class="smart-table">
+                    <thead><tr><th>المورد</th><th>القيمة الإجمالية</th><th>العدد</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($topSuppliersByValue as $row): ?>
+                        <tr>
+                            <td class="font-bold"><?= htmlspecialchars(mb_substr($row['name'], 0, 30)) ?></td>
+                            <td class="text-center font-bold text-green-600"><?= number_format($row['total_value']) ?> <span class="text-xs text-gray-400">ريال</span></td>
+                            <td class="text-center text-xs"><?= number_format($row['count']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($topSuppliersByValue)): ?><tr><td colspan="3" class="text-center text-gray-400">لا توجد بيانات</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SECTION 7: NEW - Temporal Trends -->
+        <div class="section-divider"></div>
+        <h2 class="text-lg font-bold mb-3 text-gray-700 mt-8">📅 الاتجاهات الزمنية</h2>
+        <div class="card-box mb-8">
+            <div class="card-header flex justify-between items-center">
+                <span>معدل الإدخال (آخر 6 أشهر)</span>
+                <i data-lucide="trending-up" class="w-4 h-4 text-gray-400"></i>
+            </div>
+            <div class="p-4" style="height: 280px;">
+                <canvas id="temporalTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- SECTION 8: NEW - Alerts & Warnings -->
+        <div class="section-divider"></div>
+        <h2 class="text-lg font-bold mb-3 text-gray-700 mt-8">🚨 تنبيهات وإشعارات</h2>
+        <div class="insights-grid">
+            <!-- Expiring Guarantees -->
+            <div class="card-box">
+                <div class="card-header border-b-orange-500 border-b-2 text-orange-600">⚠️ ضمانات قريبة الانتهاء (خلال 30 يوم)</div>
+                <table class="smart-table">
+                    <thead><tr><th>رقم الضمان</th><th>المورد</th><th>الأيام المتبقية</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($expiringGuarantees as $row): ?>
+                        <tr class="<?= $row['days_remaining'] <= 7 ? 'bg-red-50' : 'bg-orange-50' ?>">
+                            <td class="font-mono font-bold"><?= htmlspecialchars($row['guarantee_number']) ?></td>
+                            <td class="text-xs"><?= htmlspecialchars(mb_substr($row['supplier'], 0, 20)) ?></td>
+                            <td class="text-center font-bold <?= $row['days_remaining'] <= 7 ? 'text-red-600' : 'text-orange-600' ?>">
+                                <?= $row['days_remaining'] ?> يوم
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($expiringGuarantees)): ?><tr><td colspan="3" class="text-center text-green-600">لا توجد ضمانات قريبة الانتهاء! 👍</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pending Records (Oldest First) -->
+            <div class="card-box">
+                <div class="card-header border-b-yellow-500 border-b-2 text-yellow-600">⏳ أقدم السجلات المعلقة</div>
+                <table class="smart-table">
+                    <thead><tr><th>رقم الضمان</th><th>المورد</th><th>العمر</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($oldIncompleteRecords as $row): ?>
+                        <tr>
+                            <td class="font-mono text-xs"><?= htmlspecialchars($row['guarantee_number']) ?></td>
+                            <td class="text-xs"><?= htmlspecialchars(mb_substr($row['supplier'], 0, 20)) ?></td>
+                            <td class="text-center font-bold text-gray-500"><?= $row['age_days'] ?> يوم</td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($oldIncompleteRecords)): ?><tr><td colspan="3" class="text-center text-green-600">كل السجلات محدثة! ممتاز 🎉</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </main>
 
     <script>
         lucide.createIcons();
 
-        // Charts
+        // Original Charts
         const ctxExpiry = document.getElementById('expiryChart').getContext('2d');
         new Chart(ctxExpiry, {
             type: 'bar',
@@ -333,6 +613,69 @@ foreach ($advancedStats['top_banks_value'] as $row) {
                 }]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {position:'bottom'} } }
+        });
+
+        // NEW: Import Methods Pie Chart
+        const ctxImportMethods = document.getElementById('importMethodsChart').getContext('2d');
+        new Chart(ctxImportMethods, {
+            type: 'pie',
+            data: {
+                labels: <?= json_encode($importMethodLabels) ?>,
+                datasets: [{
+                    data: <?= json_encode($importMethodCounts) ?>,
+                    backgroundColor: <?= json_encode($importMethodColors) ?>,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { family: 'Tajawal', size: 12 },
+                            padding: 10
+                        }
+                    }
+                }
+            }
+        });
+
+        // NEW: Temporal Trends Line Chart
+        const ctxTemporal = document.getElementById('temporalTrendChart').getContext('2d');
+        new Chart(ctxTemporal, {
+            type: 'line',
+            data: {
+                labels: <?= json_encode($trendLabels) ?>,
+                datasets: [{
+                    label: 'عدد السجلات',
+                    data: <?= json_encode($trendCounts) ?>,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
         });
     </script>
 </body>

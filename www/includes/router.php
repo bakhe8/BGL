@@ -67,7 +67,23 @@ if (str_starts_with($uri, '/api/')) {
             exit;
         }
 
-        // 6. Text Import API (Smart Paste)
+        // 6. Manual Entry API
+        if ($method === 'POST' && $uri === '/api/import/manual') {
+            $manualEntryController = new \App\Controllers\ManualEntryController(
+                $apiImportSessionRepo,
+                $apiRecords,
+                new \App\Services\MatchingService(
+                    new SupplierRepository(),
+                    new SupplierAlternativeNameRepository(),
+                    new BankRepository()
+                )
+            );
+            $payload = json_decode(file_get_contents('php://input'), true) ?? [];
+            $manualEntryController->handle($payload);
+            exit;
+        }
+
+        // 7. Text Import API (Smart Paste)
         if ($method === 'POST' && $uri === '/api/import/text') {
             $textImportController = new \App\Controllers\TextImportController(
                 new \App\Services\TextParsingService(new Normalizer()),

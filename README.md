@@ -22,7 +22,9 @@
    - **هام للمطورين**: شرح قاعدة البيانات (Schema)، والـ API، ومنطق الاستيراد.
 5. **[05-Deployment.md](docs/05-Deployment.md)**
    - كيفية تشغيل النظام محلياً، ومتطلبات السيرفر (PHP/SQLite).
-6. **[DEPLOYMENT-CHECKLIST.md](docs/DEPLOYMENT-CHECKLIST.md)** ⭐
+6. **[06-Manual-Entry.md](docs/06-Manual-Entry.md)** ✍️
+   - **الإدخال اليدوي**: دليل شامل لميزة الإدخال اليدوي للسجلات.
+7. **[DEPLOYMENT-CHECKLIST.md](docs/DEPLOYMENT-CHECKLIST.md)** ⭐
    - **قائمة التحقق الشاملة للنشر**: متطلبات السيرفر، خطوات النشر، النسخ الاحتياطي، والصيانة الدورية.
 
 ### للمطورين (For Developers)
@@ -38,6 +40,6 @@
 ## التشغيل السريع (Quick Start)
 
 ```bash
-php -S localhost:8000 -t www
+php -S localhost:8000 server.php
 ```
 ثم افتح: http://localhost:8000

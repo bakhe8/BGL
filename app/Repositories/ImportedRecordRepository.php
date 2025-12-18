@@ -35,6 +35,7 @@ class ImportedRecordRepository
             'guarantee_number' => $record->guaranteeNumber,
             'contract_number' => $record->contractNumber,
             'contract_source' => $record->contractSource,
+            'related_to' => $record->relatedTo,
             'issue_date' => $record->issueDate,
             'expiry_date' => $record->expiryDate,
             'type' => $record->type,
@@ -407,7 +408,7 @@ class ImportedRecordRepository
             WHERE raw_bank_name IS NOT NULL AND raw_bank_name != ''
             GROUP BY raw_bank_name 
             ORDER BY count DESC 
-            LIMIT 5
+            LIMIT 10
         ");
         $topBanks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -532,7 +533,7 @@ class ImportedRecordRepository
               AND raw_supplier_name != supplier_display_name
             GROUP BY raw_supplier_name, supplier_display_name
             ORDER BY count DESC
-            LIMIT 5
+            LIMIT 10
         ")->fetchAll(PDO::FETCH_ASSOC);
 
         return [
@@ -540,6 +541,211 @@ class ImportedRecordRepository
             'supplier_variations' => $variations,
             'common_corrections' => $corrections
         ];
+    }
+
+    /**
+     * إحصائيات طرق الإدخال
+     * Import Methods Statistics
+     */
+    public function getImportMethodStats(): array
+    {
+        $pdo = Database::connection();
+        
+        $stmt = $pdo->query("
+            SELECT 
+                COALESCE(s.session_type, 'unknown') as source,
+                COUNT(r.id) as count,
+                SUM(CASE WHEN r.match_status IN ('ready', 'approved') THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN r.amount IS NOT NULL THEN CAST(r.amount AS REAL) ELSE 0 END) as total_value
+            FROM imported_records r
+            JOIN import_sessions s ON r.session_id = s.id
+            GROUP BY s.session_type
+            ORDER BY count DESC
+        ");
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * إحصائيات أنواع الضمانات
+     * Guarantee Types Statistics
+     */
+    public function getGuaranteeTypeStats(): array
+    {
+        $pdo = Database::connection();
+        
+        $stmt = $pdo->query("
+            SELECT 
+                COALESCE(UPPER(type), 'غير محدد') as type_name,
+                COUNT(*) as count,
+                SUM(CASE WHEN amount IS NOT NULL THEN CAST(amount AS REAL) ELSE 0 END) as total_value,
+                AVG(CASE WHEN amount IS NOT NULL THEN CAST(amount AS REAL) ELSE NULL END) as avg_value
+            FROM imported_records
+            GROUP BY UPPER(type)
+            ORDER BY count DESC
+        ");
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * أكثر الموردين نشاطاً (بالعدد)
+     * Top Suppliers by Count
+     */
+    public function getTopSuppliersByCount(int $limit = 10): array
+    {
+        $pdo = Database::connection();
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                s.official_name as name,
+                COUNT(r.id) as count,
+                ROUND(COUNT(r.id) * 100.0 / (SELECT COUNT(*) FROM imported_records), 2) as percentage
+            FROM imported_records r
+            JOIN suppliers s ON r.supplier_id = s.id
+            WHERE r.supplier_id IS NOT NULL
+            GROUP BY s.id, s.official_name
+            ORDER BY count DESC
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * أكثر الموردين بالقيمة المالية
+     * Top Suppliers by Value
+     */
+    public function getTopSuppliersByValue(int $limit = 10): array
+    {
+        $pdo = Database::connection();
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                s.official_name as name,
+                SUM(CAST(r.amount AS REAL)) as total_value,
+                AVG(CAST(r.amount AS REAL)) as avg_value,
+                COUNT(*) as count
+            FROM imported_records r
+            JOIN suppliers s ON r.supplier_id = s.id
+            WHERE r.supplier_id IS NOT NULL AND r.amount IS NOT NULL AND r.amount != ''
+            GROUP BY s.id, s.official_name
+            ORDER BY total_value DESC
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * الضمانات القريبة من الانتهاء
+     * Expiring Guarantees Alert
+     */
+    public function getExpiringGuarantees(int $days = 30): array
+    {
+        $pdo = Database::connection();
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                id,
+                guarantee_number,
+                COALESCE(supplier_display_name, raw_supplier_name) as supplier,
+                COALESCE(bank_display, raw_bank_name) as bank,
+                expiry_date,
+                amount,
+                CAST(julianday(expiry_date) - julianday('now') AS INTEGER) as days_remaining
+            FROM imported_records
+            WHERE expiry_date IS NOT NULL 
+              AND expiry_date != ''
+              AND julianday(expiry_date) - julianday('now') BETWEEN 0 AND :days
+            ORDER BY days_remaining ASC
+            LIMIT 20
+        ");
+        $stmt->bindValue(':days', $days, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * السجلات المعلقة (الأقدم أولاً)
+     * Oldest Pending Records (No specific age limit)
+     */
+    public function getOldIncompleteRecords(int $limit = 20): array
+    {
+        $pdo = Database::connection();
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                id,
+                COALESCE(supplier_display_name, raw_supplier_name) as supplier,
+                COALESCE(bank_display, raw_bank_name) as bank,
+                guarantee_number,
+                created_at,
+                CAST(julianday('now') - julianday(created_at) AS INTEGER) as age_days
+            FROM imported_records
+            WHERE match_status IN ('needs_review', 'pending')
+            -- User requested to remove 7-day filter as guarantees last a year
+            -- showing oldest pending first
+            ORDER BY created_at ASC
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * اتجاهات زمنية - السجلات حسب الشهر
+     * Temporal Trends
+     */
+    public function getTemporalTrends(int $months = 12): array
+    {
+        $pdo = Database::connection();
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                strftime('%Y-%m', created_at) as month,
+                COUNT(*) as count,
+                SUM(CASE WHEN amount IS NOT NULL THEN CAST(amount AS REAL) ELSE 0 END) as total_value
+            FROM imported_records
+            WHERE created_at >= date('now', '-' || :months || ' months')
+            GROUP BY month
+            ORDER BY month ASC
+        ");
+        $stmt->bindValue(':months', $months, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * مقارنة العقود مقابل أوامر الشراء
+     * Contracts vs Purchase Orders Analysis
+     */
+    public function getContractVsPOStats(): array
+    {
+        $pdo = Database::connection();
+        
+        // Now using actual related_to field instead of heuristic
+        $stmt = $pdo->query("
+            SELECT 
+                related_to as doc_type,
+                COUNT(*) as count,
+                SUM(CASE WHEN amount IS NOT NULL THEN CAST(amount AS REAL) ELSE 0 END) as total_value,
+                AVG(CASE WHEN amount IS NOT NULL THEN CAST(amount AS REAL) ELSE NULL END) as avg_value
+            FROM imported_records
+            WHERE related_to IS NOT NULL
+            GROUP BY related_to
+            ORDER BY total_value DESC
+        ");
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 

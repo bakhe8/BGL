@@ -569,10 +569,17 @@
             errorDiv.classList.add('hidden');
 
             try {
+                // Get optional document type from selector
+                const relatedToSelect = document.getElementById('smartPasteRelatedTo');
+                const relatedTo = relatedToSelect ? relatedToSelect.value || null : null;
+
                 const res = await fetch('/api/import/text', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: text })
+                    body: JSON.stringify({
+                        text: text,
+                        related_to: relatedTo  // Optional: auto-detection fallback if null
+                    })
                 });
 
                 const json = await res.json();

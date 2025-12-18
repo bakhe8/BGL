@@ -71,6 +71,9 @@
                             <!-- Import Group -->
                             <button class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
                                 id="btnToggleImport" title="استيراد ملف Excel">📥</button>
+                            <!-- Manual Entry Button -->
+                            <button class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                                id="btnOpenManualEntry" title="إدخال يدوي">✍️</button>
                             <!-- Smart Paste Button Injected Here via JS -->
 
                             <div class="h-4 w-px bg-gray-300 mx-1"></div>
@@ -523,12 +526,152 @@
                 <textarea id="smartPasteInput" class="w-full h-48 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:border-blue-500 transition-all font-mono text-sm leading-relaxed" placeholder="مثال: يرجى إصدار ضمان بنكي بمبلغ 50,000 ريال لصالح شركة المراعي..."></textarea>
                 
                 <div id="smartPasteError" class="mt-3 text-red-600 text-sm hidden font-bold"></div>
+                
+                <!-- Document Type Selector (Optional) -->
+                <div class="mt-4">
+                    <label for="smartPasteRelatedTo" class="block text-sm font-medium text-gray-700 mb-1">نوع المستند (اختياري)</label>
+                    <select id="smartPasteRelatedTo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white">
+                        <option value="">-- سيتم التحديد تلقائيا --</option>
+                        <option value="contract"> عقود</option>
+                        <option value="purchase_order"> أوامر شراء</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">سيحاول النظام التعرف على النوع تلقائيا من النص</p>
+                </div>
             </div>
 
             <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
                 <button id="btnCancelSmartPaste" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">إلغاء</button>
                 <button id="btnProcessSmartPaste" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
                     <i data-lucide="sparkles" class="w-4 h-4"></i> تحليل وإضافة
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Entry Modal -->
+    <div id="manualEntryModal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center">
+        <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden animate-fade-in-up">
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <i data-lucide="edit-3" class="w-5 h-5 text-green-600"></i> إدخال سجل يدوي
+                </h3>
+                <button id="btnCloseManualEntry" class="text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none">&times;</button>
+            </div>
+            
+            <form id="manualEntryForm" class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Supplier -->
+                    <div class="form-group">
+                        <label for="manualSupplier" class="block text-sm font-bold text-gray-700 mb-1">
+                            المورد <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="manualSupplier" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                            placeholder="اسم المورد">
+                    </div>
+
+                    <!-- Bank -->
+                    <div class="form-group">
+                        <label for="manualBank" class="block text-sm font-bold text-gray-700 mb-1">
+                            البنك <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="manualBank" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                            placeholder="اسم البنك">
+                    </div>
+
+                    <!-- Guarantee Number -->
+                    <div class="form-group">
+                        <label for="manualGuarantee" class="block text-sm font-bold text-gray-700 mb-1">
+                            رقم الضمان <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="manualGuarantee" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                            placeholder="رقم الضمان">
+                    </div>
+
+                    <!-- Contract Number -->
+                    <div class="form-group">
+                        <label for="manualContract" class="block text-sm font-bold text-gray-700 mb-1">
+                            رقم العقد <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="manualContract" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                            placeholder="رقم العقد أو أمر الشراء">
+                    </div>
+
+                    <!-- Related To: Document Type -->
+                    <div class="form-group">
+                        <label for="manualRelatedTo" class="block text-sm font-bold text-gray-700 mb-1">
+                            نوع المستند <span class="text-red-500">*</span>
+                        </label>
+                        <select id="manualRelatedTo" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white">
+                            <option value="">-- اختر نوع المستند --</option>
+                            <option value="contract">📜 عقد</option>
+                            <option value="purchase_order">🛒 أمر شراء</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">هل هذا الضمان يعود لعقد أم لأمر شراء؟</p>
+                    </div>
+
+                    <!-- Amount -->
+                    <div class="form-group">
+                        <label for="manualAmount" class="block text-sm font-bold text-gray-700 mb-1">
+                            المبلغ <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="manualAmount" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                            placeholder="50000.00">
+                    </div>
+
+                    <!-- Expiry Date -->
+                    <div class="form-group">
+                        <label for="manualExpiry" class="block text-sm font-bold text-gray-700 mb-1">
+                            تاريخ الانتهاء
+                        </label>
+                        <input type="date" id="manualExpiry"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                    </div>
+
+                    <!-- Type -->
+                    <div class="form-group">
+                        <label for="manualType" class="block text-sm font-bold text-gray-700 mb-1">
+                            نوع الضمان
+                        </label>
+                        <select id="manualType"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                            <option value="">اختر النوع</option>
+                            <option value="FINAL">نهائي (FINAL)</option>
+                            <option value="ADVANCED">دفعة مقدمة (ADVANCED)</option>
+                        </select>
+                    </div>
+
+                    <!-- Issue Date -->
+                    <div class="form-group">
+                        <label for="manualIssue" class="block text-sm font-bold text-gray-700 mb-1">
+                            تاريخ الإصدار
+                        </label>
+                        <input type="date" id="manualIssue"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm">
+                    </div>
+                </div>
+
+                <!-- Comment -->
+                <div class="form-group mt-4">
+                    <label for="manualComment" class="block text-sm font-bold text-gray-700 mb-1">
+                        ملاحظات
+                    </label>
+                    <textarea id="manualComment" rows="2"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm resize-none"
+                        placeholder="ملاحظات إضافية..."></textarea>
+                </div>
+
+                <div id="manualEntryError" class="mt-3 text-red-600 text-sm hidden font-bold"></div>
+            </form>
+
+            <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+                <button id="btnCancelManualEntry" type="button" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">إلغاء</button>
+                <button id="btnSaveManualEntry" type="button" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold shadow-lg shadow-green-200 transition-all flex items-center gap-2">
+                    <i data-lucide="check" class="w-4 h-4"></i> حفظ وإضافة
                 </button>
             </div>
         </div>
@@ -555,6 +698,9 @@
 
     <!-- Guarantee Search Feature -->
     <script src="/assets/js/guarantee-search.js"></script>
+    
+    <!-- Manual Entry Feature -->
+    <script src="/assets/js/manual-entry.js"></script>
     
     <!-- Initialize Icons -->
     <script>

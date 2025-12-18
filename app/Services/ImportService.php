@@ -130,14 +130,14 @@ class ImportService
                 $guarantee = $this->colValue($row, $map['guarantee'] ?? null);
                 $contractVal = $this->colValue($row, $map['contract'] ?? null);
                 $poVal = $this->colValue($row, $map['po'] ?? null);
-                $contractSource = null;
+                $relatedTo = null;
                 $finalContract = null;
                 if ($contractVal !== '') {
                     $finalContract = $contractVal;
-                    $contractSource = 'contract';
+                    $relatedTo = 'contract';
                 } elseif ($poVal !== '') {
                     $finalContract = $poVal;
-                    $contractSource = 'po';
+                    $relatedTo = 'purchase_order';
                 }
                 $typeRaw = $this->colValue($row, $map['type'] ?? null);
                 $typeVal = trim($typeRaw) !== '' ? trim($typeRaw) : null;
@@ -195,7 +195,8 @@ class ImportService
                     amount: $amount ?: null,
                     guaranteeNumber: $guarantee ?: null,
                     contractNumber: $finalContract,
-                    contractSource: $contractSource,
+                    contractSource: null,  // deprecated
+                    relatedTo: $relatedTo,
                     expiryDate: $expiry ?: null,
                     issueDate: $issue ?: null,
                     type: $typeVal ?: null,
