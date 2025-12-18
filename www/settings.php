@@ -245,7 +245,7 @@ $banksList = $banks->allNormalized();
                             <td><code><?= htmlspecialchars($supplier['normalized_name'] ?? '') ?></code></td>
                             <td>
                                 <a href="/settings/supplier-form.php?id=<?= $supplier['id'] ?>" class="btn-xs btn-outline-primary">تعديل</a>
-                                <a href="/settings/supplier-delete.php?id=<?= $supplier['id'] ?>" class="btn-xs btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا المورد؟')">حذف</a>
+                                <a href="/settings/supplier-delete.php?id=<?= $supplier['id'] ?>" class="btn-xs btn-outline-danger">حذف</a>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -280,7 +280,7 @@ $banksList = $banks->allNormalized();
                             <td><code><?= htmlspecialchars($bank['short_code'] ?? '') ?></code></td>
                             <td>
                                 <a href="/settings/bank-form.php?id=<?= $bank['id'] ?>" class="btn-xs btn-outline-primary">تعديل</a>
-                                <a href="/settings/bank-delete.php?id=<?= $bank['id'] ?>" class="btn-xs btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذا البنك؟')">حذف</a>
+                                <a href="/settings/bank-delete.php?id=<?= $bank['id'] ?>" class="btn-xs btn-outline-danger">حذف</a>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -316,5 +316,26 @@ $banksList = $banks->allNormalized();
 
         </div>
     </main>
+    
+    <script>
+        // Modern delete confirmation
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle all delete links
+            const deleteLinks = document.querySelectorAll('a[href*="delete"]');
+            
+            deleteLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const url = this.getAttribute('href');
+                    const entityType = url.includes('supplier') ? 'المورد' : 'البنك';
+                    
+                    if (confirm(`هل أنت متأكد من حذف هذا ${entityType}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`)) {
+                        window.location.href = url;
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
