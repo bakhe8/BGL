@@ -384,12 +384,12 @@
             // Try to get session_id from URL params first, then from config
             const urlParams = new URLSearchParams(window.location.search);
             let sid = urlParams.get('session_id');
-            
+
             // If not in URL, try to get from config (which PHP sets)
             if (!sid && config.sessionId) {
                 sid = config.sessionId;
             }
-            
+
             // If still no session_id, try to read from meta display
             if (!sid) {
                 const metaElem = document.getElementById('metaSessionId');
@@ -397,7 +397,7 @@
                     sid = metaElem.textContent.trim();
                 }
             }
-            
+
             if (sid && sid !== '-') {
                 // Create hidden iframe for printing without leaving page
                 const iframe = document.createElement('iframe');
@@ -418,7 +418,7 @@
 
                 document.body.appendChild(iframe);
             } else {
-                alert('لا يوجد رقم جلسة محدد. الرجاء اختيار جلسة أولاً أو استيراد ملف.');
+                showWarning('لا يوجد رقم جلسة محدد. الرجاء اختيار جلسة أولاً أو استيراد ملف.');
             }
         });
     }
@@ -441,10 +441,10 @@
                 if (json.success && json.data && json.data.session_id) {
                     window.location.href = '/?session_id=' + json.data.session_id;
                 } else {
-                    alert('خطأ: ' + (json.message || 'فشل الاستيراد'));
+                    showError('خطأ: ' + (json.message || 'فشل الاستيراد'));
                 }
             } catch (err) {
-                alert('خطأ في الاتصال');
+                showError('خطأ في الاتصال');
             }
         });
     }
@@ -482,13 +482,13 @@
                 const res = await fetch('/api/records/recalculate', { method: 'POST' });
                 const json = await res.json();
                 if (json.success) {
-                    alert('تمت إعادة المطابقة: ' + (json.data?.processed || 0) + ' سجل');
+                    showSuccess('تمت إعادة المطابقة: ' + (json.data?.processed || 0) + ' سجل');
                     window.location.href = window.location.href; // Force reload with params
                 } else {
-                    alert('خطأ: ' + (json.message || 'فشلت العملية'));
+                    showError('خطأ: ' + (json.message || 'فشلت العملية'));
                 }
             } catch (err) {
-                alert('خطأ في الاتصال');
+                showError('خطأ في الاتصال');
             } finally {
                 btnRecalc.disabled = false;
                 btnRecalc.innerHTML = btnRecalc.dataset.originalHtml || '<i data-lucide="refresh-cw" class="w-4 h-4"></i>';

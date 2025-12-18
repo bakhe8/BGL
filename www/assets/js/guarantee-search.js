@@ -42,7 +42,7 @@
         const guaranteeNumber = searchInput.value.trim();
 
         if (!guaranteeNumber) {
-            alert('الرجاء إدخال رقم ضمان');
+            showWarning('الرجاء إدخال رقم ضمان');
             return;
         }
 

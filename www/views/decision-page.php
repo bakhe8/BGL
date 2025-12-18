@@ -546,6 +546,10 @@
         };
     </script>
     
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/assets/js/sweetalert-helpers.js"></script>
+    
     <!-- Main Logic Script -->
     <script src="/assets/js/decision.js"></script>
 

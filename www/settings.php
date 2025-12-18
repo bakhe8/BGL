@@ -118,6 +118,8 @@ $banksList = $banks->allNormalized();
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="/assets/css/output.css">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         .tabs-nav { display: flex; gap: 1rem; border-bottom: 2px solid var(--border-color); margin-bottom: 2rem; }
         .tab-link { padding: 0.75rem 1.5rem; font-weight: bold; color: var(--text-muted); text-decoration: none; border-bottom: 3px solid transparent; transition: all 0.2s; }
@@ -318,7 +320,7 @@ $banksList = $banks->allNormalized();
     </main>
     
     <script>
-        // Modern delete confirmation
+        // Modern delete confirmation with SweetAlert2
         document.addEventListener('DOMContentLoaded', function() {
             // Handle all delete links
             const deleteLinks = document.querySelectorAll('a[href*="delete"]');
@@ -330,9 +332,23 @@ $banksList = $banks->allNormalized();
                     const url = this.getAttribute('href');
                     const entityType = url.includes('supplier') ? 'المورد' : 'البنك';
                     
-                    if (confirm(`هل أنت متأكد من حذف هذا ${entityType}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`)) {
-                        window.location.href = url;
-                    }
+                    // SweetAlert2 confirmation
+                    Swal.fire({
+                        title: `حذف ${entityType}`,
+                        text: `هل أنت متأكد من حذف هذا ${entityType}؟`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#dc2626',
+                        cancelButtonColor: '#6b7280',
+                        confirmButtonText: 'نعم، احذف',
+                        cancelButtonText: 'إلغاء',
+                        reverseButtons: true,
+                        focusCancel: true
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = url;
+                        }
+                    });
                 });
             });
         });
