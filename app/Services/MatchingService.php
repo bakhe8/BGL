@@ -222,6 +222,12 @@ class MatchingService
         // Load Cache
         if ($this->cachedBanks === null) {
             $this->cachedBanks = $this->banks->allNormalized();
+            // Pre-calculate normalized English names for faster lookup
+            foreach ($this->cachedBanks as &$bank) {
+                $bank['normalized_en'] = isset($bank['official_name_en']) 
+                    ? $this->normalizer->normalizeBankName($bank['official_name_en']) 
+                    : '';
+            }
         }
 
         // Step 1: short code exact
@@ -270,10 +276,16 @@ class MatchingService
             return $result;
         }
 
-        // Step 3: full name exact via normalized_key
+        // Step 3: full name exact via normalized_key (Arabic) OR normalized_en (English)
         $bankKey = null;
         foreach ($this->cachedBanks as $b) {
+            // Check Arabic Key (normalized_key)
             if (($b['normalized_key'] ?? '') === $normalized) {
+                $bankKey = $b;
+                break;
+            }
+            // Check English Key (normalized_en)
+            if (($b['normalized_en'] ?? '') === $normalized) {
                 $bankKey = $b;
                 break;
             }
@@ -282,30 +294,37 @@ class MatchingService
         if ($bankKey) {
             if (!isset($result['_blocked_bank_id']) || $result['_blocked_bank_id'] !== (int) $bankKey['id']) {
                 $result['bank_id'] = (int) $bankKey['id'];
-                $result['final_name'] = $bankKey['officialNameAr'] ?? $bankKey['officialName'] ?? null;
+                $result['final_name'] = $bankKey['official_name'] ?? null;
                 return $result;
             }
         }
 
-        // Step 4: full name fuzzy on normalized_key (>=0.95)
+        // Step 4: full name fuzzy on normalized_key OR normalized_en (>=0.95)
         $best = null;
         $bestScore = 0.0;
-        $threshold = 0.95; // تطابق قوي فقط
+        $threshold = 0.95; 
+        
         foreach ($this->cachedBanks as $row) {
-            $key = $row['normalized_key'] ?? '';
-            if ($key === '') {
-                continue;
-            }
             if (isset($result['_blocked_bank_id']) && $result['_blocked_bank_id'] === (int) $row['id']) {
-                continue; // محظور لهذا البنك
+                continue; 
             }
-            // استخدام النسخة السريعة - normalized_key مضمون القصر
-            $score = SimilarityCalculator::fastLevenshteinRatio($normalized, $key);
-            if ($score > $bestScore) {
-                $bestScore = $score;
+
+            // Score with Arabic Key
+            $keyAr = $row['normalized_key'] ?? '';
+            $scoreAr = ($keyAr !== '') ? SimilarityCalculator::fastLevenshteinRatio($normalized, $keyAr) : 0;
+            
+            // Score with English Key
+            $keyEn = $row['normalized_en'] ?? '';
+            $scoreEn = ($keyEn !== '') ? SimilarityCalculator::fastLevenshteinRatio($normalized, $keyEn) : 0;
+            
+            $maxScore = max($scoreAr, $scoreEn);
+
+            if ($maxScore > $bestScore) {
+                $bestScore = $maxScore;
                 $best = $row;
             }
         }
+        
         if ($best && $bestScore >= $threshold) {
             $result['bank_id'] = (int) $best['id'];
             $result['final_name'] = $best['official_name'] ?? null;
