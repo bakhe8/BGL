@@ -1,48 +1,30 @@
 <?php
 /**
  * =============================================================================
- * CandidateService - Supplier & Bank Matching Engine
+ * CandidateService - Unified Supplier & Bank Matching Facade
  * =============================================================================
  * 
- * VERSION: 5.0 (2025-12-17) - Cache-First Architecture
+ * VERSION: 6.0 (2025-12-19) - Refactored to Facade Pattern
  * 
  * 📚 DOCUMENTATION: docs/09-Supplier-System-Refactoring.md
  * 
  * PURPOSE:
  * --------
- * This service finds potential matches (candidates) for raw supplier/bank names
- * imported from Excel files. Uses fuzzy matching + cache-first approach.
+ * This service acts as a FACADE that delegates to:
+ * - SupplierCandidateService for supplier matching
+ * - BankCandidateService for bank matching
  * 
- * ARCHITECTURE (v5.0):
- * -------------------
- * 1. Check supplier_suggestions cache FIRST
- * 2. If cache miss, generate candidates and save to cache
- * 3. Blocking handled via block_count (gradual penalty)
+ * This maintains backward compatibility with existing code that uses
+ * CandidateService while keeping the implementation clean and separated.
  * 
- * KEY BUSINESS RULES:
- * -------------------
- * 1. EMPTY CANDIDATES IS VALID: If no supplier scores >= 70%
- * 2. THRESHOLDS:
- *    - MATCH_AUTO_THRESHOLD (90%): Auto-accept
- *    - MATCH_REVIEW_THRESHOLD (70%): Minimum to appear
- * 3. STAR RATINGS (UNIFIED):
- *    - >=200 points = 3 stars ⭐⭐⭐
- *    - >=120 points = 2 stars ⭐⭐
- *    - <120 points = 1 star ⭐
+ * USAGE:
+ * ------
+ * $service = new CandidateService(...);
+ * $suppliers = $service->supplierCandidates($rawName);
+ * $banks = $service->bankCandidates($rawName);
  * 
- * SCORING FORMULA:
- * ---------------
- * total_score = (fuzzy × 100) + source_weight + min(usage × 15, 75)
- * effective_score = total_score - (block_count × 50)
- * 
- * DATA SOURCES:
- * ------------
- * 1. supplier_suggestions cache (PRIMARY)
- * 2. suppliers (official dictionary)
- * 3. supplier_alternative_names
- * 4. supplier_overrides
- * 
- * @see docs/09-Supplier-System-Refactoring.md
+ * @see SupplierCandidateService for supplier matching implementation
+ * @see BankCandidateService for bank matching implementation
  * =============================================================================
  */
 declare(strict_types=1);
@@ -51,472 +33,62 @@ namespace App\Services;
 
 use App\Repositories\SupplierAlternativeNameRepository;
 use App\Repositories\SupplierRepository;
-use App\Repositories\SupplierSuggestionRepository;
+use App\Repositories\BankRepository;
+use App\Repositories\SupplierOverrideRepository;
+use App\Repositories\BankLearningRepository;
 use App\Support\Normalizer;
 use App\Support\Settings;
-use App\Support\Config;
-use App\Support\SimilarityCalculator;
-
-/**
- * =============================================================================
- * استخدام SimilarityCalculator في CandidateService
- * =============================================================================
- * 
- * هذا الملف يستخدم SimilarityCalculator::safeLevenshteinRatio() لأن:
- * 
- * 1. السياق: الواجهة الأمامية - المستخدم قد يدخل نصوص يدوياً
- * 2. عدم ضمان الطول: النصوص قد تتجاوز 255 بايت
- * 3. الأمان: الحماية من أخطاء PHP levenshtein مع النصوص الطويلة
- * 4. Fallback: يتحول تلقائياً إلى Jaccard للنصوص الطويلة
- * 
- * ⚠️ لا تستخدم fastLevenshteinRatio() هنا:
- * - قد يفشل مع نصوص > 255 بايت
- * - غير آمن مع مدخلات المستخدم
- * 
- * راجع: app/Support/SimilarityCalculator.php للتفاصيل
- * =============================================================================
- */
 
 class CandidateService
 {
-    private ?array $cachedSuppliers = null;
-    private ?array $cachedBanks = null;
+    private SupplierCandidateService $supplierService;
+    private BankCandidateService $bankService;
 
     public function __construct(
         private SupplierRepository $suppliers,
         private SupplierAlternativeNameRepository $supplierAlts,
         private Normalizer $normalizer = new Normalizer(),
-        private \App\Repositories\BankRepository $banks = new \App\Repositories\BankRepository(),
-        private \App\Repositories\SupplierOverrideRepository $overrides = new \App\Repositories\SupplierOverrideRepository(),
+        private BankRepository $banks = new BankRepository(),
+        private SupplierOverrideRepository $overrides = new SupplierOverrideRepository(),
         private Settings $settings = new Settings(),
-        private ?\App\Repositories\BankLearningRepository $bankLearning = null,
+        private ?BankLearningRepository $bankLearning = null,
     ) {
-        $this->bankLearning = $this->bankLearning ?: new \App\Repositories\BankLearningRepository();
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // SCORING SYSTEM (NEW - 2025-12-17)
-    // ═══════════════════════════════════════════════════════════════════
-
-    private function calculateBaseScore(float $fuzzyScore, string $matchType): int
-    {
-        if ($matchType === 'exact') return 100;
-        if ($fuzzyScore >= 0.90) return 80;
-        if ($fuzzyScore >= 0.80) return 60;
-        return 40;
-    }
-
-    private function calculateBonusPoints(?array $usageData): int
-    {
-        if (!$usageData || empty($usageData['usage_count'])) return 0;
+        // Initialize the split services
+        $this->supplierService = new SupplierCandidateService(
+            $this->suppliers,
+            $this->supplierAlts,
+            $this->normalizer,
+            $this->overrides,
+            $this->settings
+        );
         
-        $bonus = 50;
-        $count = (int)$usageData['usage_count'];
-        $bonus += min(($count - 1) * 25, 150);
-        
-        if (isset($usageData['last_used_at'])) {
-            $daysSince = (new \DateTime())->diff(new \DateTime($usageData['last_used_at']))->days;
-            if ($daysSince <= 30) $bonus += 25;
-        }
-        
-        return $bonus;
-    }
-
-    private function assignStarRating(int $totalScore): int
-    {
-        if ($totalScore >= 200) return 3;
-        if ($totalScore >= 120) return 2;
-        return 1;
+        $this->bankService = new BankCandidateService(
+            $this->banks,
+            $this->normalizer,
+            $this->settings,
+            $this->bankLearning
+        );
     }
 
     /**
-     * إرجاع قائمة المرشحين للاسم الخام من المصادر: official + alternative names، مع درجات أساسية (Exact/StartsWith/Contains/Distance/Token).
-     * لا يوجد Auto-Accept هنا؛ النتائج للعرض.
+     * إرجاع قائمة المرشحين للاسم الخام من المصادر
+     * Delegates to SupplierCandidateService
      *
      * @return array{normalized:string, candidates: array<int, array{source:string, supplier_id:int, name:string, score:float}>}
      */
     public function supplierCandidates(string $rawSupplier): array
     {
-        $normalized = $this->normalizer->normalizeSupplierName($rawSupplier);
-        
-        /**
-         * ═══════════════════════════════════════════════════════════════════
-         * العتبات الثلاث ودورها (Thresholds Explained)
-         * ═══════════════════════════════════════════════════════════════════
-         * 
-         * 1. MATCH_AUTO_THRESHOLD (strongTh) = 0.90
-         *    → النتائج >= 0.90 تُعتبر "قوية" وموثوقة للاعتماد التلقائي
-         *    → تُستخدم لتحديد match_type: 'fuzzy_strong' vs 'fuzzy_weak'
-         * 
-         * 2. MATCH_WEAK_THRESHOLD (weakTh) = 0.80
-         *    → الحد الأدنى للنتائج التي تظهر في القائمة النهائية
-         *    → النتائج < 0.80 تُرفض نهائياً ولا تُعرض للمستخدم
-         *    → يمكن تعديلها من واجهة الإعدادات
-         * 
-         * 3. MATCH_REVIEW_THRESHOLD (reviewThreshold) = 0.70
-         *    → عتبة أقل للسماح بمرور النتائج أثناء المعالجة الداخلية
-         *    → الشرط (< reviewThreshold && < weakTh) يعني: رفض فوري للضعيف جداً
-         * 
-         * لماذا نتحقق من كلاهما (reviewThreshold && weakTh)؟
-         * ─────────────────────────────────────────────────────
-         * لإعطاء مرونة: المستخدم يمكنه تعديل weakTh من الإعدادات،
-         * لكن reviewThreshold ثابت كحد أدنى صلب (hardcoded floor).
-         * ═══════════════════════════════════════════════════════════════════
-         */
-        $strongTh = (float) $this->settings->get('MATCH_AUTO_THRESHOLD', Config::MATCH_AUTO_THRESHOLD);
-        $weakTh = (float) $this->settings->get('MATCH_WEAK_THRESHOLD', 0.80);
-        $reviewThreshold = $this->settings->get('MATCH_REVIEW_THRESHOLD', Config::MATCH_REVIEW_THRESHOLD);
-        if ($normalized === '') {
-            return ['normalized' => '', 'candidates' => []];
-        }
-
-        $candidates = [];
-        
-        // ═══════════════════════════════════════════════════════════════════
-        // CACHE-FIRST APPROACH (Updated 2025-12-17)
-        // ═══════════════════════════════════════════════════════════════════
-        // 1. Check NEW cache (supplier_suggestions) for learning-based matches
-        // 2. Blocking is now handled via block_count in the cache (gradual penalty)
-        //    - getSuggestions() filters out suppliers with negative effective_score
-        //    - getBlockedSupplierIds() returns IDs with negative score for filtering
-        // ═══════════════════════════════════════════════════════════════════
-        
-        // Get blocked supplier IDs from cache (used for filtering dictionary/alternatives)
-        $suggestionRepo = new SupplierSuggestionRepository();
-        $blockedIds = $suggestionRepo->getBlockedSupplierIds($normalized);
-        $cachedSuggestions = $suggestionRepo->getSuggestions($normalized, 10);
-        
-        if (!empty($cachedSuggestions)) {
-            // Use cached suggestions as primary source for learning matches
-            foreach ($cachedSuggestions as $cached) {
-                // Only add 'learning' source items (skip dictionary matches - they'll be re-added below)
-                if ($cached['source'] === 'learning' || $cached['source'] === 'user_history') {
-                    $candidates[] = [
-                        'source' => 'learning',
-                        'match_type' => 'exact',
-                        'strength' => 'strong',
-                        'supplier_id' => (int) $cached['supplier_id'],
-                        'name' => $cached['display_name'],
-                        'score' => 1.0,
-                        'score_raw' => (float) $cached['fuzzy_score'],
-                        'is_learning' => true,
-                        'usage_count' => (int) ($cached['usage_count'] ?? 0),
-                        'star_rating' => (int) ($cached['star_rating'] ?? 1),
-                    ];
-                }
-            }
-        }
-        // NOTE: Old fallback to supplier_aliases_learning removed (table deleted 2025-12-17)
-
-        // Cache ONCE
-        if ($this->cachedSuppliers === null) {
-            $this->cachedSuppliers = $this->suppliers->allNormalized();
-        }
-
-        // Overrides
-        foreach ($this->overrides->allNormalized() as $ov) {
-            $candNorm = $this->normalizer->normalizeSupplierName($ov['override_name']);
-            $sim = $this->scoreComponents($normalized, $candNorm);
-            $scoreRaw = $this->maxScore($sim);
-            if ($scoreRaw < $reviewThreshold) {
-                continue;
-            }
-            if (in_array((int) $ov['supplier_id'], $blockedIds, true)) {
-                continue;
-            }
-            $candidates[] = [
-                'source' => 'override',
-                'match_type' => 'exact',
-                'strength' => 'strong',
-                'supplier_id' => $ov['supplier_id'],
-                'name' => $ov['override_name'],
-                'score' => $scoreRaw * (float) $this->settings->get('WEIGHT_OFFICIAL', Config::WEIGHT_OFFICIAL),
-                'score_raw' => $scoreRaw,
-                'is_learning' => false,
-            ];
-        }
-
-        // تطابق رسمي (FROM CACHE)
-        foreach ($this->cachedSuppliers as $supplier) {
-            if (($supplier['normalized_name'] === $normalized) || ($supplier['supplier_normalized_key'] ?? '') === $this->normalizer->makeSupplierKey($rawSupplier)) {
-                // Logic for exact match duplicated here for candidate listing...
-            }
-
-            // Actually, let's just run the full scan on cache since we need similarity scores for everyone
-            $candNorm = $this->normalizer->normalizeSupplierName($supplier['normalized_name'] ?? $supplier['official_name']);
-            $sim = $this->scoreComponents($normalized, $candNorm);
-            $scoreRaw = $this->maxScore($sim);
-
-            // Adjust weight based on if it was exact or fuzzy
-            // Simplification: if scoreRaw is 1.0 -> Official Exact
-            $scoreWeighted = $scoreRaw * (float) $this->settings->get('WEIGHT_OFFICIAL', Config::WEIGHT_OFFICIAL);
-
-            // Fuzzy Logic mixed in
-            if ($scoreRaw < $reviewThreshold && $scoreRaw < $weakTh) {
-                continue;
-            }
-
-            if (in_array((int) $supplier['id'], $blockedIds, true)) {
-                continue;
-            }
-
-            $type = 'fuzzy_weak';
-            $strength = 'weak';
-            if ($scoreRaw >= 1.0) {
-                $type = 'exact';
-                $strength = 'strong';
-            } elseif ($scoreRaw >= $strongTh) {
-                $type = 'fuzzy_strong';
-                $strength = 'strong';
-                $scoreWeighted = $scoreRaw * (float) $this->settings->get('WEIGHT_FUZZY', Config::WEIGHT_FUZZY);
-            } else {
-                $scoreWeighted = $scoreRaw * (float) $this->settings->get('WEIGHT_FUZZY', Config::WEIGHT_FUZZY);
-            }
-
-            $candidates[] = [
-                'source' => ($scoreRaw >= 1.0) ? 'official' : 'fuzzy_official',
-                'match_type' => $type,
-                'strength' => $strength,
-                'supplier_id' => $supplier['id'],
-                'name' => $supplier['official_name'],
-                'score' => $scoreWeighted,
-                'score_raw' => $scoreRaw,
-                'is_learning' => false,
-            ];
-        }
-
-        // Create a map for fast lookup of official names from cache
-        $supplierMap = [];
-        foreach ($this->cachedSuppliers as $s) {
-            $supplierMap[$s['id']] = $s['official_name'];
-        }
-
-        // تطابق أسماء بديلة (Direct DB still required unless cached)
-        foreach ($this->supplierAlts->findAllByNormalized($normalized) as $alt) {
-            // ... [Logic kept same but wrapped for blockedId]
-            if (in_array((int) $alt['supplier_id'], $blockedIds, true))
-                continue;
-
-            // Resolve Official Name
-            $officialName = $supplierMap[$alt['supplier_id']] ?? $alt['raw_name'];
-
-            // If exact match found via `findAllByNormalized`
-            $candidates[] = [
-                'source' => 'alternative',
-                'match_type' => 'alternative',
-                'strength' => 'strong',
-                'supplier_id' => $alt['supplier_id'],
-                'name' => $officialName, // PRIMARY: Official Name
-                'matched_on' => $alt['raw_name'], // CONTEXT: What matched
-                'score' => 1.0 * (float) $this->settings->get('WEIGHT_ALT_CONFIRMED', Config::WEIGHT_ALT_CONFIRMED),
-                'score_raw' => 1.0,
-                'is_learning' => false,
-            ];
-        }
-
-        // Fuzzy Alts
-        foreach ($this->supplierAlts->allNormalized() as $alt) {
-            if (in_array((int) $alt['supplier_id'], $blockedIds, true)) {
-                continue;
-            }
-            $candNorm = $this->normalizer->normalizeSupplierName($alt['normalized_raw_name'] ?? $alt['raw_name']);
-            $sim = $this->scoreComponents($normalized, $candNorm);
-            $scoreRaw = $this->maxScore($sim);
-            $score = $scoreRaw * (float) $this->settings->get('WEIGHT_FUZZY', Config::WEIGHT_FUZZY);
-            if ($scoreRaw >= $weakTh) {
-                $officialName = $supplierMap[$alt['supplier_id']] ?? $alt['raw_name'];
-                $candidates[] = [
-                    'source' => 'fuzzy_alternative',
-                    'match_type' => $scoreRaw >= $strongTh ? 'fuzzy_strong' : 'fuzzy_weak',
-                    'strength' => $scoreRaw >= $strongTh ? 'strong' : 'weak',
-                    'supplier_id' => $alt['supplier_id'],
-                    'name' => $officialName, // PRIMARY
-                    'matched_on' => $alt['raw_name'], // CONTEXT
-                    'score' => $score,
-                    'score_raw' => $scoreRaw,
-                    'is_learning' => false,
-                ];
-            }
-        }
-
-        // أفضل درجة لكل supplier_id
-        $bestBySupplier = [];
-        foreach ($candidates as $c) {
-            $sid = $c['supplier_id'];
-            if (!isset($bestBySupplier[$sid]) || $c['score'] > $bestBySupplier[$sid]['score']) {
-                $bestBySupplier[$sid] = $c;
-            }
-        }
-
-        $unique = array_values($bestBySupplier);
-        // فلترة نهائية حسب العتبات: رفض ما دون 0.80
-        $unique = array_filter($unique, fn($c) => ($c['score_raw'] ?? $c['score'] ?? 0) >= $weakTh);
-        usort($unique, fn($a, $b) => $b['score'] <=> $a['score']);
-
-        $limit = (int) $this->settings->get('CANDIDATES_LIMIT', 20);
-        if ($limit > 0) {
-            $unique = array_slice($unique, 0, $limit);
-        }
-
-        return ['normalized' => $normalized, 'candidates' => $unique];
-    }
-
-    private function scoreComponents(string $input, string $candidate): array
-    {
-        $exact = $input === $candidate ? 1.0 : 0.0;
-        $starts = (str_starts_with($candidate, $input) || str_starts_with($input, $candidate)) ? 0.85 : 0.0;
-        $contains = (str_contains($candidate, $input) || str_contains($input, $candidate)) ? 0.75 : 0.0;
-        // استخدام النسخة الآمنة - قد يدخل المستخدم نصوص طويلة
-        $lev = SimilarityCalculator::safeLevenshteinRatio($input, $candidate);
-        $tokens = $this->tokenSimilarity($input, $candidate);
-        return compact('exact', 'starts', 'contains', 'lev', 'tokens');
-    }
-
-    private function maxScore(array $sim): float
-    {
-        return max($sim['exact'], $sim['starts'], $sim['contains'], $sim['lev'], $sim['tokens']);
-    }
-
-    // ملاحظة: تم نقل دوال حساب التشابه إلى SimilarityCalculator
-    // راجع: app/Support/SimilarityCalculator.php
-
-    private function tokenSimilarity(string $a, string $b): float
-    {
-        $ta = array_filter(explode(' ', $a));
-        $tb = array_filter(explode(' ', $b));
-        if (!$ta || !$tb) {
-            return 0.0;
-        }
-        $intersect = count(array_intersect($ta, $tb));
-        $union = count(array_unique(array_merge($ta, $tb)));
-        return $union === 0 ? 0.0 : $intersect / $union;
+        return $this->supplierService->supplierCandidates($rawSupplier);
     }
 
     /**
-     * مرشحي البنوك (official + fuzzy بسيط).
+     * مرشحي البنوك
+     * Delegates to BankCandidateService
      *
      * @return array{normalized:string, candidates: array<int, array{source:string, bank_id:int, name:string, score:float}>}
      */
     public function bankCandidates(string $rawBank): array
     {
-        $normalized = $this->normalizer->normalizeBankName($rawBank);
-        $short = $this->normalizer->normalizeBankShortCode($rawBank);
-        $reviewThreshold = $this->settings->get('MATCH_REVIEW_THRESHOLD', Config::MATCH_REVIEW_THRESHOLD);
-        if ($normalized === '') {
-            return ['normalized' => '', 'candidates' => []];
-        }
-
-        $blockedId = null;
-        $learning = $this->bankLearning?->findByNormalized($normalized);
-        if ($learning) {
-            if ($learning['status'] === 'alias' && !empty($learning['bank_id'])) {
-                return [
-                    'normalized' => $normalized,
-                    'candidates' => [
-                        [
-                            'source' => 'learning_alias',
-                            'bank_id' => (int) $learning['bank_id'],
-                            'name' => $this->banks->find((int) $learning['bank_id'])?->officialName ?? '',
-                            'score' => 1.0,
-                            'score_raw' => 1.0,
-                        ]
-                    ],
-                ];
-            }
-            if ($learning['status'] === 'blocked') {
-                // Block logic...
-                if (!empty($learning['bank_id']))
-                    $blockedId = (int) $learning['bank_id'];
-                else
-                    return ['normalized' => $normalized, 'candidates' => []];
-            }
-        }
-
-        // Cache Banks
-        if ($this->cachedBanks === null) {
-            $this->cachedBanks = $this->banks->allNormalized();
-        }
-
-        $candidates = [];
-
-        // Iterate Cache Once for both Short and Long
-        foreach ($this->cachedBanks as $row) {
-            if ($blockedId && (int) $row['id'] === $blockedId)
-                continue;
-
-            // Short Code Logic
-            if ($short !== '') {
-                $sc = strtoupper(trim((string) ($row['short_code'] ?? '')));
-                if ($sc !== '') {
-                    if ($sc === $short) {
-                        $candidates[] = [
-                            'source' => 'short_exact',
-                            'bank_id' => (int) $row['id'],
-                            'name' => $row['official_name'] ?? '',
-                            'score' => 1.0,
-                            'score_raw' => 1.0,
-                        ];
-                    } else {
-                        // استخدام النسخة الآمنة - short codes عادة قصيرة لكن نحتاط
-                        $score = SimilarityCalculator::safeLevenshteinRatio($short, $sc);
-                        if ($score >= 0.9) {
-                            $candidates[] = [
-                                'source' => 'short_fuzzy',
-                                'bank_id' => (int) $row['id'],
-                                'name' => $row['official_name'] ?? '',
-                                'score' => $score,
-                                'score_raw' => $score,
-                            ];
-                        }
-                    }
-                }
-            }
-
-            // Full Name Logic
-            $key = $row['normalized_key'] ?? '';
-            if ($key !== '') {
-                // Exact
-                // Note: normalized_key check against 'normalized'
-                if ($key === $normalized) {
-                    $candidates[] = [
-                        'source' => 'official',
-                        'bank_id' => (int) $row['id'],
-                        'name' => $row['official_name'] ?? '',
-                        'score' => 1.0,
-                        'score_raw' => 1.0,
-                    ];
-                } else {
-                    // استخدام النسخة الآمنة - أسماء البنوك قد تكون طويلة
-                    $score = SimilarityCalculator::safeLevenshteinRatio($normalized, $key);
-                    if ($score >= 0.95) {
-                        $candidates[] = [
-                            'source' => 'fuzzy_official',
-                            'bank_id' => (int) $row['id'],
-                            'name' => $row['official_name'] ?? '',
-                            'score' => $score,
-                            'score_raw' => $score,
-                        ];
-                    }
-                }
-            }
-        }
-
-        // تصفية حسب العتبة
-        $candidates = array_filter($candidates, fn($c) => ($c['score'] ?? 0) >= $reviewThreshold);
-
-        // أفضل لكل بنك
-        $best = [];
-        foreach ($candidates as $c) {
-            $bid = $c['bank_id'];
-            if (!isset($best[$bid]) || $c['score'] > $best[$bid]['score']) {
-                $best[$bid] = $c;
-            }
-        }
-
-        $unique = array_values($best);
-        usort($unique, fn($a, $b) => $b['score'] <=> $a['score']);
-
-        return ['normalized' => $normalized, 'candidates' => $unique];
+        return $this->bankService->bankCandidates($rawBank);
     }
-
 }
