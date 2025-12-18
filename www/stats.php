@@ -1,8 +1,8 @@
 <?php
 /**
- * Statistics Page - PHP Version
+ * Smart Analytics Dashboard
  * 
- * صفحة الإحصائيات - تعرض ملخص البيانات بدون JavaScript
+ * لوحة قيادة تحليلية متقدمة تدمج الإحصائيات الأساسية والذكية.
  */
 declare(strict_types=1);
 
@@ -13,156 +13,248 @@ use App\Repositories\SupplierRepository;
 use App\Repositories\BankRepository;
 
 $records = new ImportedRecordRepository();
-$suppliers = new SupplierRepository();
-$banks = new BankRepository();
+$suppliersRepo = new SupplierRepository();
+$banksRepo = new BankRepository();
 
-// Get stats
-$stats = $records->getStats();
-
-$totalRecords = $stats['total_records'] ?? 0;
-$completed = $stats['completed'] ?? 0;
-$pending = $stats['pending'] ?? 0;
-$suppliersCount = $stats['suppliers_count'] ?? 0;
-$topBanks = $stats['top_banks'] ?? [];
-
-// Calculate percentages
+// 1. Fetch Basic Stats (Original)
+$basicStats = $records->getStats();
+$totalRecords = $basicStats['total_records'] ?? 0;
+$completed = $basicStats['completed'] ?? 0;
+$pending = $basicStats['pending'] ?? 0;
 $completionRate = $totalRecords > 0 ? round(($completed / $totalRecords) * 100) : 0;
+$suppliersCount = $basicStats['suppliers_count'] ?? count($suppliersRepo->allNormalized());
+$banksCount = count($banksRepo->allNormalized());
+$topBanksCount = $basicStats['top_banks'] ?? []; // Top by Volume
 
-// Get banks count
-$banksCount = count($banks->allNormalized());
+// 2. Fetch Advanced Stats (New)
+$advancedStats = $records->getAdvancedStats();
+$totalExposure = $advancedStats['financial']['total_exposure'] ?? 0;
+$avgAmount = $advancedStats['financial']['avg_amount'] ?? 0;
+$automationRate = $advancedStats['automation_rate'] ?? 0;
+
+// 3. Data Quality Stats (New Insights)
+$qualityStats = $records->getDataQualityStats();
+
+// 4. Prepare Chart Data (Expiry Forecast)
+$expiryLabels = [];
+$expiryValues = [];
+foreach ($advancedStats['expiry_forecast'] as $row) {
+    $dateObj = DateTime::createFromFormat('Y-m', $row['month']);
+    $expiryLabels[] = $dateObj ? $dateObj->format('M Y') : $row['month']; 
+    $expiryValues[] = $row['value']; 
+}
+
+// 5. Prepare Chart Data (Bank Value Share)
+$bankValueLabels = [];
+$bankValueData = [];
+$bankColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280']; 
+foreach ($advancedStats['top_banks_value'] as $row) {
+    // Format: Arab Bank (50M)
+    $val = $row['total_value'] / 1000000; // Millions
+    $bankValueLabels[] = ($row['name'] ?? 'غير معروف');
+    $bankValueData[] = $row['total_value'];
+}
 ?>
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الإحصائيات - نظام خطابات الضمان</title>
+    <title>تحليل البيانات الشامل - BGL</title>
+    
+    <!-- CSS -->
     <link rel="stylesheet" href="/assets/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="/assets/css/output.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Scripts -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-        .stat-card { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .stat-card-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem; }
-        .stat-card-value { font-size: 2rem; font-weight: bold; margin-bottom: 0.25rem; }
-        .stat-card-label { color: #6b7280; font-size: 0.9rem; }
-        .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
-        .progress-fill { height: 100%; border-radius: 4px; }
-        .data-table { width: 100%; border-collapse: collapse; }
-        .data-table th { text-align: right; padding: 0.75rem; background: var(--bg-hover); border-bottom: 2px solid var(--border-color); }
-        .data-table td { padding: 0.75rem; border-bottom: 1px solid var(--border-color); }
-        .data-table tr:hover { background: var(--bg-hover); }
-        .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: bold; }
-        .badge-blue { background: #dbeafe; color: #1d4ed8; }
-        .badge-green { background: #d1fae5; color: #065f46; }
-        .badge-orange { background: #ffedd5; color: #c2410c; }
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; }
+        .dashboard-container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        
+        /* Typography */
+        h1, h2, h3 { color: #1e293b; }
+        
+        /* Cards */
+        .metric-card {
+            background: white; border-radius: 12px; padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;
+        }
+        .metric-icon { 
+            width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 0.75rem;
+        }
+        .metric-value { font-size: 1.75rem; font-weight: 800; color: #0f172a; }
+        .metric-label { color: #64748b; font-size: 0.85rem; font-weight: 500; }
+        
+        /* Section Dividers */
+        .section-divider { margin: 2rem 0 1rem 0; border-bottom: 2px dashed #e2e8f0; }
+
+        /* Tables & Charts Container */
+        .card-box {
+            background: white; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #f1f5f9;
+            margin-bottom: 1.5rem;
+        }
+        .card-header { padding: 1rem; border-bottom: 1px solid #f1f5f9; background: #fff; font-weight: bold; }
+        
+        .smart-table { width: 100%; border-collapse: collapse; }
+        .smart-table th { text-align: right; padding: 0.75rem 1rem; background: #f8fafc; color: #64748b; font-size: 0.8rem; }
+        .smart-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 0.9rem; }
+        
+        .progress-bar { height: 6px; background: #f1f5f9; border-radius: 99px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 99px; }
+
+        /* Grid Layouts */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .insights-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
     </style>
 </head>
 <body class="app-shell">
-    <!-- Shared Header -->
+
+    <!-- Header -->
     <?php include __DIR__ . '/../app/Views/partials/subpage_header.php'; ?>
 
-    <main class="app-main">
-        <div class="app-container">
-            <div class="page-header">
-                <h1 class="page-title">لوحة الإحصائيات</h1>
-                <p class="section-subtitle">ملخص أداء النظام والبيانات</p>
+    <main class="dashboard-container">
+        
+        <div class="flex items-end justify-between mb-6">
+            <div>
+                <h1 class="text-3xl font-extrabold mb-1">لوحة الإحصائيات الشاملة</h1>
+                <p class="text-gray-500">متابعة الأداء، المالية، وجودة البيانات في مكان واحد</p>
             </div>
+            <div class="text-left font-mono text-sm text-gray-400">
+                <?= date('Y-m-d') ?>
+            </div>
+        </div>
 
-            <!-- Stats Cards -->
-            <div class="stats-grid">
-                <!-- Card 1: Total -->
-                <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #dbeafe; color: #2563eb;">
-                        <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+        <!-- SECTION 1: Operational KPIs (The Basics) -->
+        <h2 class="text-lg font-bold mb-3 text-gray-700">🚀 الأداء التشغيلي</h2>
+        <div class="kpi-grid">
+            <!-- Total -->
+            <div class="metric-card border-l-4 border-l-blue-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="metric-value"><?= number_format($totalRecords) ?></div>
+                        <div class="metric-label">إجمالي الخطابات</div>
                     </div>
-                    <div class="stat-card-value"><?= number_format($totalRecords) ?></div>
-                    <div class="stat-card-label">إجمالي الخطابات</div>
-                </div>
-                
-                <!-- Card 2: Completed -->
-                <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #d1fae5; color: #16a34a;">
-                        <i data-lucide="check-circle-2" class="w-6 h-6"></i>
-                    </div>
-                    <div class="stat-card-value" style="color: #16a34a;"><?= number_format($completed) ?></div>
-                    <div class="stat-card-label">مكتملة (جاهزة/معتمدة)</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: <?= $completionRate ?>%; background: #16a34a;"></div>
-                    </div>
-                </div>
-                
-                <!-- Card 3: Pending -->
-                <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #ffedd5; color: #ea580c;">
-                        <i data-lucide="alert-circle" class="w-6 h-6"></i>
-                    </div>
-                    <div class="stat-card-value" style="color: #ea580c;"><?= number_format($pending) ?></div>
-                    <div class="stat-card-label">معلقة (تحتاج مراجعة)</div>
-                </div>
-                
-                <!-- Card 4: Suppliers -->
-                <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #ede9fe; color: #7c3aed;">
-                        <i data-lucide="building-2" class="w-6 h-6"></i>
-                    </div>
-                    <div class="stat-card-value"><?= number_format($suppliersCount) ?></div>
-                    <div class="stat-card-label">الموردين في القاموس</div>
-                </div>
-                
-                <!-- Card 5: Banks -->
-                <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #fce7f3; color: #db2777;">
-                        <i data-lucide="landmark" class="w-6 h-6"></i>
-                    </div>
-                    <div class="stat-card-value"><?= number_format($banksCount) ?></div>
-                    <div class="stat-card-label">البنوك في القاموس</div>
-                </div>
-                
-                <!-- Card 6: Completion Rate -->
-                <div class="stat-card">
-                    <div class="stat-card-icon" style="background: #ecfccb; color: #65a30d;">
-                        <i data-lucide="pie-chart" class="w-6 h-6"></i>
-                    </div>
-                    <div class="stat-card-value"><?= $completionRate ?>%</div>
-                    <div class="stat-card-label">نسبة الإنجاز</div>
+                    <div class="metric-icon bg-blue-50 text-blue-600"><i data-lucide="files"></i></div>
                 </div>
             </div>
 
-            <!-- Top Banks Table -->
-            <?php if (!empty($topBanks)): ?>
-            <div class="card" style="margin-bottom: 2rem;">
-                <div class="card-header">
-                    <h2 class="card-title">أكثر البنوك نشاطاً</h2>
+            <!-- Completed -->
+            <div class="metric-card border-l-4 border-l-green-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="metric-value"><?= number_format($completed) ?></div>
+                        <div class="metric-label">مكتملة وجاهزة</div>
+                    </div>
+                    <div class="metric-icon bg-green-50 text-green-600"><i data-lucide="check-circle-2"></i></div>
                 </div>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>اسم البنك</th>
-                            <th>عدد الخطابات</th>
-                            <th>النسبة</th>
-                        </tr>
-                    </thead>
+                <div class="mt-2 text-xs text-green-600 font-bold bg-green-50 inline-block px-1 rounded"><?= $completionRate ?>% نسبة الإنجاز</div>
+            </div>
+
+            <!-- Pending -->
+            <div class="metric-card border-l-4 border-l-orange-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="metric-value"><?= number_format($pending) ?></div>
+                        <div class="metric-label">معلقة للمراجعة</div>
+                    </div>
+                    <div class="metric-icon bg-orange-50 text-orange-600"><i data-lucide="clock"></i></div>
+                </div>
+            </div>
+
+            <!-- Dictionary Size -->
+            <div class="metric-card">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="metric-value text-xl"><?= number_format($suppliersCount) ?> <span class="text-sm font-normal text-gray-400">مورد</span></div>
+                        <div class="metric-value text-xl"><?= number_format($banksCount) ?> <span class="text-sm font-normal text-gray-400">بنك</span></div>
+                        <div class="metric-label mt-1">حجم القاموس</div>
+                    </div>
+                    <div class="metric-icon bg-purple-50 text-purple-600"><i data-lucide="book"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: Financial & Intelligence (The Smart Stuff) -->
+        <h2 class="text-lg font-bold mb-3 text-gray-700 mt-8">💡 الذكاء المالي والتحليل</h2>
+        <div class="kpi-grid">
+            <!-- Total Exposure -->
+            <div class="metric-card bg-slate-800 text-white border-none">
+                <div class="metric-label text-slate-400">إجمالي القيمة المالية</div>
+                <div class="metric-value text-white my-2"><?= number_format($totalExposure) ?> <span class="text-sm font-normal">ريال</span></div>
+                <div class="text-xs text-slate-400">متوسط الضمان: <?= number_format($avgAmount) ?> ريال</div>
+            </div>
+
+            <!-- Automation Rate -->
+            <div class="metric-card">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-12 h-12 rounded-full border-4 border-blue-500 flex items-center justify-center font-bold text-blue-700 bg-blue-50">
+                        <?= $automationRate ?>%
+                    </div>
+                    <div>
+                        <div class="font-bold text-gray-800">معدل الأتمتة</div>
+                        <div class="text-xs text-gray-500">تطابق تلقائي دون تدخل</div>
+                    </div>
+                </div>
+                <div class="progress-bar mt-2"><div class="progress-fill bg-blue-500" style="width: <?= $automationRate ?>%"></div></div>
+            </div>
+            
+            <!-- Future Expiry Count -->
+            <div class="metric-card">
+                <div class="metric-value"><?= count($advancedStats['expiry_forecast']) ?></div>
+                <div class="metric-label">أشهر قادمة بها استحقاق</div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: Visual Analytics -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8 mb-8">
+            <!-- Forecast Chart -->
+            <div class="card-box lg:col-span-2">
+                <div class="card-header flex justify-between items-center">
+                    <span>توقعات السيولة (تجويد الضمانات) - 12 شهر</span>
+                    <i data-lucide="bar-chart-2" class="w-4 h-4 text-gray-400"></i>
+                </div>
+                <div class="p-4" style="height: 300px;">
+                    <canvas id="expiryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Risk Pie Chart -->
+            <div class="card-box">
+                <div class="card-header flex justify-between items-center">
+                    <span>التركيز المالي للبنوك (Risk)</span>
+                    <i data-lucide="pie-chart" class="w-4 h-4 text-gray-400"></i>
+                </div>
+                <div class="p-4 flex justify-center items-center" style="height: 300px;">
+                    <canvas id="bankRiskChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: Detailed Tables (Old + New) -->
+        <div class="insights-grid">
+            
+            <!-- 1. Top Banks by Volume (Old Favorite) -->
+            <div class="card-box">
+                <div class="card-header border-b-blue-500 border-b-2">أكثر البنوك نشاطاً (بالعدد)</div>
+                <table class="smart-table">
+                    <thead><tr><th>البنك</th><th>العدد</th><th>النسبة</th></tr></thead>
                     <tbody>
-                        <?php foreach ($topBanks as $index => $bank): 
-                            $percentage = $totalRecords > 0 ? round(($bank['count'] / $totalRecords) * 100, 1) : 0;
+                        <?php foreach ($topBanksCount as $bank): 
+                             $pct = $totalRecords > 0 ? round(($bank['count']/$totalRecords)*100, 1) : 0;
                         ?>
                         <tr>
-                            <td><?= $index + 1 ?></td>
-                            <td><strong><?= htmlspecialchars($bank['raw_bank_name'] ?? '') ?></strong></td>
-                            <td><span class="badge badge-blue"><?= number_format($bank['count']) ?></span></td>
+                            <td><?= htmlspecialchars($bank['raw_bank_name']) ?></td>
+                            <td class="font-bold"><?= $bank['count'] ?></td>
                             <td>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <div style="flex: 1; max-width: 100px;">
-                                        <div class="progress-bar">
-                                            <div class="progress-fill" style="width: <?= $percentage ?>%; background: #2563eb;"></div>
-                                        </div>
-                                    </div>
-                                    <span><?= $percentage ?>%</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="progress-bar w-16"><div class="progress-fill bg-blue-500" style="width: <?= $pct ?>%"></div></div>
+                                    <span class="text-xs"><?= $pct ?>%</span>
                                 </div>
                             </td>
                         </tr>
@@ -170,36 +262,78 @@ $banksCount = count($banks->allNormalized());
                     </tbody>
                 </table>
             </div>
-            <?php endif; ?>
 
-            <!-- Summary Section -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">ملخص الحالة</h2>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; padding: 1rem 0;">
-                    <div style="text-align: center; padding: 1rem;">
-                        <div class="flex justify-center mb-2"><i data-lucide="check-circle" class="w-8 h-8 text-green-600"></i></div>
-                        <div style="font-weight: bold; font-size: 1.25rem;"><?= $completed ?></div>
-                        <div style="color: #6b7280; font-size: 0.875rem;">مكتملة</div>
-                    </div>
-                    <div style="text-align: center; padding: 1rem;">
-                        <div class="flex justify-center mb-2"><i data-lucide="clock" class="w-8 h-8 text-orange-500"></i></div>
-                        <div style="font-weight: bold; font-size: 1.25rem;"><?= $pending ?></div>
-                        <div style="color: #6b7280; font-size: 0.875rem;">معلقة</div>
-                    </div>
-                    <div style="text-align: center; padding: 1rem;">
-                        <div class="flex justify-center mb-2"><i data-lucide="trending-up" class="w-8 h-8 text-blue-600"></i></div>
-                        <div style="font-weight: bold; font-size: 1.25rem;"><?= $completionRate ?>%</div>
-                        <div style="color: #6b7280; font-size: 0.875rem;">نسبة الإنجاز</div>
-                    </div>
-                </div>
+            <!-- 2. Data Quality: Corrections (New) -->
+            <div class="card-box">
+                <div class="card-header border-b-orange-500 border-b-2">أعلى التصحيحات اليدوية</div>
+                <table class="smart-table">
+                    <thead><tr><th>الأصل (Raw)</th><th>المعتمد</th><th>مرات</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($qualityStats['common_corrections'] as $row): ?>
+                        <tr>
+                            <td class="text-red-500 font-mono text-xs"><?= htmlspecialchars(mb_substr($row['raw_supplier_name'],0,15)) ?></td>
+                            <td class="text-green-600 text-xs"><?= htmlspecialchars(mb_substr($row['supplier_display_name'],0,15)) ?></td>
+                            <td><span class="bg-gray-100 px-2 rounded font-bold"><?= $row['count'] ?></span></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($qualityStats['common_corrections'])): ?><tr><td colspan="3" class="text-center text-gray-400">لا توجد بيانات</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 3. Duplicate Risks (New) -->
+            <div class="card-box">
+                <div class="card-header border-b-red-500 border-b-2 text-red-600">⚠️ ضمانات مكررة محتملة</div>
+                <table class="smart-table">
+                    <thead><tr><th>رقم الضمان</th><th>البنك</th><th>تكرار</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($qualityStats['duplicate_guarantees'] as $row): ?>
+                        <tr class="bg-red-50">
+                            <td class="font-mono font-bold"><?= htmlspecialchars($row['guarantee_number']) ?></td>
+                            <td class="text-xs"><?= htmlspecialchars($row['bank']) ?></td>
+                            <td class="font-bold text-red-600 text-center"><?= $row['count'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($qualityStats['duplicate_guarantees'])): ?><tr><td colspan="3" class="text-center text-gray-400">سجل نظيف! ممتاز</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
             </div>
 
         </div>
+
     </main>
+
     <script>
         lucide.createIcons();
+
+        // Charts
+        const ctxExpiry = document.getElementById('expiryChart').getContext('2d');
+        new Chart(ctxExpiry, {
+            type: 'bar',
+            data: {
+                labels: <?= json_encode($expiryLabels) ?>,
+                datasets: [{
+                    label: 'قيمة السيولة',
+                    data: <?= json_encode($expiryValues) ?>,
+                    backgroundColor: '#3b82f6', borderRadius: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display: false} } }
+        });
+
+        const ctxBank = document.getElementById('bankRiskChart').getContext('2d');
+        new Chart(ctxBank, {
+            type: 'pie',
+            data: {
+                labels: <?= json_encode($bankValueLabels) ?>,
+                datasets: [{
+                    data: <?= json_encode($bankValueData) ?>,
+                    backgroundColor: <?= json_encode($bankColors) ?>,
+                    borderWidth: 0
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {position:'bottom'} } }
+        });
     </script>
 </body>
 </html>

@@ -420,4 +420,126 @@ class ImportedRecordRepository
             'top_banks' => $topBanks
         ];
     }
+    public function getAdvancedStats(): array
+    {
+        $pdo = Database::connection();
+        
+        // 1. Financial Overview
+        $fin = $pdo->query("
+            SELECT 
+                SUM(amount) as total_exposure,
+                COUNT(*) as total_guarantees,
+                AVG(amount) as avg_amount
+            FROM imported_records
+        ")->fetch(PDO::FETCH_ASSOC);
+
+        // 2. Top Banks by Value (Financial Risk)
+        // Groups by the Display Name if available, otherwise Raw Name
+        $topBanksValue = $pdo->query("
+            SELECT 
+                COALESCE(NULLIF(bank_display, ''), raw_bank_name) as name, 
+                SUM(amount) as total_value,
+                COUNT(*) as count
+            FROM imported_records 
+            WHERE amount > 0 AND (bank_display IS NOT NULL OR raw_bank_name IS NOT NULL)
+            GROUP BY COALESCE(NULLIF(bank_display, ''), raw_bank_name)
+            ORDER BY total_value DESC 
+            LIMIT 5
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 3. Automation Insight
+        // 'ready' usually implies automatic high-confidence match
+        $autoCount = $pdo->query("SELECT COUNT(*) FROM imported_records WHERE match_status = 'ready'")->fetchColumn();
+        $total = $fin['total_guarantees'] ?: 1;
+        $automationRate = round(($autoCount / $total) * 100, 1);
+
+        // 4. Expiry Forecast (Next 12 Months)
+        // Uses SQLite date functions assuming YYYY-MM-DD format
+        $expiry = $pdo->query("
+            SELECT 
+                strftime('%Y-%m', expiry_date) as month,
+                COUNT(*) as count,
+                SUM(amount) as value
+            FROM imported_records
+            WHERE expiry_date IS NOT NULL AND expiry_date != '' 
+            -- AND expiry_date >= date('now') -- Optional: only future
+            GROUP BY month
+            ORDER BY month ASC
+            LIMIT 12
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        
+        // 5. Top Suppliers by Volume
+        $topSuppliers = $pdo->query("
+            SELECT 
+                COALESCE(NULLIF(supplier_display_name, ''), raw_supplier_name) as name,
+                COUNT(*) as count,
+                SUM(amount) as total_value
+            FROM imported_records
+            GROUP BY COALESCE(NULLIF(supplier_display_name, ''), raw_supplier_name)
+            ORDER BY count DESC
+            LIMIT 5
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'financial' => $fin,
+            'top_banks_value' => $topBanksValue,
+            'automation_rate' => $automationRate,
+            'expiry_forecast' => $expiry,
+            'top_suppliers' => $topSuppliers
+        ];
+    }
+    public function getDataQualityStats(): array
+    {
+        $pdo = Database::connection();
+        
+        // 1. Duplicate Guarantees (Potential Double Entry or Renewal History)
+        $duplicates = $pdo->query("
+            SELECT guarantee_number, COUNT(*) as count, 
+                   GROUP_CONCAT(DISTINCT session_id) as sessions,
+                   MAX(raw_bank_name) as bank
+            FROM imported_records
+            WHERE guarantee_number IS NOT NULL AND guarantee_number != ''
+            GROUP BY guarantee_number
+            HAVING count > 1
+            ORDER BY count DESC
+            LIMIT 10
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 2. High Variation Suppliers (Messy Data Sources)
+        // Suppliers that appear with many different raw name spellings
+        $variations = $pdo->query("
+            SELECT 
+                COALESCE(supplier_display_name, 'Unknown') as official_name,
+                COUNT(DISTINCT raw_supplier_name) as distinct_forms
+            FROM imported_records
+            WHERE supplier_id IS NOT NULL
+            GROUP BY supplier_id
+            HAVING distinct_forms > 1
+            ORDER BY distinct_forms DESC
+            LIMIT 5
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        // 3. Most Frequent Manual Corrections
+        // Records where the Raw Name differs significantly from the Final Name
+        // indicating valuable work done by the system/user
+        $corrections = $pdo->query("
+            SELECT 
+                raw_supplier_name, 
+                supplier_display_name,
+                COUNT(*) as count
+            FROM imported_records
+            WHERE supplier_id IS NOT NULL 
+              AND raw_supplier_name != supplier_display_name
+            GROUP BY raw_supplier_name, supplier_display_name
+            ORDER BY count DESC
+            LIMIT 5
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'duplicate_guarantees' => $duplicates,
+            'supplier_variations' => $variations,
+            'common_corrections' => $corrections
+        ];
+    }
 }
+
