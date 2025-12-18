@@ -99,6 +99,22 @@ class TextImportController
 
     private function createRecordFromData(array $data, int $sessionId): ImportedRecord
     {
+        // Detect related_to from contract_number pattern or use provided value
+        $relatedTo = $data['related_to'] ?? null;
+        if (!$relatedTo && !empty($data['contract_number'])) {
+            // Auto-detect from contract number pattern
+            $contract = $data['contract_number'];
+            if (preg_match('/^C\//i', $contract) || stripos($contract, 'contract') !== false) {
+                $relatedTo = 'contract';
+            } else {
+                $relatedTo = 'purchase_order';
+            }
+        }
+        // Default fallback
+        if (!$relatedTo) {
+            $relatedTo = 'purchase_order';  // Safe default for Smart Paste
+        }
+        
         // Map parsed data to ImportedRecord properties
         return $this->records->create(new ImportedRecord(
             id: null,
@@ -109,6 +125,7 @@ class TextImportController
             guaranteeNumber: $data['guarantee_number'],
             contractNumber: $data['contract_number'] ?? null,
             contractSource: null,
+            relatedTo: $relatedTo,  // FIXED: Was missing, now with auto-detection
             issueDate: null,
             expiryDate: $data['expiry_date'],
             type: $data['type'],

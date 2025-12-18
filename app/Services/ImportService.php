@@ -139,6 +139,10 @@ class ImportService
                     $finalContract = $poVal;
                     $relatedTo = 'purchase_order';
                 }
+                // Fallback: ensure relatedTo is never NULL
+                if (!$relatedTo) {
+                    $relatedTo = 'purchase_order'; // Default fallback
+                }
                 $typeRaw = $this->colValue($row, $map['type'] ?? null);
                 $typeVal = trim($typeRaw) !== '' ? trim($typeRaw) : null;
                 $commentVal = $this->colValue($row, $map['comment'] ?? null);
