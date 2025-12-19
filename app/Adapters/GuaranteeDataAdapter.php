@@ -194,7 +194,8 @@ class GuaranteeDataAdapter
         $oldRecord = $this->oldRepo->find($oldId);
         if ($oldRecord && $oldRecord->id) {
             // Get migrated guarantee ID from old record
-            $stmt = $this->oldRepo->db()->prepare("
+            $db = \App\Support\Database::connection();
+            $stmt = $db->prepare("
                 SELECT migrated_guarantee_id 
                 FROM imported_records 
                 WHERE id = ?

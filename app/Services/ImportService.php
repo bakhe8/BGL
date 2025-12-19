@@ -7,6 +7,8 @@ use App\Models\ImportedRecord;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\ImportedRecordRepository;
 use App\Repositories\LearningLogRepository;
+use App\Repositories\ImportBatchRepository;
+use App\Adapters\GuaranteeDataAdapter;
 use App\Services\ExcelColumnDetector;
 use App\Services\CandidateService;
 use App\Services\AutoAcceptService;
@@ -24,7 +26,7 @@ use RuntimeException;
  * - قراءة ملفات Excel ومعالجة الصفوف
  * - الكشف التلقائي عن أعمدة البيانات (supplier, bank, amount, etc.)
  * - مطابقة الموردين والبنوك تلقائياً
- * - إنشاء سجلات ImportedRecord
+ * - إنشاء سجلات ImportedRecord (يكتب للجدولين: القديم والجديد)
  * - تطبيق القبول التلقائي للتطابقات العالية
  * 
  * الحدود:
@@ -46,6 +48,8 @@ class ImportService
         private ?AutoAcceptService $autoAcceptService = null,
         private ?ConflictDetector $conflictDetector = null,
         private ?LearningLogRepository $learningLog = null,
+        private ?ImportBatchRepository $batchRepo = null,
+        private ?GuaranteeDataAdapter $adapter = null,
     ) {
         $this->matchingService ??= new MatchingService(
             new \App\Repositories\SupplierRepository(),
@@ -61,6 +65,8 @@ class ImportService
         $this->autoAcceptService ??= new AutoAcceptService($this->records);
         $this->conflictDetector ??= new ConflictDetector();
         $this->learningLog ??= new LearningLogRepository();
+        $this->batchRepo ??= new ImportBatchRepository();
+        $this->adapter ??= new GuaranteeDataAdapter();
     }
 
     /**
@@ -68,12 +74,20 @@ class ImportService
      */
     public function importExcel(string $filePath): array
     {
+        // Create OLD session (for compatibility)
         $session = $this->sessions->create('excel');
         
         // التحقق من إنشاء الجلسة بنجاح
         if (!$session || !$session->id) {
             throw new RuntimeException('فشل إنشاء جلسة الاستيراد. يرجى المحاولة مرة أخرى.');
         }
+        
+        // Create NEW batch (dual-write)
+        $batchId = $this->batchRepo->create([
+            'batch_type' => 'excel_import',
+            'filename' => basename($filePath),
+            'description' => 'استيراد Excel - ' . date('Y-m-d H:i')
+        ]);
 
         $rows = $this->xlsxReader->read($filePath);
         
@@ -191,28 +205,34 @@ class ImportService
                     ['raw_supplier_name' => $supplier, 'raw_bank_name' => $bank]
                 );
 
-                $record = new ImportedRecord(
-                    id: null,
-                    sessionId: $session->id ?? 0,
-                    rawSupplierName: (string) $supplier,
-                    rawBankName: (string) $bank,
-                    amount: $amount ?: null,
-                    guaranteeNumber: $guarantee ?: null,
-                    contractNumber: $finalContract,
-                    relatedTo: $relatedTo,
-                    expiryDate: $expiry ?: null,
-                    issueDate: $issue ?: null,
-                    type: $typeVal ?: null,
-                    comment: $commentVal ?: null,
-                    matchStatus: $status,
-                    supplierId: $match['supplier_id'] ?? null,
-                    bankId: $bankMatch['bank_id'] ?? null,
-                    normalizedSupplier: $match['normalized'] ?? null,
-                    normalizedBank: $bankMatch['normalized'] ?? null,
-                    bankDisplay: $bankDisplay,
-                    supplierDisplayName: null,
-                );
-                $this->records->create($record);
+                // Prepare data for adapter (dual-write)
+                $recordData = [
+                    'guarantee_number' => $guarantee ?: null,
+                    'raw_supplier_name' => (string) $supplier,
+                    'raw_bank_name' => (string) $bank,
+                    'contract_number' => $finalContract,
+                    'amount' => $amount ?: null,
+                    'issue_date' => $issue ?: null,
+                    'expiry_date' => $expiry ?: null,
+                    'type' => $typeVal ?: null,
+                    'comment' => $commentVal ?: null,
+                    'supplier_id' => $match['supplier_id'] ?? null,
+                    'bank_id' => $bankMatch['bank_id'] ?? null,
+                    'supplier_display_name' => null,
+                    'bank_display' => $bankDisplay,
+                    'match_status' => $status,
+                    'normalized_supplier' => $match['normalized'] ?? null,
+                    'normalized_bank' => $bankMatch['normalized'] ?? null,
+                    'related_to' => $relatedTo,
+                    'import_type' => 'excel',
+                    'created_at' => date('Y-m-d H:i:s')
+                ];
+                
+                // Use adapter to write to both old and new tables
+                $ids = $this->adapter->createGuarantee($recordData, $session->id, $batchId);
+                
+                // For compatibility, get the old record for auto-accept
+                $record = $this->records->find($ids['old_id']);
 
                 $this->autoAcceptService->tryAutoAccept($record, $candidates, $conflicts);
                 $this->autoAcceptService->tryAutoAcceptBank($record, $bankCandidatesArr, $conflicts);
@@ -243,6 +263,7 @@ class ImportService
             $pdo->commit();
             // تحديث عدد السجلات دفعة واحدة بدلاً من كل صف
             $this->sessions->incrementRecordCount($session->id ?? 0, $count);
+            $this->batchRepo->incrementRecordCount($batchId, $count);
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
