@@ -105,11 +105,17 @@ status: active
 ## 4. المجلدات والملفات (Directory Structure)
 
 - `app/`: كود الواجهة الخلفية (PHP).
-  - `Services/`: منطق العمل (Business Logic).
+  - `Controllers/`: المتحكمات REST API.
+  - `Models/`: كائنات البيانات.
   - `Repositories/`: التعامل مع قاعدة البيانات.
+  - `Services/`: منطق العمل (Business Logic).
   - `Support/`: أدوات مساعدة (Normalizer, Settings).
+  - `Views/`: قوالب الواجهات (صفحات كاملة، طباعة، partials).
 - `storage/`: البيانات المتغيرة (DB, Uploads, Logs).
 - `www/`: الواجهة الأمامية (Public).
+  - `index.php`: نقطة الدخول والروتر.
+  - `includes/`: ملفات مساعدة (router.php, views-router.php).
+  - `assets/`: ملفات ثابتة (CSS, JS).
 
 ## 5. واجهة المستخدم (Frontend Architecture)
 

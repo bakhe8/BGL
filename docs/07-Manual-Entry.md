@@ -184,7 +184,7 @@ if ($method === 'POST' && $uri === '/api/import/manual') {
 
 #### 1. UI Components
 
-**الملف**: `www/views/decision-page.php`
+**الملف**: `app/Views/pages/decision-page.php`
 
 ##### أ. زر الإدخال اليدوي
 
@@ -597,8 +597,8 @@ curl -X POST http://localhost:8000/api/import/manual `
 | الملف | التعديل | السبب |
 |------|---------|-------|
 | `www/includes/router.php` | إضافة route لـ `/api/import/manual` | ربط API endpoint بـ Controller |
-| `www/views/decision-page.php` | إضافة زر + Modal | واجهة الإدخال اليدوي |
-| `www/views/decision-page.php` | إضافة `<script>` tag | تحميل `manual-entry.js` |
+| `app/Views/pages/decision-page.php` | إضافة زر + Modal | واجهة الإدخال اليدوي |
+| `app/Views/pages/decision-page.php` | إضافة `<script>` tag | تحميل `manual-entry.js` |
 
 ### ملفات غير متأثرة (Reuse)
 

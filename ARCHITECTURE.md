@@ -9,17 +9,25 @@ BGL/
 │   ├── Models/               # الكائنات (Data Objects)
 │   ├── Repositories/         # طبقة الوصول لقاعدة البيانات
 │   ├── Services/             # منطق الأعمال
-│   └── Support/              # أدوات مساعدة (Normalizer, Logger, etc.)
+│   ├── Support/              # أدوات مساعدة (Normalizer, Logger, etc.)
+│   └── Views/                # قوالب الواجهات
+│       ├── pages/            # صفحات كاملة (decision-page, stats, reports, etc.)
+│       ├── letters/          # قوالب الطباعة (print-letter)
+│       └── partials/         # قطع مشتركة (headers, footers)
 ├── storage/
 │   ├── database/app.sqlite   # قاعدة البيانات
 │   ├── backups/              # النسخ الاحتياطية
 │   └── uploads/              # ملفات Excel المرفوعة
-└── www/                      # الملفات العامة
+└── www/                      # الملفات العامة فقط
     ├── index.php             # نقطة الدخول + Router
-    ├── assets/
-    │   ├── css/              # أنماط CSS
-    │   └── js/               # ملفات JavaScript
-    └── *.html                # صفحات HTML
+    ├── settings.php          # صفحة الإعدادات
+    ├── includes/             # ملفات مساعدة
+    │   ├── router.php        # API router
+    │   └── views-router.php  # Views router
+    ├── api/                  # API endpoints مستقلة
+    └── assets/               # ملفات ثابتة
+        ├── css/              # أنماط CSS
+        └── js/               # ملفات JavaScript
 ```
 
 ---

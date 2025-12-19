@@ -219,7 +219,7 @@ else:
 endif;
 ```
 
-**`www/views/decision-page.php`**
+**`app/Views/pages/decision-page.php`**
 
 Same conditional logic for preview section.
 
