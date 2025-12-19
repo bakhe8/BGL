@@ -26,6 +26,7 @@ class ImportedRecord
         public ?string $bankDisplay = null,
         public ?string $supplierDisplayName = null,
         public ?string $createdAt = null,
+        public ?string $recordType = 'import',  // Record type: 'import', 'modification', 'release_action'
     ) {
     }
 }
