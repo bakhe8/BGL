@@ -431,6 +431,9 @@
                     $bankDetails['address_line_2'] ?? null,
                 ]);
                 $bankEmail = $bankDetails['contact_email'] ?? null;
+                
+                // Determine if this is a release letter
+                $isRelease = ($currentRecord->recordType ?? 'import') === 'release_action';
             ?>
             <!-- Letter Preview Section -->
             <section class="mt-8" id="letterPreviewSection">
@@ -463,13 +466,27 @@
                         <div class="subject">
                             <span style="flex:0 0 70px;">الموضوع:</span>
                             <span>
-                              طلب تمديد الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>) 
+                              <?php if ($isRelease): ?>
+                              إفراج الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>)
+                              <?php else: ?>
+                              طلب تمديد الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>)
+                              <?php endif; ?>
                               <?php if ($contractNo !== '-'): ?>
                               والعائد للعقد رقم (<?= htmlspecialchars($contractNo) ?>)
                               <?php endif; ?>
                             </span>
                         </div>
 
+                        <?php if ($isRelease): ?>
+                        <div class="first-paragraph">
+                            إشارة الى <?= $guaranteeDesc ?> الموضح أعلاه، والصادر منكم لصالحنا على حساب 
+                            <span style="<?= $supplierStyle ?>" id="letterSupplier"><?= htmlspecialchars($supplierName) ?></span> 
+                            بمبلغ قدره (<strong><?= $amountHindi ?></strong>) ريال، 
+                            نود إفادتكم بأنه قد تم الانتهاء من العقد المذكور أعلاه وفق الأصول والشروط المتفق عليها، 
+                            لذا نأمل منكم <span class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">إلغاء الضمان البنكي</span> 
+                            وإعادته إلى المقاول المذكور أعلاه.
+                        </div>
+                        <?php else: ?>
                         <div class="first-paragraph">
                             إشارة الى <?= $guaranteeDesc ?> الموضح أعلاه، والصادر منكم لصالحنا على حساب 
                             <span style="<?= $supplierStyle ?>" id="letterSupplier"><?= htmlspecialchars($supplierName) ?></span> 
@@ -487,6 +504,7 @@
                         <div class="first-paragraph">
                             علمًا بأنه في حال عدم تمكن البنك من تمديد الضمان المذكور قبل انتهاء مدة سريانه، فيجب على البنك دفع قيمة الضمان إلينا حسب النظام.
                         </div>
+                        <?php endif; ?>
 
                         <div style="text-indent:5em; margin-top:5px;">وَتفضَّلوا بِقبُول خَالِص تحيَّاتِي</div>
 
