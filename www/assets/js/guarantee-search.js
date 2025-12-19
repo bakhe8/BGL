@@ -226,9 +226,14 @@
                         
                         
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
-                            <a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
-                                عرض السجل
-                            </a>
+                            ${item.record_type === 'release_action'
+                    ? `<a href="/release-letter.php?id=${item.record_id}" target="_blank" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
+                                    عرض السجل
+                                </a>`
+                    : `<a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
+                                    عرض السجل
+                                </a>`
+                }
                             <button onclick="
                                 var recId = ${item.record_id || 0};
                                 if (!recId) { alert('خطأ: معرف السجل مفقود'); return; }
