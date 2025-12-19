@@ -329,6 +329,10 @@
             background: #fef3c7;
             color: #92400e;
         }
+        .status-badge-timeline.release {
+            background: #fee2e2;
+            color: #dc2626;
+        }
         .timeline-date {
            font-size: 11px;
             color: #64748b;

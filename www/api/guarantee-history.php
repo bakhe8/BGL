@@ -39,6 +39,7 @@ try {
             r.bank_id,
             r.supplier_display_name,
             r.bank_display,
+            r.record_type,
             r.created_at,
             s.official_name as supplier_name,
             b.official_name as bank_name
@@ -136,6 +137,7 @@ try {
             'expiry_date' => $record['expiry_date'],
             'type' => $record['type'],
             'status' => $status,
+            'record_type' => $record['record_type'] ?? 'import',
             'changes' => $changes,
             'is_first' => $previousRecord === null
         ];

@@ -130,7 +130,7 @@
                                 </div>
                             </span>
                             <span class="text-gray-600 font-mono">السجل: <strong><?= $currentRecord->id ?></strong></span>
-                            <span class="text-gray-600">رقم الضمان: <strong><?= htmlspecialchars($currentRecord->guaranteeNumber ?? '-') ?></strong></span>
+                            <span class="text-gray-600">رقم الضمان: <strong id="btnQuickSearch" class="cursor-pointer hover:text-blue-600 hover:underline transition-colors border-b border-transparent hover:border-blue-600" title="انقر لعرض السجل التاريخي"><?= htmlspecialchars($currentRecord->guaranteeNumber ?? '-') ?></strong></span>
                             <span class="text-gray-600">رقم العقد: <strong><?= htmlspecialchars($currentRecord->contractNumber ?? '-') ?></strong></span>
                             <span class="text-gray-600">انتهاء الضمان: <strong><?= htmlspecialchars($currentRecord->expiryDate ?? '-') ?></strong></span>
                             <span class="text-gray-600">المبلغ: <strong><?= number_format((float)($currentRecord->amount ?? 0), 2) ?></strong></span>
@@ -354,7 +354,12 @@
             <div id="guaranteeHistoryPanel" class="hidden">
                 <div class="panel-header">
                     <h3 id="historyTitle">📜 تاريخ الضمان</h3>
-                    <button onclick="document.getElementById('guaranteeHistoryPanel').classList.add('hidden'); document.getElementById('badgeSearch').classList.remove('search-active'); document.getElementById('searchInputWrapper').classList.remove('visible');">✕ إغلاق</button>
+                    <div class="flex items-center gap-2">
+                        <button id="btnIssueRelease" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-bold shadow transition-colors flex items-center gap-1 hidden">
+                            <i data-lucide="file-x-2" class="w-3 h-3"></i> إصدار خطاب إفراج
+                        </button>
+                        <button onclick="document.getElementById('guaranteeHistoryPanel').classList.add('hidden'); document.getElementById('badgeSearch').classList.remove('search-active'); document.getElementById('searchInputWrapper').classList.remove('visible');">✕ إغلاق</button>
+                    </div>
                 </div>
                 <div class="history-timeline" id="historyTimeline">
                     <!-- Timeline content will be inserted here by JavaScript -->

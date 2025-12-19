@@ -11,8 +11,66 @@
     const historyPanel = document.getElementById('guaranteeHistoryPanel');
     const historyTimeline = document.getElementById('historyTimeline');
     const historyTitle = document.getElementById('historyTitle');
+    const quickSearchBtn = document.getElementById('btnQuickSearch'); // Quick search from meta bar
+    const issueReleaseBtn = document.getElementById('btnIssueRelease'); // New Release Button
 
     if (!searchBtn) return; // Exit if elements not found
+
+    // Quick Search Listener (Meta Bar Click)
+    if (quickSearchBtn) {
+        quickSearchBtn.addEventListener('click', () => {
+            const guaranteeNum = quickSearchBtn.innerText.trim();
+            if (guaranteeNum && guaranteeNum !== '-') {
+                // Populate search input
+                if (searchInput) {
+                    searchInput.value = guaranteeNum;
+                    // Show the search wrapper for better UX
+                    if (searchWrapper) searchWrapper.classList.add('visible');
+                    // Trigger search
+                    searchGuarantee();
+                }
+            }
+        });
+    }
+
+
+    // Issue Release Letter Listener
+    if (issueReleaseBtn) {
+        issueReleaseBtn.addEventListener('click', async () => {
+            const guaranteeNum = issueReleaseBtn.dataset.guarantee;
+            if (!guaranteeNum) return;
+
+            // Disable button during request
+            issueReleaseBtn.disabled = true;
+            issueReleaseBtn.textContent = 'جاري الإصدار...';
+
+            try {
+                const response = await fetch('/api/issue-release.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `guarantee_no=${encodeURIComponent(guaranteeNum)}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess('تم إصدار خطاب الإفراج بنجاح');
+                    // Refresh history to show new release record
+                    searchGuarantee();
+                } else {
+                    showWarning(data.error || 'فشل إصدار الخطاب');
+                }
+            } catch (error) {
+                showWarning('خطأ في الاتصال بالخادم');
+                console.error('Release error:', error);
+            } finally {
+                issueReleaseBtn.disabled = false;
+                issueReleaseBtn.innerHTML = '<i data-lucide="file-check"></i> إصدار خطاب إفراج';
+                lucide.createIcons();
+            }
+        });
+    }
+
 
     // Toggle search input visibility
     if (searchWrapper && searchBtn) {
@@ -45,6 +103,9 @@
             showWarning('الرجاء إدخال رقم ضمان');
             return;
         }
+
+        // Hide release button initially
+        if (issueReleaseBtn) issueReleaseBtn.classList.add('hidden');
 
         // Show loading
         historyPanel.classList.remove('hidden');
@@ -88,6 +149,12 @@
         historyTitle.innerHTML = `<span class="flex items-center gap-2"><i data-lucide="history" class="w-5 h-5"></i> تاريخ الضمان رقم: ${data.guarantee_number} (${data.total_records} سجل)</span>`;
         lucide.createIcons();
 
+        // Show and setup Release Button
+        if (issueReleaseBtn) {
+            issueReleaseBtn.classList.remove('hidden');
+            issueReleaseBtn.dataset.guarantee = data.guarantee_number;
+        }
+
         if (!data.history || data.history.length === 0) {
             historyTimeline.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">لا توجد سجلات</div>';
             return;
@@ -97,7 +164,8 @@
 
         data.history.forEach((item, index) => {
             const isFirst = item.is_first;
-            const statusClass = item.status === 'جاهز' ? 'ready' : 'pending';
+            const isRelease = item.record_type === 'release_action';
+            const statusClass = isRelease ? 'release' : (item.status === 'جاهز' ? 'ready' : 'pending');
             const date = new Date(item.date);
             const formattedDate = date.toLocaleDateString('ar-SA', {
                 year: 'numeric',
@@ -114,7 +182,7 @@
                         <div class="timeline-header">
                             <div>
                                 <span class="session-badge flex items-center gap-1"><i data-lucide="file-digit" class="w-3 h-3"></i> جلسة #${item.session_id}</span>
-                                <span class="status-badge-timeline ${statusClass}">${item.status}</span>
+                                <span class="status-badge-timeline ${statusClass}">${isRelease ? 'إفراج' : item.status}</span>
                             </div>
                         </div>
                         <div class="timeline-date">${formattedDate}</div>
@@ -156,12 +224,26 @@
                             </div>
                         ` : ''}
                         
-                        <a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn">
-                            عرض السجل ←
-                        </a>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
+                                عرض السجل
+                            </a>
+                            <button onclick="
+                                var recId = ${item.record_id || 0};
+                                if (!recId) { alert('خطأ: معرف السجل مفقود'); return; }
+                                window.open('/release-letter.php?id=' + recId, '_blank', 'width=900,height=800');
+                            " 
+                                    class="view-record-btn" 
+                                    style="width: auto; padding: 6px 20px; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; text-decoration: none;"
+                                    title="طباعة خطاب الإفراج">
+                                <i data-lucide="printer" class="w-4 h-4"></i> طباعة
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
+
         });
 
         historyTimeline.innerHTML = html;
