@@ -5,6 +5,8 @@ namespace App\Controllers;
 
 use App\Repositories\ImportedRecordRepository;
 use App\Repositories\ImportSessionRepository;
+use App\Repositories\ImportBatchRepository;
+use App\Adapters\GuaranteeDataAdapter;
 use App\Models\ImportedRecord;
 use App\Services\MatchingService;
 use App\Services\CandidateService;
@@ -35,6 +37,8 @@ class ManualEntryController
         private ?CandidateService $candidateService = null,
         private ?ConflictDetector $conflictDetector = null,
         private ?AutoAcceptService $autoAcceptService = null,
+        private ?ImportBatchRepository $batchRepo = null,
+        private ?GuaranteeDataAdapter $adapter = null,
     ) {
         // Auto-wire dependencies (similar to TextImportController)
         if (!$this->candidateService) {
@@ -51,6 +55,8 @@ class ManualEntryController
         if (!$this->conflictDetector) {
             $this->conflictDetector = new ConflictDetector();
         }
+        $this->batchRepo ??= new ImportBatchRepository();
+        $this->adapter ??= new GuaranteeDataAdapter();
     }
 
     /**
@@ -73,44 +79,44 @@ class ManualEntryController
         }
 
         try {
-            // 1. Create session (type: 'manual')
+            // 1. Create OLD session (for compatibility)
             $session = $this->sessions->create('manual');
             
             if (!$session || !$session->id) {
                 throw new \RuntimeException('فشل إنشاء جلسة الإدخال اليدوي');
             }
+            
+            // 2. Get or create daily manual batch
+            $batchId = $this->batchRepo->getOrCreateDailyManualBatch();
 
-            // 2. Create ImportedRecord
-            $record = new ImportedRecord(
-                id: null,
-                sessionId: $session->id,
-                rawSupplierName: trim($input['supplier']),
-                rawBankName: trim($input['bank']),
-                amount: $this->normalizeAmount($input['amount']),
-                guaranteeNumber: trim($input['guarantee_number']),
-                contractNumber: trim($input['contract_number']),
-                relatedTo: $input['related_to'] ?? 'contract',
-                expiryDate: !empty($input['expiry_date']) ? $this->normalizeDate($input['expiry_date']) : null,
-                issueDate: !empty($input['issue_date']) ? $this->normalizeDate($input['issue_date']) : null,
-                type: !empty($input['type']) ? strtoupper(trim($input['type'])) : null,
-                comment: !empty($input['comment']) ? trim($input['comment']) : 'إدخال يدوي',
-                matchStatus: 'needs_review',
-                supplierId: null,
-                bankId: null,
-                normalizedSupplier: null,
-                normalizedBank: null,
-                bankDisplay: null,
-                supplierDisplayName: null
-            );
+            // 3. Prepare record data
+            $recordData = [
+                'guarantee_number' => trim($input['guarantee_number']),
+                'raw_supplier_name' => trim($input['supplier']),
+                'raw_bank_name' => trim($input['bank']),
+                'contract_number' => trim($input['contract_number']),
+                'amount' => $this->normalizeAmount($input['amount']),
+                'issue_date' => !empty($input['issue_date']) ? $this->normalizeDate($input['issue_date']) : null,
+                'expiry_date' => !empty($input['expiry_date']) ? $this->normalizeDate($input['expiry_date']) : null,
+                'type' => !empty($input['type']) ? strtoupper(trim($input['type'])) : null,
+                'comment' => !empty($input['comment']) ? trim($input['comment']) : 'إدخال يدوي',
+                'related_to' => $input['related_to'] ?? 'contract',
+                'match_status' => 'needs_review',
+                'import_type' => 'manual',
+            ];
+            
+            // 4. Use adapter for dual-write
+            $ids = $this->adapter->createGuarantee($recordData, $session->id, $batchId);
 
-            // 3. Save record
-            $savedRecord = $this->records->create($record);
+            // 5. Get old record for matching
+            $savedRecord = $this->records->find($ids['old_id']);
 
-            // 4. Run matching
+            // 6. Run matching
             $this->processMatching($savedRecord);
 
-            // 5. Update session count
+            // 7. Update session and batch counts
             $this->sessions->incrementRecordCount($session->id, 1);
+            $this->batchRepo->incrementRecordCount($batchId, 1);
 
             // 6. Return success
             echo json_encode([
