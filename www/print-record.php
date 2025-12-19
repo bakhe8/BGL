@@ -30,16 +30,17 @@ $record = (object) [
     'id' => $row['id'],
     'supplierId' => $row['supplier_id'],
     'bankId' => $row['bank_id'],
-    'rawSupplierName' => $row['raw_supplier_name'], // Fixed
-    'rawBankName' => $row['raw_bank_name'], // Fixed
+    'rawSupplierName' => $row['raw_supplier_name'],
+    'rawBankName' => $row['raw_bank_name'],
     'guaranteeNumber' => $row['guarantee_number'],
     'contractNumber' => $row['contract_number'],
     'amount' => $row['amount'],
     'expiryDate' => $row['expiry_date'],
     'type' => $row['type'],
+    'recordType' => $row['record_type'] ?? 'import',
     'matchStatus' => $row['match_status'] ?? 'pending',
-    'supplierDisplayName' => null, // Will fetch
-    'bankDisplay' => null // Will fetch
+    'supplierDisplayName' => null,
+    'bankDisplay' => null
 ];
 
 // Fetch Supplier Details
@@ -120,6 +121,9 @@ $hasBank = !empty($record->bankId);
 $watermarkText = ($hasSupplier && $hasBank) ? 'جاهز' : 'يحتاج قرار';
 $watermarkClass = ($hasSupplier && $hasBank) ? 'status-ready' : 'status-draft';
 
+// Determine if this is a release letter
+$isRelease = ($record->recordType === 'release_action');
+
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -191,12 +195,26 @@ $watermarkClass = ($hasSupplier && $hasBank) ? 'status-ready' : 'status-draft';
                 <div class="subject">
                     <span style="flex:0 0 70px;">الموضوع:</span>
                     <span>
-                        طلب تمديد الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>) 
+                        <?php if ($isRelease): ?>
+                        إفراج الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>)
+                        <?php else: ?>
+                        طلب تمديد الضمان البنكي رقم (<?= htmlspecialchars($guaranteeNo) ?>)
+                        <?php endif; ?>
                         <?php if ($contractNo !== '-'): ?>
                         والعائد للعقد رقم (<?= htmlspecialchars($contractNo) ?>)
                         <?php endif; ?>
                     </span>
                 </div>
+                <?php if ($isRelease): ?>
+                <div class="first-paragraph">
+                    إشارة الى <?= $guaranteeDesc ?> الموضح أعلاه، والصادر منكم لصالحنا على حساب 
+                    <span style="<?= $supplierStyle ?>"><?= htmlspecialchars($supplierName) ?></span> 
+                    بمبلغ قدره (<strong><?= $amountHindi ?></strong>) ريال، 
+                    نود إفادتكم بأنه قد تم الانتهاء من العقد المذكور أعلاه وفق الأصول والشروط المتفق عليها، 
+                    لذا نأمل منكم <span class="fw-800-sharp" style="text-shadow: 0 0 1px #333, 0 0 1px #333;">إلغاء الضمان البنكي</span> 
+                    وإعادته إلى المقاول المذكور أعلاه.
+                </div>
+                <?php else: ?>
                 <div class="first-paragraph">
                     إشارة الى <?= $guaranteeDesc ?> الموضح أعلاه، والصادر منكم لصالحنا على حساب 
                     <span style="<?= $supplierStyle ?>"><?= htmlspecialchars($supplierName) ?></span> 
@@ -214,6 +232,7 @@ $watermarkClass = ($hasSupplier && $hasBank) ? 'status-ready' : 'status-draft';
                 <div class="first-paragraph">
                     علمًا بأنه في حال عدم تمكن البنك من تمديد الضمان المذكور قبل انتهاء مدة سريانه، فيجب على البنك دفع قيمة الضمان إلينا حسب النظام.
                 </div>
+                <?php endif; ?>
 
                 <div style="text-indent:5em; margin-top:5px;">وَتفضَّلوا بِقبُول خَالِص تحيَّاتِي</div>
 
