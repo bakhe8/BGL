@@ -1,18 +1,22 @@
 <?php
 /**
  * API Endpoint: Guarantee History
- * Returns all records for a specific guarantee number across all sessions
+ * Returns complete history for a guarantee from both old and new tables
  */
 
 require_once __DIR__ . '/../../app/Support/autoload.php';
+
+use App\Repositories\GuaranteeRepository;
+use App\Repositories\GuaranteeActionRepository;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
 try {
-    // Connect to Database
     $db = \App\Support\Database::connect();
-
+    $guaranteeRepo = new GuaranteeRepository();
+    $actionRepo = new GuaranteeActionRepository();
+    
     $guaranteeNumber = trim($_GET['number'] ?? '');
     
     if (empty($guaranteeNumber)) {
@@ -23,7 +27,64 @@ try {
         exit;
     }
     
-    // Get all records with this guarantee number across ALL sessions
+    $history = [];
+    
+    // ========================================================================
+    // Get records from NEW tables (guarantees + guarantee_actions)
+    // ========================================================================
+    
+    // 1. Get guarantee records
+    $guarantees = $guaranteeRepo->findByNumber($guaranteeNumber);
+    foreach ($guarantees as $g) {
+        $history[] = [
+            'id' => 'g_' . $g['id'],
+            'source' => 'new',
+            'type' => 'import',
+            'guarantee_number' => $g['guarantee_number'],
+            'contract_number' => $g['contract_number'],
+            'amount' => $g['amount'],
+            'expiry_date' => $g['expiry_date'],
+            'issue_date' => $g['issue_date'],
+            'guarantee_type' => $g['type'],
+            'supplier_id' => $g['supplier_id'],
+            'bank_id' => $g['bank_id'],
+            'supplier_display_name' => $g['supplier_display_name'],
+            'bank_display' => $g['bank_display'],
+            'import_type' => $g['import_type'],
+            'match_status' => $g['match_status'],
+            'created_at' => $g['created_at'],
+            'record_type' => null
+        ];
+    }
+    
+    // 2. Get action records
+    $actions = $actionRepo->findByGuaranteeNumber($guaranteeNumber);
+    foreach ($actions as $a) {
+        $history[] = [
+            'id' => 'a_' . $a['id'],
+            'source' => 'new',
+            'type' => 'action',
+            'guarantee_number' => $a['guarantee_number'],
+            'contract_number' => null,
+            'amount' => $a['new_amount'],
+            'expiry_date' => $a['new_expiry_date'],
+            'issue_date' => null,
+            'guarantee_type' => null,
+            'supplier_id' => $a['supplier_id'],
+            'bank_id' => $a['bank_id'],
+            'supplier_display_name' => $a['supplier_display_name'],
+            'bank_display' => $a['bank_display'],
+            'import_type' => null,
+            'match_status' => $a['action_status'],
+            'created_at' => $a['created_at'],
+            'record_type' => $a['action_type'] . '_action'
+        ];
+    }
+    
+    // ========================================================================
+    // Get records from OLD table (for backwards compatibility)
+    // Only get records that haven't been migrated
+    // ========================================================================
     $stmt = $db->prepare("
         SELECT 
             r.id,
@@ -32,131 +93,84 @@ try {
             r.contract_number,
             r.amount,
             r.expiry_date,
+            r.issue_date,
             r.type,
-            r.raw_supplier_name,
-            r.raw_bank_name,
             r.supplier_id,
             r.bank_id,
             r.supplier_display_name,
             r.bank_display,
             r.record_type,
-            r.created_at,
-            s.official_name as supplier_name,
-            b.official_name as bank_name
+            r.match_status,
+            r.created_at
         FROM imported_records r
-        LEFT JOIN suppliers s ON r.supplier_id = s.id
-        LEFT JOIN banks b ON r.bank_id = b.id
         WHERE r.guarantee_number = :number
+          AND r.migrated_guarantee_id IS NULL
+          AND r.migrated_action_id IS NULL
         ORDER BY r.session_id DESC, r.created_at DESC
     ");
     
     $stmt->execute(['number' => $guaranteeNumber]);
-    $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $oldRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    if (empty($records)) {
-        echo json_encode([
-            'success' => true, // Return true but empty history to avoid error message in UI
-            'guarantee_number' => $guaranteeNumber,
-            'total_records' => 0,
-            'history' => []
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+    foreach ($oldRecords as $r) {
+        $history[] = [
+            'id' => 'old_' . $r['id'],
+            'source' => 'old',
+            'type' => $r['record_type'] ? 'action' : 'import',
+            'guarantee_number' => $r['guarantee_number'],
+            'contract_number' => $r['contract_number'],
+            'amount' => $r['amount'],
+            'expiry_date' => $r['expiry_date'],
+            'issue_date' => $r['issue_date'],
+            'guarantee_type' => $r['type'],
+            'supplier_id' => $r['supplier_id'],
+            'bank_id' => $r['bank_id'],
+            'supplier_display_name' => $r['supplier_display_name'],
+            'bank_display' => $r['bank_display'],
+            'import_type' => null,
+            'match_status' => $r['match_status'],
+            'created_at' => $r['created_at'],
+            'record_type' => $r['record_type']
+        ];
     }
     
-    // Process records to track changes
-    $history = [];
-    $previousRecord = null;
-    
-    // Sort by session ASC (oldest first) to track changes naturally
-    usort($records, fn($a, $b) => ($a['session_id'] <=> $b['session_id']) ?: ($a['created_at'] <=> $b['created_at']));
-
-    foreach ($records as $record) {
-        $changes = [];
-        
-        if ($previousRecord) {
-            // Track supplier changes
-            if ($record['supplier_id'] != $previousRecord['supplier_id']) {
-                $changes[] = [
-                    'field' => 'المورد',
-                    'from' => $previousRecord['supplier_name'] ?? $previousRecord['raw_supplier_name'],
-                    'to' => $record['supplier_name'] ?? $record['raw_supplier_name']
-                ];
-            }
-            
-            // Track bank changes
-            if ($record['bank_id'] != $previousRecord['bank_id']) {
-                $changes[] = [
-                    'field' => 'البنك',
-                    'from' => $previousRecord['bank_name'] ?? $previousRecord['raw_bank_name'],
-                    'to' => $record['bank_name'] ?? $record['raw_bank_name']
-                ];
-            }
-            
-            // Track amount changes
-            if ((float)$record['amount'] != (float)$previousRecord['amount']) {
-                $changes[] = [
-                    'field' => 'المبلغ',
-                    'from' => number_format((float)$previousRecord['amount'], 2),
-                    'to' => number_format((float)$record['amount'], 2)
-                ];
-            }
-
-            // Track type changes (primary, final, etc.)
-            if ($record['type'] != $previousRecord['type']) {
-                $changes[] = [
-                    'field' => 'نوع الضمان',
-                    'from' => $previousRecord['type'] ?: 'غير محدد',
-                    'to' => $record['type'] ?: 'غير محدد'
-                ];
-            }
-
-            // Track expiry date changes
-            if ($record['expiry_date'] != $previousRecord['expiry_date']) {
-                $changes[] = [
-                    'field' => 'تاريخ الانتهاء',
-                    'from' => $previousRecord['expiry_date'] ?: '-',
-                    'to' => $record['expiry_date'] ?: '-'
-                ];
-            }
+    // ========================================================================
+    // Get supplier and bank names
+    // ========================================================================
+    foreach ($history as &$record) {
+        if ($record['supplier_id']) {
+            $stmt = $db->prepare("SELECT official_name FROM suppliers WHERE id = ?");
+            $stmt->execute([$record['supplier_id']]);
+            $record['supplier_name'] = $stmt->fetchColumn() ?: null;
+        } else {
+            $record['supplier_name'] = null;
         }
         
-        // Determine status
-        $hasSupplier = !empty($record['supplier_id']);
-        $hasBank = !empty($record['bank_id']);
-        $status = ($hasSupplier && $hasBank) ? 'جاهز' : 'معلق';
-        
-        $history[] = [
-            'record_id' => $record['id'],
-            'session_id' => $record['session_id'],
-            'date' => $record['created_at'],
-            'supplier' => $record['supplier_name'] ?? $record['raw_supplier_name'],
-            'supplier_id' => $record['supplier_id'],
-            'bank' => $record['bank_name'] ?? $record['raw_bank_name'],
-            'bank_id' => $record['bank_id'],
-            'amount' => $record['amount'],
-            'expiry_date' => $record['expiry_date'],
-            'type' => $record['type'],
-            'status' => $status,
-            'record_type' => $record['record_type'] ?? 'import',
-            'changes' => $changes,
-            'is_first' => $previousRecord === null
-        ];
-        
-        $previousRecord = $record;
+        if ($record['bank_id']) {
+            $stmt = $db->prepare("SELECT official_name FROM banks WHERE id = ?");
+            $stmt->execute([$record['bank_id']]);
+            $record['bank_name'] = $stmt->fetchColumn() ?: null;
+        } else {
+            $record['bank_name'] = null;
+        }
     }
     
-    // Reverse history to show Newest First in UI
-    $history = array_reverse($history);
+    // ========================================================================
+    // Sort by date (newest first)
+    // ========================================================================
+    usort($history, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
     
+    // ========================================================================
+    // Return Results
+    // ========================================================================
     echo json_encode([
         'success' => true,
         'guarantee_number' => $guaranteeNumber,
-        'total_records' => count($records),
+        'total_records' => count($history),
         'history' => $history
     ], JSON_UNESCAPED_UNICODE);
     
 } catch (Exception $e) {
-    // Log error securely if possible, here just return generic
     http_response_code(500);
     echo json_encode([
         'success' => false,
