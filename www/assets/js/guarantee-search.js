@@ -226,20 +226,13 @@
                         
                         
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
-                            ${item.record_type === 'release_action'
-                    ? `<a href="/release-letter.php?id=${item.record_id}" target="_blank" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
-                                    عرض السجل
-                                </a>`
-                    : `<a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
-                                    عرض السجل
-                                </a>`
-                }
+                            <a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
+                                عرض السجل
+                            </a>
                             <button onclick="
                                 var recId = ${item.record_id || 0};
                                 if (!recId) { alert('خطأ: معرف السجل مفقود'); return; }
-                                var isRelease = '${item.record_type}' === 'release_action';
-                                var url = isRelease ? '/release-letter.php?id=' + recId : '/print-record.php?id=' + recId;
-                                window.open(url, '_blank', 'width=900,height=800');
+                                window.open('/print-record.php?id=' + recId, '_blank', 'width=900,height=800');
                             " 
                                     class="view-record-btn" 
                                     style="width: auto; padding: 6px 20px; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; text-decoration: none;"
