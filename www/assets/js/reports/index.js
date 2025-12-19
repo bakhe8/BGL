@@ -17,7 +17,7 @@ async function init() {
 
 async function fetchAPI(endpoint) {
     // We use the standalone entry point with query params (server.php safe)
-    const res = await fetch(`/reports.php?api=${endpoint}`);
+    const res = await fetch(`/pages/reports.php?api=${endpoint}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Unknown error');
     return json.data;

@@ -6,7 +6,7 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__ . '/../app/Support/autoload.php';
+require_once __DIR__ . '/../../app/Support/autoload.php';
 
 use App\Repositories\ImportedRecordRepository;
 use App\Repositories\SupplierRepository;
@@ -158,7 +158,7 @@ $contractVsPoStats = $records->getContractVsPOStats();
 <body class="app-shell">
 
     <!-- Header -->
-    <?php include __DIR__ . '/../app/Views/partials/subpage_header.php'; ?>
+    <?php include __DIR__ . '/../../app/Views/partials/subpage_header.php'; ?>
 
     <main class="dashboard-container">
         

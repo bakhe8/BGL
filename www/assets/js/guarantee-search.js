@@ -232,7 +232,7 @@
                             <button onclick="
                                 var recId = ${item.record_id || 0};
                                 if (!recId) { alert('خطأ: معرف السجل مفقود'); return; }
-                                window.open('/print-record.php?id=' + recId, '_blank', 'width=900,height=800');
+                                window.open('/letters/print-letter.php?id=' + recId, '_blank', 'width=900,height=800');
                             " 
                                     class="view-record-btn" 
                                     style="width: auto; padding: 6px 20px; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; text-decoration: none;"

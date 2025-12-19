@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 use App\Controllers\ReportController;
 
-require __DIR__ . '/../app/Support/autoload.php';
+require __DIR__ . '/../../app/Support/autoload.php';
 
 // Route Handlers specific to this plugin
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -48,7 +48,7 @@ try {
     }
 
     // Default: Redirect to View
-    header('Location: /reports.php');
+    header('Location: /pages/reports.php');
     exit;
 
 } catch (Throwable $e) {
