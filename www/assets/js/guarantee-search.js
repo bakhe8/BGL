@@ -232,11 +232,13 @@
                             <button onclick="
                                 var recId = ${item.record_id || 0};
                                 if (!recId) { alert('خطأ: معرف السجل مفقود'); return; }
-                                window.open('/release-letter.php?id=' + recId, '_blank', 'width=900,height=800');
+                                var isRelease = '${item.record_type}' === 'release_action';
+                                var url = isRelease ? '/release-letter.php?id=' + recId : '/print-record.php?id=' + recId;
+                                window.open(url, '_blank', 'width=900,height=800');
                             " 
                                     class="view-record-btn" 
                                     style="width: auto; padding: 6px 20px; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; text-decoration: none;"
-                                    title="طباعة خطاب الإفراج">
+                                    title="طباعة">
                                 <i data-lucide="printer" class="w-4 h-4"></i> طباعة
                             </button>
                         </div>
