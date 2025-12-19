@@ -93,8 +93,8 @@
 
                 if (data.success) {
                     showSuccess(data.message || 'تم إنشاء سجل التمديد بنجاح');
-                    // Redirect to new record
-                    window.location.href = `/?record_id=${data.record_id}&session_id=${data.session_id}`;
+                    // Refresh history to show new extension record
+                    loadGuaranteeHistory(guaranteeNum);
                 } else {
                     showWarning(data.error || 'فشل إنشاء التمديد');
                 }
