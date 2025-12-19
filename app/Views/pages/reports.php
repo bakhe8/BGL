@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 use App\Controllers\ReportController;
 
-require __DIR__ . '/../../app/Support/autoload.php';
+require_once __DIR__ . '/../../Support/autoload.php';
 
 // Route Handlers specific to this plugin
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);

@@ -34,13 +34,16 @@ use App\Support\Normalizer;
 // ROUTING
 // ═══════════════════════════════════════════════════════════════════
 
+// Handle View requests (stats, reports, letters)
+require __DIR__ . '/includes/views-router.php';
+
 // Handle API requests
 require __DIR__ . '/includes/router.php';
 
 // Check for batch print mode
 if (isset($_GET['print_batch']) && $_GET['print_batch'] == '1') {
     require __DIR__ . '/includes/decision-logic.php';
-    require __DIR__ . '/views/batch-print.php';
+    require __DIR__ . '/../app/Views/pages/batch-print.php';
     exit;
 }
 
@@ -53,4 +56,4 @@ require __DIR__ . '/includes/decision-logic.php';
 
 // Render decision page view - this file has all PHP logic and HTML from original index.php (lines 676-1233)
 // We kept it as one file to avoid breaking the complex HTML structure
-require __DIR__ . '/views/decision-page.php';
+require __DIR__ . '/../app/Views/pages/decision-page.php';
