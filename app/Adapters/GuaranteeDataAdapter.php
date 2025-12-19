@@ -120,6 +120,13 @@ class GuaranteeDataAdapter
      */
     public function createAction(array $data, ?int $legacySessionId = null, ?int $actionSessionId = null): array
     {
+        // Determine record_type based on action_type
+        $recordType = match($data['action_type']) {
+            'extension' => 'extension_action',
+            'release' => 'release_action',
+            default => $data['action_type'] . '_action'
+        };
+        
         // 1. Write to OLD table (for compatibility)
         $record = new ImportedRecord(
             id: null,
@@ -141,7 +148,8 @@ class GuaranteeDataAdapter
             bankId: $data['bank_id'] ?? null,
             bankDisplay: $data['bank_display'] ?? null,
             supplierDisplayName: $data['supplier_display_name'] ?? null,
-            createdAt: date('Y-m-d H:i:s')
+            createdAt: date('Y-m-d H:i:s'),
+            recordType: $recordType  // CRITICAL FIX: Set record type!
         );
         
         $oldRecord = $this->oldRepo->create($record);
