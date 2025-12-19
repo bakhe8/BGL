@@ -104,14 +104,36 @@ $currentIndex = 0;
 $currentRecord = null;
 
 if ($recordId) {
-    foreach ($filteredRecords as $index => $r) {
-        if ($r->id === $recordId) {
-            $currentIndex = $index;
-            $currentRecord = $r;
-            break;
+    // CRITICAL FIX: Find the record directly by ID, not within filtered session
+    // This ensures extension/release actions from different sessions display correctly
+    $currentRecord = $records->find($recordId);
+    
+    if ($currentRecord) {
+        // Update sessionId to match the record's session
+        $sessionId = $currentRecord->sessionId;
+        
+        // Reload all records for this session
+        $allRecords = $records->allBySession($sessionId);
+        
+        // Apply filter
+        $filteredRecords = array_filter($allRecords, function($r) use ($filter) {
+            if ($filter === 'all') return true;
+            $isCompleted = in_array($r->matchStatus, ['ready', 'approved']);
+            if ($filter === 'approved') return $isCompleted;
+            if ($filter === 'pending') return !$isCompleted;
+            return true;
+        });
+        $filteredRecords = array_values($filteredRecords);
+        
+        // Find the index of current record in filtered list
+        foreach ($filteredRecords as $index => $r) {
+            if ($r->id === $recordId) {
+                $currentIndex = $index;
+                break;
+            }
         }
     }
-}
+} else {
 if (!$currentRecord && !empty($filteredRecords)) {
     // Smart Jump: Find the first pending record to save user time
     foreach ($filteredRecords as $index => $r) {
