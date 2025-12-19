@@ -1,7 +1,10 @@
-<?php
 /**
- * Simple Router for New View Locations
- * Maps URLs to new unified Views structure in app/Views/
+ * Simple Router for Unified Views (v2.0 Architecture)
+ * Maps URLs to the new centralized View structure in `app/Views/`
+ * 
+ * Part of the BGL 2.0 refactoring to separate Logic from Presentation.
+ * This router intercepts legacy paths like `/pages/stats.php` and routes them
+ * to the correct location in `app/Views/pages/`.
  */
 
 // Stats page

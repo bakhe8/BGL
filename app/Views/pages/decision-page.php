@@ -355,6 +355,9 @@
                 <div class="panel-header">
                     <h3 id="historyTitle">📜 تاريخ الضمان</h3>
                     <div class="flex items-center gap-2">
+                        <button id="btnIssueExtension" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold shadow transition-colors flex items-center gap-1 hidden">
+                            <i data-lucide="refresh-cw" class="w-3 h-3"></i> إنشاء تمديد
+                        </button>
                         <button id="btnIssueRelease" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-bold shadow transition-colors flex items-center gap-1 hidden">
                             <i data-lucide="file-x-2" class="w-3 h-3"></i> إصدار خطاب إفراج
                         </button>

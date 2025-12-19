@@ -12,7 +12,8 @@
     const historyTimeline = document.getElementById('historyTimeline');
     const historyTitle = document.getElementById('historyTitle');
     const quickSearchBtn = document.getElementById('btnQuickSearch'); // Quick search from meta bar
-    const issueReleaseBtn = document.getElementById('btnIssueRelease'); // New Release Button
+    const issueReleaseBtn = document.getElementById('btnIssueRelease'); // Release Button
+    const issueExtensionBtn = document.getElementById('btnIssueExtension'); // Extension Button
 
     if (!searchBtn) return; // Exit if elements not found
 
@@ -66,6 +67,43 @@
             } finally {
                 issueReleaseBtn.disabled = false;
                 issueReleaseBtn.innerHTML = '<i data-lucide="file-check"></i> إصدار خطاب إفراج';
+                lucide.createIcons();
+            }
+        });
+    }
+
+    // Issue Extension Letter Listener
+    if (issueExtensionBtn) {
+        issueExtensionBtn.addEventListener('click', async () => {
+            const guaranteeNum = issueExtensionBtn.dataset.guarantee;
+            if (!guaranteeNum) return;
+
+            // Disable button during request
+            issueExtensionBtn.disabled = true;
+            issueExtensionBtn.textContent = 'جاري الإنشاء...';
+
+            try {
+                const response = await fetch('/api/issue-extension.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `guarantee_no=${encodeURIComponent(guaranteeNum)}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess(data.message || 'تم إنشاء سجل التمديد بنجاح');
+                    // Redirect to new record
+                    window.location.href = `/?record_id=${data.record_id}&session_id=${data.session_id}`;
+                } else {
+                    showWarning(data.error || 'فشل إنشاء التمديد');
+                }
+            } catch (error) {
+                showWarning('خطأ في الاتصال بالخادم');
+                console.error('Extension error:', error);
+            } finally {
+                issueExtensionBtn.disabled = false;
+                issueExtensionBtn.innerHTML = '<i data-lucide="refresh-cw"></i> إنشاء تمديد';
                 lucide.createIcons();
             }
         });
@@ -155,6 +193,12 @@
             issueReleaseBtn.dataset.guarantee = data.guarantee_number;
         }
 
+        // Show and setup Extension Button
+        if (issueExtensionBtn) {
+            issueExtensionBtn.classList.remove('hidden');
+            issueExtensionBtn.dataset.guarantee = data.guarantee_number;
+        }
+
         if (!data.history || data.history.length === 0) {
             historyTimeline.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">لا توجد سجلات</div>';
             return;
@@ -165,7 +209,9 @@
         data.history.forEach((item, index) => {
             const isFirst = item.is_first;
             const isRelease = item.record_type === 'release_action';
-            const statusClass = isRelease ? 'release' : (item.status === 'جاهز' ? 'ready' : 'pending');
+            const isExtension = item.record_type === 'extension_action';
+            const statusClass = isRelease ? 'release' : (isExtension ? 'extension' : (item.status === 'جاهز' ? 'ready' : 'pending'));
+            const statusLabel = isRelease ? 'إفراج' : (isExtension ? 'تمديد' : item.status);
             const date = new Date(item.date);
             const formattedDate = date.toLocaleDateString('ar-SA', {
                 year: 'numeric',
@@ -182,7 +228,7 @@
                         <div class="timeline-header">
                             <div>
                                 <span class="session-badge flex items-center gap-1"><i data-lucide="file-digit" class="w-3 h-3"></i> جلسة #${item.session_id}</span>
-                                <span class="status-badge-timeline ${statusClass}">${isRelease ? 'إفراج' : item.status}</span>
+                                <span class="status-badge-timeline ${statusClass}">${statusLabel}</span>
                             </div>
                         </div>
                         <div class="timeline-date">${formattedDate}</div>

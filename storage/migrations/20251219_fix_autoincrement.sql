@@ -31,7 +31,7 @@ CREATE TABLE imported_records_new (
     bank_display TEXT NULL,
     supplier_display_name TEXT NULL,
     related_to TEXT NULL,
-    record_type TEXT DEFAULT 'import' CHECK(record_type IN ('import', 'modification', 'release_action', 'renewal_request')),
+    record_type TEXT DEFAULT 'import' CHECK(record_type IN ('import', 'modification', 'release_action', 'renewal_request', 'extension_action')),
     
     FOREIGN KEY (session_id) REFERENCES import_sessions(id),
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
