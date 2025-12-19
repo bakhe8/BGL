@@ -146,17 +146,23 @@ try {
         if ($record['supplier_id']) {
             $stmt = $db->prepare("SELECT official_name FROM suppliers WHERE id = ?");
             $stmt->execute([$record['supplier_id']]);
-            $record['supplier_name'] = $stmt->fetchColumn() ?: null;
+            $supplierName = $stmt->fetchColumn() ?: null;
+            $record['supplier'] = $supplierName; // JS expects 'supplier'
+            $record['supplier_name'] = $supplierName; // Keep for compatibility
         } else {
-            $record['supplier_name'] = null;
+            $record['supplier'] = $record['supplier_display_name'] ?: null;
+            $record['supplier_name'] = $record['supplier_display_name'] ?: null;
         }
         
         if ($record['bank_id']) {
             $stmt = $db->prepare("SELECT official_name FROM banks WHERE id = ?");
             $stmt->execute([$record['bank_id']]);
-            $record['bank_name'] = $stmt->fetchColumn() ?: null;
+            $bankName = $stmt->fetchColumn() ?: null;
+            $record['bank'] = $bankName; // JS expects 'bank'
+            $record['bank_name'] = $bankName; // Keep for compatibility
         } else {
-            $record['bank_name'] = null;
+            $record['bank'] = $record['bank_display'] ?: null;
+            $record['bank_name'] = $record['bank_display'] ?: null;
         }
     }
     
