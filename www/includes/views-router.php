@@ -1,3 +1,4 @@
+<?php
 /**
  * Simple Router for Unified Views (v2.0 Architecture)
  * Maps URLs to the new centralized View structure in `app/Views/`
