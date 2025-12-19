@@ -36,8 +36,20 @@ try {
     // 1. Get guarantee records
     $guarantees = $guaranteeRepo->findByNumber($guaranteeNumber);
     foreach ($guarantees as $g) {
+        // Find corresponding old record
+        $stmt = $db->prepare("
+            SELECT id, session_id 
+            FROM imported_records 
+            WHERE migrated_guarantee_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$g['id']]);
+        $oldRecord = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         $history[] = [
             'id' => 'g_' . $g['id'],
+            'record_id' => $oldRecord ? $oldRecord['id'] : null,
+            'session_id' => $oldRecord ? $oldRecord['session_id'] : null,
             'source' => 'new',
             'type' => 'import',
             'guarantee_number' => $g['guarantee_number'],
@@ -53,15 +65,30 @@ try {
             'import_type' => $g['import_type'],
             'match_status' => $g['match_status'],
             'created_at' => $g['created_at'],
-            'record_type' => null
+            'date' => $g['created_at'],
+            'status' => $g['match_status'] === 'ready' ? 'جاهز' : 'يحتاج قرار',
+            'record_type' => null,
+            'is_first' => false
         ];
     }
     
     // 2. Get action records
     $actions = $actionRepo->findByGuaranteeNumber($guaranteeNumber);
     foreach ($actions as $a) {
+        // Find corresponding old record
+        $stmt = $db->prepare("
+            SELECT id, session_id 
+            FROM imported_records 
+            WHERE migrated_action_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$a['id']]);
+        $oldRecord = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         $history[] = [
             'id' => 'a_' . $a['id'],
+            'record_id' => $oldRecord ? $oldRecord['id'] : null,
+            'session_id' => $oldRecord ? $oldRecord['session_id'] : null,
             'source' => 'new',
             'type' => 'action',
             'guarantee_number' => $a['guarantee_number'],
@@ -77,7 +104,10 @@ try {
             'import_type' => null,
             'match_status' => $a['action_status'],
             'created_at' => $a['created_at'],
-            'record_type' => $a['action_type'] . '_action'
+            'date' => $a['created_at'],
+            'status' => $a['action_status'] === 'issued' ? 'جاهز' : 'يحتاج قرار',
+            'record_type' => $a['action_type'] . '_action',
+            'is_first' => false
         ];
     }
     
