@@ -134,18 +134,19 @@ if ($recordId) {
         }
     }
 } else {
-if (!$currentRecord && !empty($filteredRecords)) {
-    // Smart Jump: Find the first pending record to save user time
-    foreach ($filteredRecords as $index => $r) {
-        if (!in_array($r->matchStatus, ['ready', 'approved'])) {
-            $currentRecord = $r;
-            $currentIndex = $index;
-            break;
+    if (!$currentRecord && !empty($filteredRecords)) {
+        // Smart Jump: Find the first pending record to save user time
+        foreach ($filteredRecords as $index => $r) {
+            if (!in_array($r->matchStatus, ['ready', 'approved'])) {
+                $currentRecord = $r;
+                $currentIndex = $index;
+                break;
+            }
         }
-    }
-    // Fallback: If all are ready, just show the first one
-    if (!$currentRecord) {
-        $currentRecord = $filteredRecords[0];
+        // Fallback: If all are ready, just show the first one
+        if (!$currentRecord) {
+            $currentRecord = $filteredRecords[0];
+        }
     }
 }
 
