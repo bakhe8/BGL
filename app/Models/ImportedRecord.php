@@ -26,6 +26,7 @@ class ImportedRecord
         public ?string $bankDisplay = null,
         public ?string $supplierDisplayName = null,
         public ?string $createdAt = null,
+        // Record type determines letter content: 'import'=extension, 'release_action'=release, 'modification'=amendment
         public ?string $recordType = 'import',  // Record type: 'import', 'modification', 'release_action'
     ) {
     }

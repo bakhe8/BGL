@@ -1,6 +1,6 @@
 ---
-last_updated: 2025-12-13
-version: 1.1
+last_updated: 2025-12-19
+version: 1.4
 status: active
 ---
 
@@ -20,7 +20,9 @@ status: active
 | [03-Matching-Engine.md](03-Matching-Engine.md) | ⭐⭐⭐ | محرك المطابقة |
 | [04-Technical-Reference.md](04-Technical-Reference.md) | ⭐⭐ | المرجع التقني |
 | [05-Deployment.md](05-Deployment.md) | ⭐ | دليل النشر |
-| [06-Decision-Page.md](06-Decision-Page.md) | ⭐⭐⭐ جديد | صفحة اتخاذ القرار |
+| [06-Decision-Page.md](06-Decision-Page.md) | ⭐⭐⭐ | صفحة اتخاذ القرار |
+| [14-Version-1.4-Release-Notes.md](14-Version-1.4-Release-Notes.md) | ⭐⭐⭐ جديد | نظام إدارة خطابات الإفراج |
+| [features/release-letter-logging.md](features/release-letter-logging.md) | ⭐⭐ جديد | دليل ميزة تسجيل الإفراج |
 
 ---
 
