@@ -155,7 +155,11 @@
 
     if (btnAddSupplier && supplierInput && supplierNamePreview) {
         // 1. Dynamic Text Update & Visibility
-        // PORTS PHP App\Support\Normalizer::makeSupplierKey LOGIC TO JS
+        // ⚠️ SYNC WARNING: This function is duplicated from PHP!
+        // @see app/Support/Normalizer.php - makeSupplierKey() method
+        // 
+        // السبب: نحتاج التحقق الفوري قبل إرسال الطلب للخادم (كل حرف يكتبه المستخدم).
+        // إذا عدّلت هذه الدالة، يجب تحديث نسخة PHP أيضاً!
         const makeSupplierKey = (val) => {
             if (!val) return '';
             let s = val.toLowerCase().trim();

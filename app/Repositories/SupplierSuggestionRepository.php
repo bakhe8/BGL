@@ -337,29 +337,16 @@ class SupplierSuggestionRepository
         return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'supplier_id');
     }
     
-    /**
-     * Delete cached suggestions for a normalized input
-     * (Call when cache needs refresh)
-     */
-    public function clearCache(string $normalizedInput): bool
-    {
-        $stmt = $this->db->prepare("
-            DELETE FROM supplier_suggestions WHERE normalized_input = ?
-        ");
-        return $stmt->execute([$normalizedInput]);
-    }
-    
-    /**
-     * Get all cached normalized inputs (for debugging/admin)
-     */
-    public function getAllCachedInputs(): array
-    {
-        $stmt = $this->db->query("
-            SELECT DISTINCT normalized_input, COUNT(*) as suggestion_count
-            FROM supplier_suggestions
-            GROUP BY normalized_input
-            ORDER BY suggestion_count DESC
-        ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
+    // ═══════════════════════════════════════════════════════════════════
+    // NOTE: clearCache() و getAllCachedInputs() تم حذفها (2025-12-19)
+    // ═══════════════════════════════════════════════════════════════════
+    // السبب: هذه الدوال لم تكن مستخدمة في أي من:
+    // - نظام التعلم التلقائي
+    // - واجهة المستخدم
+    // - زر التحديث أو الطباعة
+    // 
+    // إذا احتجت لتنظيف الكاش يدوياً، استخدم SQL مباشرة:
+    // DELETE FROM supplier_suggestions WHERE normalized_input = '...'
+    // ═══════════════════════════════════════════════════════════════════
 }
+

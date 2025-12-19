@@ -174,6 +174,46 @@ class UserDecisionRepository
         return $count;
     }
     
+    // ═══════════════════════════════════════════════════════════════════
+    // GLOBAL STATISTICS (NEW - 2025-12-19)
+    // Used in stats.php for displaying decision intelligence
+    // ═══════════════════════════════════════════════════════════════════
+    
+    /**
+     * Get decision counts grouped by source (for charts)
+     * @return array [{decision_source, count}, ...]
+     */
+    public function getDecisionsBySource(): array
+    {
+        return $this->db->query("
+            SELECT decision_source, COUNT(*) as count 
+            FROM user_decisions 
+            GROUP BY decision_source
+            ORDER BY count DESC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Get globally most chosen suppliers (across all names)
+     * @return array [{supplier_id, display_name, choice_count}, ...]
+     */
+    public function getTopChosenSuppliersGlobal(int $limit = 10): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT 
+                chosen_supplier_id as supplier_id,
+                chosen_display_name as display_name,
+                COUNT(*) as choice_count
+            FROM user_decisions
+            WHERE decision_source NOT IN ('propagation', 'import')
+            GROUP BY chosen_supplier_id
+            ORDER BY choice_count DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$limit]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
     /**
      * Get decision source display label
      * Used for showing badges in UI

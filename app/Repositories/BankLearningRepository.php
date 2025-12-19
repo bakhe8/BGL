@@ -43,23 +43,12 @@ class BankLearningRepository
         return $row ?: null;
     }
 
-    /**
-     * INCREMENT USAGE COUNT (NEW - 2025-12-17)
-     * Tracks bank alias usage frequency
-     */
-    public function incrementUsage(string $normalized): bool
-    {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare("
-            UPDATE bank_aliases_learning 
-            SET usage_count = COALESCE(usage_count, 0) + 1,
-                last_used_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE normalized_input = ?
-        ");
-        
-        return $stmt->execute([$normalized]);
-    }
+    // ═══════════════════════════════════════════════════════════════════
+    // NOTE: incrementUsage() was removed (2025-12-19)
+    // ═══════════════════════════════════════════════════════════════════
+    // السبب: دالة upsert() تقوم بزيادة usage_count تلقائياً عند التحديث.
+    // لا حاجة لدالة منفصلة.
+    // ═══════════════════════════════════════════════════════════════════
     
     /**
      * GET USAGE STATISTICS (NEW - 2025-12-17)

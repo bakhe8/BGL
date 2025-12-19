@@ -66,6 +66,12 @@ class Normalizer
 
     /**
      * إنشاء مفتاح هوية ثابت للمورد (normalized بدون مسافات).
+     * 
+     * ⚠️ SYNC WARNING: This logic is duplicated in JavaScript!
+     * @see www/assets/js/decision.js - makeSupplierKey() function (line ~159)
+     * 
+     * السبب: نحتاج التحقق الفوري (client-side) قبل إرسال الطلب للخادم.
+     * إذا عدّلت هذه الدالة، يجب تحديث نسخة JS أيضاً!
      */
     public function makeSupplierKey(string $value): string
     {

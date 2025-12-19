@@ -11,10 +11,14 @@ require_once __DIR__ . '/../../Support/autoload.php';
 use App\Repositories\ImportedRecordRepository;
 use App\Repositories\SupplierRepository;
 use App\Repositories\BankRepository;
+use App\Repositories\UserDecisionRepository;
+use App\Repositories\BankLearningRepository;
 
 $records = new ImportedRecordRepository();
 $suppliersRepo = new SupplierRepository();
 $banksRepo = new BankRepository();
+$decisionsRepo = new UserDecisionRepository();
+$bankLearningRepo = new BankLearningRepository();
 
 // 1. Fetch Basic Stats (Original)
 $basicStats = $records->getStats();
@@ -96,7 +100,31 @@ foreach ($temporalTrends as $row) {
 // 11. NEW: Contract vs PO Stats
 $contractVsPoStats = $records->getContractVsPOStats();
 
+// ═══════════════════════════════════════════════════════════════════
+// 12. NEW: Decision Intelligence Stats (2025-12-19)
+// ═══════════════════════════════════════════════════════════════════
+$decisionStats = $decisionsRepo->getDecisionsBySource();
+$mostChosenSuppliers = $decisionsRepo->getTopChosenSuppliersGlobal(5);
+$bankLearningStats = $bankLearningRepo->getUsageStats(10);
+
+// Prepare decision stats for chart
+$decisionSourceLabels = [];
+$decisionSourceCounts = [];
+$decisionSourceColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+$sourceLabels = [
+    'user_click' => '👆 اختيار يدوي',
+    'propagation' => '📤 نشر تلقائي',
+    'auto_select' => '🤖 قبول تلقائي',
+    'import' => '📥 من الاستيراد'
+];
+foreach ($decisionStats as $row) {
+    $decisionSourceLabels[] = $sourceLabels[$row['decision_source']] ?? $row['decision_source'];
+    $decisionSourceCounts[] = $row['count'];
+}
+
+
 ?>
+
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
@@ -581,6 +609,60 @@ $contractVsPoStats = $records->getContractVsPOStats();
             </div>
         </div>
 
+        <!-- SECTION 9: NEW - Decision Intelligence (2025-12-19) -->
+        <div class="section-divider"></div>
+        <h2 class="text-lg font-bold mb-3 text-gray-700 mt-8">🧠 ذكاء القرارات</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Decision Sources Chart -->
+            <div class="card-box">
+                <div class="card-header flex justify-between items-center">
+                    <span>مصادر القرارات</span>
+                    <i data-lucide="pie-chart" class="w-4 h-4 text-gray-400"></i>
+                </div>
+                <div class="p-4" style="height: 280px;">
+                    <canvas id="decisionSourceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Most Chosen Suppliers -->
+            <div class="card-box">
+                <div class="card-header border-b-purple-500 border-b-2">الموردون الأكثر اختياراً</div>
+                <table class="smart-table">
+                    <thead><tr><th>المورد</th><th>الاختيارات</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($mostChosenSuppliers as $row): ?>
+                        <tr>
+                            <td class="font-bold"><?= htmlspecialchars(mb_substr($row['display_name'] ?? '', 0, 25)) ?></td>
+                            <td class="text-center">
+                                <span class="bg-purple-100 text-purple-700 px-2 py-1 rounded font-bold"><?= $row['choice_count'] ?></span>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($mostChosenSuppliers)): ?><tr><td colspan="2" class="text-center text-gray-400">لا توجد قرارات بعد</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bank Learning Stats -->
+            <div class="card-box">
+                <div class="card-header border-b-blue-500 border-b-2">تعلم البنوك</div>
+                <table class="smart-table">
+                    <thead><tr><th>البنك</th><th>الاستخدام</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($bankLearningStats as $row): ?>
+                        <tr>
+                            <td class="text-xs"><?= htmlspecialchars(mb_substr($row['input_name'] ?? '', 0, 20)) ?></td>
+                            <td class="text-center">
+                                <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold"><?= $row['usage_count'] ?></span>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($bankLearningStats)): ?><tr><td colspan="2" class="text-center text-gray-400">لا يوجد تعلم بعد</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </main>
 
     <script>
@@ -672,6 +754,34 @@ $contractVsPoStats = $records->getContractVsPOStats();
                         beginAtZero: true,
                         ticks: {
                             precision: 0
+                        }
+                    }
+                }
+            }
+        });
+
+        // NEW: Decision Source Pie Chart (2025-12-19)
+        const ctxDecisionSource = document.getElementById('decisionSourceChart').getContext('2d');
+        new Chart(ctxDecisionSource, {
+            type: 'doughnut',
+            data: {
+                labels: <?= json_encode($decisionSourceLabels) ?>,
+                datasets: [{
+                    data: <?= json_encode($decisionSourceCounts) ?>,
+                    backgroundColor: <?= json_encode($decisionSourceColors) ?>,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { family: 'Tajawal', size: 11 },
+                            padding: 8
                         }
                     }
                 }

@@ -124,23 +124,68 @@ imported_records (
     id, session_id, 
     raw_supplier_name, raw_bank_name,
     supplier_id, bank_id,           -- FK to dictionaries
-    match_status,                   -- pending/ready/approved
+    supplier_display_name,          -- الاسم المعروض (مجمّد)
+    match_status,                   -- pending/needs_review/ready
     amount, guarantee_number, ...
 )
 
 -- قاموس الموردين
-suppliers (id, official_name, normalized_name, is_confirmed)
+suppliers (id, official_name, normalized_name, supplier_normalized_key, is_confirmed)
 
 -- قاموس البنوك
-banks (id, official_name, normalized_key, short_code, ...)
+banks (id, official_name, normalized_key, short_code, department, address_line_1, ...)
 
--- الأسماء البديلة للموردين
+-- الأسماء البديلة للموردين (يدوية)
 supplier_alternative_names (id, supplier_id, raw_name, normalized_key)
-
--- تعلم المطابقات
-supplier_learning (id, normalized_key, learning_type, supplier_id)
-bank_learning (id, normalized_key, learning_type, bank_id)
 ```
+
+### جداول التعلم (Phase 4 - 2025-12-17)
+
+```sql
+-- ⭐ كاش الاقتراحات (Cache-First Architecture)
+supplier_suggestions (
+    id,
+    normalized_input,      -- الاسم المطبّع من Excel
+    supplier_id,           -- المورد المقترح
+    display_name,          -- الاسم للعرض
+    source,                -- dictionary/learning/user_history
+    fuzzy_score,           -- 0.0 - 1.0
+    source_weight,         -- 40-100
+    usage_count,           -- عدد مرات الاختيار
+    block_count,           -- عدد مرات الحظر (للحظر التدريجي)
+    total_score,           -- النقاط الإجمالية
+    star_rating            -- 1-3 نجوم
+)
+
+-- سجل كل قرارات المستخدم
+user_decisions (
+    id,
+    record_id, session_id,
+    raw_name, normalized_name,
+    chosen_supplier_id, chosen_display_name,
+    decision_source,       -- user_click/propagation/auto_select/import
+    decided_at
+)
+
+-- تعلم البنوك
+bank_aliases_learning (
+    id,
+    normalized_input, input_name,
+    status,                -- alias/blocked
+    bank_id,
+    usage_count, last_used_at
+)
+```
+
+### حالات السجلات (match_status)
+
+| الحالة | المعنى | متى تتغير |
+|--------|--------|-----------|
+| `pending` | جديد من الاستيراد | عند الإنشاء |
+| `needs_review` | يحتاج مراجعة | تطابق منخفض (<90%) |
+| `ready` | جاهز للطباعة | تم اختيار المورد والبنك |
+
+> **ملاحظة**: `approved` يُحوّل تلقائياً إلى `ready` للتبسيط.
 
 ---
 

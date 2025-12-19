@@ -14,8 +14,11 @@ class ReportController
 
     public function index()
     {
-        // Serve HTML page
-        echo file_get_contents(__DIR__ . '/../../www/reports.html');
+        // NOTE: www/reports.html was removed (2025-12-19)
+        // The reports functionality is now integrated into stats.php
+        // Redirect to stats page instead
+        header('Location: /pages/stats.php');
+        exit;
     }
 
     /**
