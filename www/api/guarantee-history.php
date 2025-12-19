@@ -101,12 +101,12 @@ try {
             r.bank_display,
             r.record_type,
             r.match_status,
-            r.created_at
+            r.created_at,
+            r.migrated_guarantee_id,
+            r.migrated_action_id
         FROM imported_records r
         WHERE r.guarantee_number = :number
-          AND r.migrated_guarantee_id IS NULL
-          AND r.migrated_action_id IS NULL
-        ORDER BY r.session_id DESC, r.created_at DESC
+        ORDER BY r.created_at DESC
     ");
     
     $stmt->execute(['number' => $guaranteeNumber]);
@@ -115,6 +115,8 @@ try {
     foreach ($oldRecords as $r) {
         $history[] = [
             'id' => 'old_' . $r['id'],
+            'record_id' => $r['id'], // IMPORTANT: Use actual record ID for links
+            'session_id' => $r['session_id'], // IMPORTANT: Include session_id for links
             'source' => 'old',
             'type' => $r['record_type'] ? 'action' : 'import',
             'guarantee_number' => $r['guarantee_number'],
@@ -130,7 +132,10 @@ try {
             'import_type' => null,
             'match_status' => $r['match_status'],
             'created_at' => $r['created_at'],
-            'record_type' => $r['record_type']
+            'record_type' => $r['record_type'],
+            'date' => $r['created_at'],
+            'status' => $r['match_status'] === 'ready' ? 'جاهز' : 'يحتاج قرار',
+            'is_first' => false
         ];
     }
     

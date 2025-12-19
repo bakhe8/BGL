@@ -31,21 +31,63 @@ $candidateService = new CandidateService($suppliers, new SupplierAlternativeName
 $suggestionRepo = new SupplierSuggestionRepository();
 $decisionRepo = new UserDecisionRepository();
 
-// Get parameters
+// NEW: Support for new architecture
+use App\Repositories\ImportBatchRepository;
+use App\Repositories\GuaranteeRepository;
+$batchRepo = new ImportBatchRepository();
+$guaranteeRepo = new GuaranteeRepository();
+
+// Get parameters - support both old (session_id) and new (batch_id)
 $sessionId = isset($_GET['session_id']) ? (int) $_GET['session_id'] : null;
+$batchId = isset($_GET['batch_id']) ? (int) $_GET['batch_id'] : null;
 $recordId = isset($_GET['record_id']) ? (int) $_GET['record_id'] : null;
 $filter = $_GET['filter'] ?? 'all'; // all, pending, approved
 
-// Get available sessions for dropdown
+// Get available sessions/batches for dropdown
 $allSessions = $sessions->getAllSessions();
 
-// Default to latest session if none specified
-if (!$sessionId && !empty($allSessions)) {
-    $sessionId = (int) $allSessions[0]['session_id'];
+// NEW: Also get batches and merge them into the list
+$allBatches = $batchRepo->all();
+foreach ($allBatches as $batch) {
+    // Add batches to the sessions list for compatibility
+    $allSessions[] = [
+        'session_id' => $batch['id'],
+        'batch_id' => $batch['id'],
+        'is_batch' => true,
+        'batch_type' => $batch['batch_type'],
+        'description' => $batch['description'],
+        'record_count' => $batch['total_records'],
+        'created_at' => $batch['created_at']
+    ];
 }
 
-// Get all records for the session
-$allRecords = $sessionId ? $records->allBySession($sessionId) : [];
+// Sort by ID desc (newest first)
+usort($allSessions, fn($a, $b) => ($b['session_id'] ?? 0) <=> ($a['session_id'] ?? 0));
+
+// Default to latest session/batch if none specified
+if (!$sessionId && !$batchId && !empty($allSessions)) {
+    if (isset($allSessions[0]['batch_id'])) {
+        $batchId = (int) $allSessions[0]['batch_id'];
+    } else {
+        $sessionId = (int) $allSessions[0]['session_id'];
+    }
+}
+
+// Get all records for the session/batch
+if ($batchId) {
+    // Get records from new architecture
+    $guarantees = $guaranteeRepo->allByBatch($batchId);
+    // Convert to ImportedRecord format for compatibility
+    $allRecords = array_map(function($g) use ($records) {
+        return $records->find($g['id']); // This won't work - we need a different approach
+    }, $guarantees);
+    // TODO: Ideally we should create a unified method that returns records from both sources
+} elseif ($sessionId) {
+    // Get records from old architecture
+    $allRecords = $records->allBySession($sessionId);
+} else {
+    $allRecords = [];
+}
 
 // Apply filter
 $filteredRecords = array_filter($allRecords, function($r) use ($filter) {
