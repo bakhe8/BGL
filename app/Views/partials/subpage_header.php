@@ -23,7 +23,7 @@ $currentScript = basename($_SERVER['PHP_SELF']);
              <!-- Left Side (RTL): Navigation Data -->
              <div class="flex items-center gap-1">
                  <!-- Stats Link -->
-                 <a href="/stats.php" 
+                 <a href="/stats" 
                     class="flex items-center justify-center gap-2 px-3 h-8 rounded-md transition-all border <?= $currentScript == 'stats.php' ? 'bg-blue-50 text-blue-700 border-blue-200 font-bold shadow-inner' : 'bg-white hover:bg-gray-50 text-gray-600 border-transparent hover:border-gray-200' ?>" 
                     title="الإحصائيات">
                      <i data-lucide="bar-chart-2" class="w-4 h-4"></i>

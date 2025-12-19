@@ -95,7 +95,7 @@
                             <div class="h-4 w-px bg-gray-300 mx-1"></div>
 
                             <!-- App Links Group -->
-                            <a href="/pages/stats.php" class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
+                            <a href="/stats" class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
                                 title="الإحصائيات">📊</a>
                             <a href="/settings.php" class="flex items-center justify-center w-7 h-7 rounded hover:bg-gray-100 transition-colors"
                                 title="الإعدادات">⚙️</a>
