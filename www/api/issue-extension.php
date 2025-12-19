@@ -1,12 +1,15 @@
 <?php
 /**
  * API Endpoint: Issue Extension
- * Creates an extension action record from the latest guarantee data
+ * Creates an extension action record using the new architecture
  */
 
 require_once __DIR__ . '/../../app/Support/autoload.php';
 
 use App\Support\Database;
+use App\Repositories\GuaranteeActionRepository;
+use App\Repositories\ImportSessionRepository;
+use App\Adapters\GuaranteeDataAdapter;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -35,57 +38,49 @@ try {
         exit;
     }
     
-    // Create extension session
-    $extensionSession = $db->prepare("INSERT INTO import_sessions (session_type, record_count) VALUES (:type, 1)");
-    $extensionSession->execute([':type' => 'extension_action']);
-    $newSessionId = (int)$db->lastInsertId();
+    // Initialize repositories
+    $actionRepo = new GuaranteeActionRepository();
+    $sessionRepo = new ImportSessionRepository();
+    $adapter = new GuaranteeDataAdapter();
     
-    // Insert extension action record
-    $logStmt = $db->prepare("
-        INSERT INTO imported_records (
-            session_id, guarantee_number,
-            raw_supplier_name, raw_bank_name,
-            amount, expiry_date, issue_date, type, contract_number,
-            supplier_id, bank_id,
-            supplier_display_name, bank_display,
-            match_status, record_type,
-            created_at
-        ) VALUES (
-            :session_id, :guarantee_number,
-            :raw_supplier, :raw_bank,
-            :amount, :expiry, :issue, :type, :contract,
-            :supplier_id, :bank_id,
-            :supplier_display, :bank_display,
-            :match_status, 'extension_action',
-            :created_at
-        )
-    ");
+    // Create OLD session (for compatibility)
+    $session = $sessionRepo->create('extension_action');
+    $sessionId = $session->id;
     
-    $logStmt->execute([
-        ':session_id' => $newSessionId,
-        ':guarantee_number' => $record['guarantee_number'],
-        ':raw_supplier' => $record['raw_supplier_name'],
-        ':raw_bank' => $record['raw_bank_name'],
-        ':amount' => $record['amount'],
-        ':expiry' => $record['expiry_date'],
-        ':issue' => $record['issue_date'],
-        ':type' => $record['type'],
-        ':contract' => $record['contract_number'],
-        ':supplier_id' => $record['supplier_id'],
-        ':bank_id' => $record['bank_id'],
-        ':supplier_display' => $record['supplier_display_name'],
-        ':bank_display' => $record['bank_display'],
-        ':match_status' => $record['match_status'],
-        ':created_at' => date('Y-m-d H:i:s')
-    ]);
+    // Prepare action data
+    $actionData = [
+        'guarantee_number' => $record['guarantee_number'],
+        'guarantee_id' => null, // Can be linked later if needed
+        'action_type' => 'extension',
+        'action_date' => date('Y-m-d'),
+        'previous_expiry_date' => $record['expiry_date'],
+        'new_expiry_date' => $record['expiry_date'], // Same for now, UI can update
+        'previous_amount' => $record['amount'],
+        'new_amount' => $record['amount'],
+        'notes' => null,
+        'supplier_id' => $record['supplier_id'],
+        'bank_id' => $record['bank_id'],
+        'supplier_display_name' => $record['supplier_display_name'],
+        'bank_display' => $record['bank_display'],
+        'action_status' => 'issued',
+        'is_locked' => 1, // Lock immediately
+        'raw_supplier_name' => $record['raw_supplier_name'],
+        'raw_bank_name' => $record['raw_bank_name'],
+        'amount' => $record['amount'],
+        'issue_date' => $record['issue_date'],
+        'type' => $record['type'],
+        'contract_number' => $record['contract_number'],
+    ];
     
-    $newRecordId = (int)$db->lastInsertId();
+    // Use adapter for dual-write (writes to both old and new tables)
+    $ids = $adapter->createAction($actionData, $sessionId, null);
     
     echo json_encode([
         'success' => true,
         'message' => 'تم إنشاء سجل التمديد بنجاح',
-        'record_id' => $newRecordId,
-        'session_id' => $newSessionId
+        'record_id' => $ids['old_id'],
+        'session_id' => $sessionId,
+        'action_id' => $ids['new_id']
     ]);
     
 } catch (Exception $e) {
