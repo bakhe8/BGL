@@ -255,6 +255,7 @@ class ImportedRecordRepository
             $row['bank_display'] ?? null,
             $row['supplier_display_name'] ?? null,
             $row['created_at'] ?? null,
+            $row['record_type'] ?? 'import',
         );
     }
 
