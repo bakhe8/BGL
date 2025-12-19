@@ -75,7 +75,7 @@ try {
     // 2. Get action records
     $actions = $actionRepo->findByGuaranteeNumber($guaranteeNumber);
     foreach ($actions as $a) {
-        // Find corresponding old record
+        // Find corresponding old record - try migrated link first
         $stmt = $db->prepare("
             SELECT id, session_id 
             FROM imported_records 
@@ -84,6 +84,21 @@ try {
         ");
         $stmt->execute([$a['id']]);
         $oldRecord = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // If no migrated link, search directly (for newly created actions)
+        if (!$oldRecord) {
+            $actionType = $a['action_type'] . '_action';
+            $stmt = $db->prepare("
+                SELECT id, session_id 
+                FROM imported_records 
+                WHERE guarantee_number = ? 
+                  AND record_type = ?
+                  AND created_at = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$guaranteeNumber, $actionType, $a['created_at']]);
+            $oldRecord = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
         
         $history[] = [
             'id' => 'a_' . $a['id'],
