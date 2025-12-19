@@ -83,27 +83,33 @@ try {
     // Get supplier and bank names
     // ========================================================================
     foreach ($history as &$record) {
+        // Try to get official name from suppliers table
+        $supplierName = null;
         if ($record['supplier_id']) {
             $stmt = $db->prepare("SELECT official_name FROM suppliers WHERE id = ?");
             $stmt->execute([$record['supplier_id']]);
             $supplierName = $stmt->fetchColumn() ?: null;
-            $record['supplier'] = $supplierName;
-            $record['supplier_name'] = $supplierName;
-        } else {
-            $record['supplier'] = $record['supplier_display_name'] ?: null;
-            $record['supplier_name'] = $record['supplier_display_name'] ?: null;
         }
+        // Fallback to display_name if official_name not found
+        if (!$supplierName) {
+            $supplierName = $record['supplier_display_name'] ?: null;
+        }
+        $record['supplier'] = $supplierName;
+        $record['supplier_name'] = $supplierName;
         
+        // Try to get official name from banks table
+        $bankName = null;
         if ($record['bank_id']) {
             $stmt = $db->prepare("SELECT official_name FROM banks WHERE id = ?");
             $stmt->execute([$record['bank_id']]);
             $bankName = $stmt->fetchColumn() ?: null;
-            $record['bank'] = $bankName;
-            $record['bank_name'] = $bankName;
-        } else {
-            $record['bank'] = $record['bank_display'] ?: null;
-            $record['bank_name'] = $record['bank_display'] ?: null;
         }
+        // Fallback to display_name if official_name not found
+        if (!$bankName) {
+            $bankName = $record['bank_display'] ?: null;
+        }
+        $record['bank'] = $bankName;
+        $record['bank_name'] = $bankName;
     }
     
     // ========================================================================
