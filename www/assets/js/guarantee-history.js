@@ -27,8 +27,8 @@
                     searchInput.value = guaranteeNum;
                     // Show the search wrapper for better UX
                     if (searchWrapper) searchWrapper.classList.add('visible');
-                    // Trigger search
-                    searchGuarantee();
+                    // Load history
+                    loadGuaranteeHistory();
                 }
             }
         });
@@ -56,8 +56,8 @@
 
                 if (data.success) {
                     showSuccess('تم إصدار خطاب الإفراج بنجاح');
-                    // Refresh history to show new release record - pass guarantee number!
-                    searchGuarantee(guaranteeNum);
+                    // Refresh history to show new release record
+                    loadGuaranteeHistory(guaranteeNum);
                 } else {
                     showWarning(data.error || 'فشل إصدار الخطاب');
                 }
@@ -298,13 +298,13 @@
 
     // Event listeners
     if (searchGoBtn) {
-        searchGoBtn.addEventListener('click', searchGuarantee);
+        searchGoBtn.addEventListener('click', loadGuaranteeHistory);
     }
 
     if (searchInput) {
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                searchGuarantee();
+                loadGuaranteeHistory();
             }
         });
     }
