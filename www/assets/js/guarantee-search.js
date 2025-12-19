@@ -132,10 +132,11 @@
     }
 
     // Search function
-    async function searchGuarantee() {
-        if (!searchInput || !historyPanel || !historyTimeline) return;
+    async function searchGuarantee(guaranteeNum = null) {
+        if (!historyPanel || !historyTimeline) return;
 
-        const guaranteeNumber = searchInput.value.trim();
+        // Use provided number or get from searchInput
+        const guaranteeNumber = guaranteeNum || (searchInput ? searchInput.value.trim() : '');
 
         if (!guaranteeNumber) {
             showWarning('الرجاء إدخال رقم ضمان');
