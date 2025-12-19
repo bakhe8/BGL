@@ -135,6 +135,11 @@
     async function loadGuaranteeHistory(guaranteeNum = null) {
         if (!historyPanel || !historyTimeline) return;
 
+        // CRITICAL FIX: Prevent Event object from being used as guarantee number
+        if (guaranteeNum && typeof guaranteeNum !== 'string') {
+            guaranteeNum = null;
+        }
+
         // Use provided number or get from searchInput
         const guaranteeNumber = guaranteeNum || (searchInput ? searchInput.value.trim() : '');
 
@@ -294,11 +299,13 @@
         });
 
         historyTimeline.innerHTML = html;
+        lucide.createIcons(); // Re-render icons
     }
 
     // Event listeners
     if (searchGoBtn) {
-        searchGoBtn.addEventListener('click', loadGuaranteeHistory);
+        // CRITICAL FIX: Wrap in arrow function to prevent passing Event object
+        searchGoBtn.addEventListener('click', () => loadGuaranteeHistory());
     }
 
     if (searchInput) {
