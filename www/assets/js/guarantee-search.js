@@ -226,7 +226,7 @@
                         
                         
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
-                            <a href="/?id=${item.record_id}&session=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
+                            <a href="/?record_id=${item.record_id}&session_id=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
                                 عرض السجل
                             </a>
                             <button onclick="
