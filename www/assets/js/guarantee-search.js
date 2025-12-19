@@ -56,8 +56,8 @@
 
                 if (data.success) {
                     showSuccess('تم إصدار خطاب الإفراج بنجاح');
-                    // Refresh history to show new release record
-                    searchGuarantee();
+                    // Refresh history to show new release record - pass guarantee number!
+                    searchGuarantee(guaranteeNum);
                 } else {
                     showWarning(data.error || 'فشل إصدار الخطاب');
                 }
