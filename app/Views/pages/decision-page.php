@@ -723,7 +723,7 @@
     <script src="/assets/js/decision.js"></script>
 
     <!-- Guarantee Search Feature -->
-    <script src="/assets/js/guarantee-search.js"></script>
+    <script src="/assets/js/guarantee-history.js"></script>
     
     <!-- Manual Entry Feature -->
     <script src="/assets/js/manual-entry.js"></script>

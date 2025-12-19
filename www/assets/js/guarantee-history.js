@@ -1,6 +1,6 @@
 /**
- * Guarantee Search and History Feature
- * Adds interactive search for guarantees and displays their history across sessions
+ * Guarantee History Feature
+ * Interactive display of guarantee history with search, extension, and release actions
  */
 
 (function () {
@@ -131,8 +131,8 @@
         });
     }
 
-    // Search function
-    async function searchGuarantee(guaranteeNum = null) {
+    // Load and display guarantee history
+    async function loadGuaranteeHistory(guaranteeNum = null) {
         if (!historyPanel || !historyTimeline) return;
 
         // Use provided number or get from searchInput
