@@ -43,7 +43,19 @@ try {
     $sessionRepo = new ImportSessionRepository();
     $adapter = new GuaranteeDataAdapter();
     
-    // Get or create daily session (shared for all actions today)
+    // ═══════════════════════════════════════════════════════════════════
+    // DAILY SESSION: All actions share ONE session per day
+    // ═══════════════════════════════════════════════════════════════════
+    // This gets or creates today's session. Multiple actions on the same
+    // day will all use the SAME session (not create separate sessions).
+    //
+    // Example:
+    // - 9am: Extension 1 → Session #500
+    // - 2pm: Extension 2 → Session #500 (same!)
+    // - 4pm: Release 1  → Session #500 (same!)
+    //
+    // Result: Session #500 contains 3 records
+    // ═══════════════════════════════════════════════════════════════════
     $session = $sessionRepo->getOrCreateDailySession('daily_actions');
     $sessionId = $session->id;
     

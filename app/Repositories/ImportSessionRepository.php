@@ -7,6 +7,38 @@ use App\Models\ImportSession;
 use App\Support\Database;
 use PDO;
 
+/**
+ * Import Session Repository
+ * 
+ * Purpose: Manages SESSIONS for grouping ACTIONS (extensions, releases, modifications)
+ * 
+ * ⚠️ IMPORTANT: Sessions are NOT for imports! Use ImportBatchRepository for imports.
+ * 
+ * Key Concepts:
+ * - Sessions group DAILY ACTIONS performed within the system
+ * - One session per day for all actions (daily_actions)
+ * - Used for audit trail and navigation
+ * 
+ * Usage:
+ * ```php
+ * // Get or create today's session
+ * $session = $repo->getOrCreateDailySession('daily_actions');
+ * 
+ * // Create an action record
+ * $record = ImportedRecordRepository::create([
+ *     'session_id' => $session->id,
+ *     'record_type' => 'extension_action',
+ *     // ...
+ * ]);
+ * ```
+ * 
+ * DO NOT:
+ * - Create a new session for each action (use getOrCreateDailySession instead)
+ * - Use sessions for imports (use ImportBatchRepository instead)
+ * 
+ * @see ImportBatchRepository For import grouping
+ * @see docs/sessions-vs-batches.md For complete documentation
+ */
 class ImportSessionRepository
 {
     public function create(string $sessionType): ImportSession
@@ -49,8 +81,29 @@ class ImportSessionRepository
      * Get or create daily action session
      * Returns the session for today, creating it if it doesn't exist
      * 
-     * @param string $sessionType Type of session (e.g., 'daily_actions')
-     * @return ImportSession
+     * ⚠️ CRITICAL: Use this method for ALL actions (extensions, releases)
+     * DO NOT create a new session for each action!
+     * 
+     * How it works:
+     * 1. Searches for a session created today with the given type
+     * 2. If found, returns the existing session
+     * 3. If not found, creates a new session for today
+     * 
+     * Example:
+     * ```php
+     * // Morning: First extension of the day
+     * $session = $repo->getOrCreateDailySession('daily_actions');
+     * // Creates Session #500
+     * 
+     * // Afternoon: Another extension
+     * $session = $repo->getOrCreateDailySession('daily_actions');
+     * // Returns SAME Session #500 (not a new one!)
+     * ```
+     * 
+     * Result: All actions performed on the same day share ONE session
+     * 
+     * @param string $sessionType Type of session (default: 'daily_actions')
+     * @return ImportSession The daily session
      */
     public function getOrCreateDailySession(string $sessionType = 'daily_actions'): ImportSession
     {

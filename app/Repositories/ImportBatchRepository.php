@@ -8,7 +8,46 @@ use PDO;
 
 /**
  * Import Batch Repository
- * Manages import batches (groups of imported guarantees)
+ * 
+ * Purpose: Manages BATCHES for grouping IMPORTS from external sources
+ * 
+ * ⚠️ IMPORTANT: Batches are NOT for actions! Use ImportSessionRepository for actions.
+ * 
+ * Key Concepts:
+ * - Batches group imported data by source (Excel file, manual entry, paste)
+ * - Each Excel file = separate batch
+ * - Manual entries/pastes = daily batch (one per day)
+ * - Used for tracking import source and bulk updates
+ * 
+ * Batch Types:
+ * - excel_import: One batch per Excel file
+ * - manual_batch: Daily batch for manual entries
+ * - text_paste: Daily batch for pasted text
+ * 
+ * Usage:
+ * ```php
+ * // Excel import
+ * $batchId = $repo->create([
+ *     'batch_type' => 'excel_import',
+ *     'filename' => 'guarantees.xlsx'
+ * ]);
+ * 
+ * // Manual entry (daily)
+ * $batchId = $repo->getOrCreateDailyManualBatch();
+ * 
+ * // Then link guarantees to this batch
+ * GuaranteeRepository::create([
+ *     'import_batch_id' => $batchId,
+ *     // ...
+ * ]);
+ * ```
+ * 
+ * DO NOT:
+ * - Use batches for actions (use ImportSessionRepository instead)
+ * - Create multiple batches for same Excel file
+ * 
+ * @see ImportSessionRepository For action grouping
+ * @see docs/sessions-vs-batches.md For complete documentation
  */
 class ImportBatchRepository
 {
