@@ -21,10 +21,10 @@ class ImportedRecordRepository
         $pdo = Database::connection();
         $stmt = $pdo->prepare('INSERT INTO imported_records (
             session_id, raw_supplier_name, raw_bank_name, amount, guarantee_number, contract_number, related_to, issue_date, expiry_date, type, comment,
-            normalized_supplier, normalized_bank, match_status, supplier_id, bank_id, bank_display, supplier_display_name, created_at
+            normalized_supplier, normalized_bank, match_status, supplier_id, bank_id, bank_display, supplier_display_name, created_at, record_type
         ) VALUES (
             :session_id, :raw_supplier_name, :raw_bank_name, :amount, :guarantee_number, :contract_number, :related_to, :issue_date, :expiry_date, :type, :comment,
-            :normalized_supplier, :normalized_bank, :match_status, :supplier_id, :bank_id, :bank_display, :supplier_display_name, :created_at
+            :normalized_supplier, :normalized_bank, :match_status, :supplier_id, :bank_id, :bank_display, :supplier_display_name, :created_at, :record_type
         )');
 
         $stmt->execute([
@@ -47,6 +47,7 @@ class ImportedRecordRepository
             'bank_display' => $record->bankDisplay,
             'supplier_display_name' => $record->supplierDisplayName ?? null,
             'created_at' => $record->createdAt ?? date('Y-m-d H:i:s'),
+            'record_type' => $record->recordType ?? 'import',
         ]);
 
         $record->id = (int) $pdo->lastInsertId();
