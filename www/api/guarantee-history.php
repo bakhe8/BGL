@@ -42,7 +42,8 @@ try {
             r.bank_display,
             r.record_type,
             r.match_status,
-            r.created_at
+            r.created_at,
+            r.import_batch_id
         FROM imported_records r
         WHERE r.guarantee_number = :number
         ORDER BY r.created_at DESC
@@ -58,6 +59,7 @@ try {
             'id' => $r['id'],
             'record_id' => $r['id'], // Always valid
             'session_id' => $r['session_id'], // Always valid
+            'import_batch_id' => $r['import_batch_id'], // For batch links
             'source' => 'imported_records',
             'type' => $r['record_type'] ? 'action' : 'import',
             'guarantee_number' => $r['guarantee_number'],

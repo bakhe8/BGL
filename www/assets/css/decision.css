@@ -435,6 +435,24 @@
             margin-top: 4px;
         }
 
+        /* Timeline source link (batch/session) */
+        .timeline-source {
+            font-size: 12px;
+            color: #666;
+            margin-top: 6px;
+            padding: 4px 0;
+        }
+
+        .timeline-source a {
+            color: #1976D2;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .timeline-source a:hover {
+            text-decoration: underline;
+        }
+
         .timeline-info {
             margin-top: 8px;
             font-size: 13px;

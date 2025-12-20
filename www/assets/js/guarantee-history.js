@@ -212,6 +212,23 @@
 
         let html = '';
 
+        // Helper function to generate source link
+        const getSourceLink = (item) => {
+            // Action (extension/release) → Session link
+            if (item.record_type && item.record_type !== 'import') {
+                const date = new Date(item.date);
+                const dateStr = date.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
+                return `<div class="timeline-source">📋 <a href="/?session_id=${item.session_id}">إجراءات ${dateStr}</a></div>`;
+            }
+            
+            // Import → Batch link (if available)
+            if (item.import_batch_id) {
+                return `<div class="timeline-source">📦 <a href="/?batch_id=${item.import_batch_id}">مجموعة #${item.import_batch_id}</a></div>`;
+            }
+            
+            return ''; // No source link
+        };
+        
         data.history.forEach((item, index) => {
             const isFirst = item.is_first;
             const isRelease = item.record_type === 'release_action';
@@ -252,6 +269,8 @@
                             </div>
                         </div>
                         <div class="timeline-date">${formattedDate}</div>
+                        
+                        ${getSourceLink(item)}
                         
                         <div class="timeline-info">
                             <div class="info-row">
