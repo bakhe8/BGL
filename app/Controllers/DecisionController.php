@@ -448,6 +448,18 @@ class DecisionController
         }
 
         $updated = $this->records->find($id);
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // PASSIVE MODIFICATION TRACKING (Audit Trail)
+        // ═══════════════════════════════════════════════════════════════════
+        // Silently log modifications to timeline - does NOT affect any logic
+        try {
+            $adapter = new \App\Adapters\GuaranteeDataAdapter();
+            $adapter->createModification($update, $id);
+        } catch (\Throwable $e) {
+            // Silent fail - don't break saveDecision
+            error_log("Passive modification tracking failed: " . $e->getMessage());
+        }
 
         echo json_encode(array(
             'success' => true,

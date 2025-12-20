@@ -220,19 +220,20 @@
                 const dateStr = date.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
                 return `<div class="timeline-source">📋 <a href="/?session_id=${item.session_id}">إجراءات ${dateStr}</a></div>`;
             }
-            
+
             // Import → Batch link (if available)
             if (item.import_batch_id) {
                 return `<div class="timeline-source">📦 <a href="/?batch_id=${item.import_batch_id}">مجموعة #${item.import_batch_id}</a></div>`;
             }
-            
+
             return ''; // No source link
         };
-        
+
         data.history.forEach((item, index) => {
             const isFirst = item.is_first;
             const isRelease = item.record_type === 'release_action';
             const isExtension = item.record_type === 'extension_action';
+            const isModification = item.record_type === 'modification';
 
             // Generate action type badge (if applicable)
             let actionBadge = '';
@@ -240,6 +241,8 @@
                 actionBadge = '<span class="status-badge-timeline release">إفراج</span>';
             } else if (isExtension) {
                 actionBadge = '<span class="status-badge-timeline extension">تمديد</span>';
+            } else if (isModification) {
+                actionBadge = '<span class="status-badge-timeline modification">📝 تعديل</span>';
             }
 
             // Generate status badge
