@@ -216,8 +216,21 @@
             const isFirst = item.is_first;
             const isRelease = item.record_type === 'release_action';
             const isExtension = item.record_type === 'extension_action';
-            const statusClass = isRelease ? 'release' : (isExtension ? 'extension' : (item.status === 'جاهز' ? 'ready' : 'pending'));
-            const statusLabel = isRelease ? 'إفراج' : (isExtension ? 'تمديد' : item.status);
+
+            // Generate action type badge (if applicable)
+            let actionBadge = '';
+            if (isRelease) {
+                actionBadge = '<span class="status-badge-timeline release">إفراج</span>';
+            } else if (isExtension) {
+                actionBadge = '<span class="status-badge-timeline extension">تمديد</span>';
+            }
+
+            // Generate status badge
+            let statusBadge = '';
+            const statusClass = item.status === 'جاهز' ? 'ready' : 'pending';
+            const statusLabel = item.status;
+            statusBadge = `<span class="status-badge-timeline ${statusClass}">${statusLabel}</span>`;
+
             const date = new Date(item.date);
             const formattedDate = date.toLocaleDateString('ar-SA', {
                 year: 'numeric',
@@ -234,7 +247,8 @@
                         <div class="timeline-header">
                             <div>
                                 <span class="session-badge flex items-center gap-1"><i data-lucide="file-digit" class="w-3 h-3"></i> جلسة #${item.session_id}</span>
-                                <span class="status-badge-timeline ${statusClass}">${statusLabel}</span>
+                                ${actionBadge}
+                                ${statusBadge}
                             </div>
                         </div>
                         <div class="timeline-date">${formattedDate}</div>
