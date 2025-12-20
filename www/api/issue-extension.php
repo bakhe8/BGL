@@ -59,6 +59,18 @@ try {
     $session = $sessionRepo->getOrCreateDailySession('daily_actions');
     $sessionId = $session->id;
     
+    // Calculate new expiry date (current + 1 year)
+    $newExpiryDate = $record['expiry_date'];
+    if ($record['expiry_date']) {
+        try {
+            $date = new DateTime($record['expiry_date']);
+            $date->modify('+1 year');
+            $newExpiryDate = $date->format('Y-m-d');
+        } catch (Exception $e) {
+            // Keep original if date parsing fails
+        }
+    }
+    
     // Prepare action data
     $actionData = [
         'guarantee_number' => $record['guarantee_number'],
@@ -66,7 +78,7 @@ try {
         'action_type' => 'extension',
         'action_date' => date('Y-m-d'),
         'previous_expiry_date' => $record['expiry_date'],
-        'new_expiry_date' => $record['expiry_date'], // Same for now, UI can update
+        'new_expiry_date' => $newExpiryDate, // Calculated: current + 1 year
         'previous_amount' => $record['amount'],
         'new_amount' => $record['amount'],
         'notes' => null,
