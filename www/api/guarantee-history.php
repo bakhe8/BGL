@@ -43,7 +43,8 @@ try {
             r.record_type,
             r.match_status,
             r.created_at,
-            r.import_batch_id
+            r.import_batch_id,
+            r.comment
         FROM imported_records r
         WHERE r.guarantee_number = :number
         ORDER BY r.created_at DESC
@@ -55,6 +56,27 @@ try {
     $history = [];
     
     foreach ($records as $r) {
+        // Parse changes from comment field for modification records
+        $changes = [];
+        if ($r['record_type'] === 'modification' && !empty($r['comment'])) {
+            $commentData = json_decode($r['comment'], true);
+            if (isset($commentData['changes'])) {
+                // Convert changes to format expected by frontend
+                foreach ($commentData['changes'] as $field => $change) {
+                    $fieldLabels = [
+                        'supplier' => 'المورد',
+                        'bank' => 'البنك',
+                        'amount' => 'المبلغ'
+                    ];
+                    $changes[] = [
+                        'field' => $fieldLabels[$field] ?? $field,
+                        'from' => $change['from'] ?? '',
+                        'to' => $change['to'] ?? ''
+                    ];
+                }
+            }
+        }
+        
         $history[] = [
             'id' => $r['id'],
             'record_id' => $r['id'], // Always valid
@@ -77,7 +99,8 @@ try {
             'date' => $r['created_at'],
             'status' => $r['match_status'] === 'ready' ? 'جاهز' : 'يحتاج قرار',
             'record_type' => $r['record_type'],
-            'is_first' => false
+            'is_first' => false,
+            'changes' => $changes // Add changes for modification records
         ];
     }
     
