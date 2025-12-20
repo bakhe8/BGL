@@ -28,6 +28,7 @@ class ImportedRecord
         public ?string $createdAt = null,
         // Record type determines letter content: 'import'=extension, 'release_action'=release, 'modification'=amendment
         public ?string $recordType = 'import',  // Record type: 'import', 'modification', 'release_action'
+        public ?int $importBatchId = null,  // Batch ID for import grouping
     ) {
     }
 }
