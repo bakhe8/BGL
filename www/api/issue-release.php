@@ -43,8 +43,8 @@ try {
     $sessionRepo = new ImportSessionRepository();
     $adapter = new GuaranteeDataAdapter();
     
-    // Create OLD session (for compatibility)
-    $session = $sessionRepo->create('release_action');
+    // Get or create daily session (shared for all actions today)
+    $session = $sessionRepo->getOrCreateDailySession('daily_actions');
     $sessionId = $session->id;
     
     // Prepare action data

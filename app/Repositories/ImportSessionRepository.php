@@ -44,4 +44,45 @@ class ImportSessionRepository
         ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Get or create daily action session
+     * Returns the session for today, creating it if it doesn't exist
+     * 
+     * @param string $sessionType Type of session (e.g., 'daily_actions')
+     * @return ImportSession
+     */
+    public function getOrCreateDailySession(string $sessionType = 'daily_actions'): ImportSession
+    {
+        $pdo = Database::connection();
+        $today = date('Y-m-d');
+        
+        // Try to find existing session for today
+        $stmt = $pdo->prepare("
+            SELECT id, session_type, record_count, created_at
+            FROM import_sessions
+            WHERE session_type = :type
+              AND DATE(created_at) = :today
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([
+            'type' => $sessionType,
+            'today' => $today
+        ]);
+        
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existing) {
+            return new ImportSession(
+                (int)$existing['id'],
+                $existing['session_type'],
+                (int)$existing['record_count'],
+                $existing['created_at']
+            );
+        }
+        
+        // Create new daily session
+        return $this->create($sessionType);
+    }
 }
