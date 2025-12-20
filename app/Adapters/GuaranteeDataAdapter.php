@@ -289,30 +289,37 @@ class GuaranteeDataAdapter
         // Detect changes
         $changes = [];
         
-        // Supplier change: only track if CHANGING from one supplier to another (not NULL → supplier)
-        if (isset($data['supplier_id']) && $original->supplierId && $data['supplier_id'] != $original->supplierId) {
+        // Supplier change: track ANY change (even NULL → value or value → NULL)
+        if (isset($data['supplier_id']) && $data['supplier_id'] != $original->supplierId) {
             $changes['supplier'] = [
-                'from' => $original->supplierDisplayName ?? $original->rawSupplierName,
+                'from' => $original->supplierDisplayName ?? $original->rawSupplierName ?? 'غير محدد',
                 'to' => $data['supplier_display_name'] ?? 'Unknown',
+                'from_id' => $original->supplierId,
+                'to_id' => $data['supplier_id']
             ];
         }
         
-        // Bank change: only track if CHANGING from one bank to another (not NULL → bank)
-        if (isset($data['bank_id']) && $original->bankId && $data['bank_id'] != $original->bankId) {
+        // Bank change: track ANY change (even NULL → value or value → NULL)
+        if (isset($data['bank_id']) && $data['bank_id'] != $original->bankId) {
             $changes['bank'] = [
-                'from' => $original->bankDisplay ?? $original->rawBankName,
+                'from' => $original->bankDisplay ?? $original->rawBankName ?? 'غير محدد',
                 'to' => $data['bank_display'] ?? 'Unknown',
+                'from_id' => $original->bankId,
+                'to_id' => $data['bank_id']
             ];
         }
         
-        // Amount change: track any change (including NULL → value)
+        // Amount change: track any change
         if (isset($data['amount']) && $data['amount'] != $original->amount) {
             $changes['amount'] = ['from' => $original->amount ?? '0', 'to' => $data['amount']];
         }
         
         if (empty($changes)) {
+            error_log("GuaranteeDataAdapter::createModification - No changes detected for record $originalRecordId");
             return null;
         }
+        
+        error_log("GuaranteeDataAdapter::createModification - Changes detected: " . json_encode($changes));
         
         $sessionRepo = new \App\Repositories\ImportSessionRepository();
         $session = $sessionRepo->getOrCreateDailySession('daily_actions');
