@@ -82,6 +82,21 @@ try {
     // Use adapter for dual-write (writes to both old and new tables)
     $ids = $adapter->createAction($actionData, $sessionId, null);
     
+    // ═══════════════════════════════════════════════════════════════════
+    // TIMELINE EVENT LOGGING (NEW SYSTEM)
+    // ═══════════════════════════════════════════════════════════════════
+    try {
+        $timelineService = new \App\Services\TimelineEventService();
+        $timelineService->logRelease(
+            $record['guarantee_number'],
+            $ids['old_id'],
+            $sessionId
+        );
+    } catch (\Throwable $e) {
+        // Silent fail - don't break release creation
+        error_log("Release timeline event failed: " . $e->getMessage());
+    }
+    
     echo json_encode([
         'success' => true,
         'message' => 'تم إصدار خطاب الإفراج بنجاح',

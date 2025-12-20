@@ -450,10 +450,64 @@ class DecisionController
         $updated = $this->records->find($id);
         
         // ═══════════════════════════════════════════════════════════════════
-        // PASSIVE MODIFICATION TRACKING (Audit Trail)
+        // TIMELINE EVENT LOGGING (NEW SYSTEM - PARALLEL MODE)
         // ═══════════════════════════════════════════════════════════════════
-        // Log modifications to timeline - does NOT affect any logic
+        // This runs alongside the old system for safety during migration.
+        // Both systems are active. Old system can be removed in cleanup phase.
+        // ═══════════════════════════════════════════════════════════════════
+        try {
+            $timelineService = new \App\Services\TimelineEventService();
+            
+            // Log supplier change
+            if (isset($update['supplier_id']) && $update['supplier_id'] != $record->supplierId) {
+                $timelineService->logSupplierChange(
+                    $record->guaranteeNumber,
+                    $id,
+                    $record->supplierId,
+                    (int) $update['supplier_id'],
+                    $record->supplierDisplayName ?? $record->rawSupplierName,
+                    $update['supplier_display_name'] ?? 'Unknown',
+                    $record->sessionId
+                );
+            }
+
+            // Log bank change
+            if (isset($update['bank_id']) && $update['bank_id'] != $record->bankId) {
+                $timelineService->logBankChange(
+                    $record->guaranteeNumber,
+                    $id,
+                    $record->bankId,
+                    (int) $update['bank_id'],
+                    $record->bankDisplay ?? $record->rawBankName,
+                    $update['bank_display'] ?? 'Unknown',
+                    $record->sessionId
+                );
+            }
+
+            // Log amount change
+            if (isset($update['amount']) && $update['amount'] != $record->amount) {
+                $timelineService->logAmountChange(
+                    $record->guaranteeNumber,
+                    $id,
+                    $record->amount,
+                    $update['amount'],
+                    $record->sessionId
+                );
+            }
+        } catch (\Throwable $e) {
+            // Silent fail - timeline logging should never break saveDecision
+            error_log("Timeline event logging failed: " . $e->getMessage());
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // OLD MODIFICATION TRACKING (KEPT FOR SAFETY - PARALLEL MODE)
+        // ═══════════════════════════════════════════════════════════════════
+        // TODO: Remove this in Phase 5 cleanup after verifying new system works
+        // ═══════════════════════════════════════════════════════════════════
+        file_put_contents(__DIR__ . '/../../debug.log', date('[Y-m-d H:i:s] ') . "saveDecision: Calling logModificationIfNeeded for record $id\n", FILE_APPEND);
         $this->logModificationIfNeeded($id, $update);
+
+
 
         echo json_encode(array(
             'success' => true,
@@ -591,7 +645,11 @@ class DecisionController
     }
     
     /**
-     * Log modification to timeline (passive audit trail)
+     * Log modification if values changed
+     * 
+     * @deprecated Since 2025-12-20. Use TimelineEventService instead.
+     *             This method is kept for backward compatibility only.
+     *             Will be removed in future release.
      * 
      * Creates a new record with type='modification' when supplier, bank, or amount changes.
      * This is purely for audit trail - does NOT affect any other logic.
@@ -602,12 +660,18 @@ class DecisionController
      */
     private function logModificationIfNeeded(int $recordId, array $newData): void
     {
+        $logFile = __DIR__ . '/../../debug.log';
+        
         try {
             // Get original record
             $original = $this->records->find($recordId);
             if (!$original) {
+                file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: Record $recordId not found!\n", FILE_APPEND);
                 return;
             }
+            
+            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: Checking record $recordId, supplier_id={$original->supplierId}, bank_id={$original->bankId}\n", FILE_APPEND);
+            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: newData = " . json_encode($newData, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
             
             // Detect changes
             $changes = [];
@@ -679,11 +743,11 @@ class DecisionController
             );
             
             $this->records->create($modificationRecord);
-            error_log("DecisionController::logModificationIfNeeded - Modification record created successfully");
+            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: Modification record created successfully!\n", FILE_APPEND);
             
         } catch (\Throwable $e) {
             // Silent fail - never break saveDecision
-            error_log("DecisionController::logModificationIfNeeded - Failed: " . $e->getMessage());
+            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: FAILED - " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND);
         }
     }
 }

@@ -131,6 +131,22 @@
         });
     }
 
+    /**
+     * Get badge CSS class based on event type
+     */
+    function getBadgeClass(eventType) {
+        const classes = {
+            'import': 'import',
+            'extension': 'extension',
+            'release': 'release',
+            'supplier_change': 'modification',
+            'bank_change': 'modification',
+            'amount_change': 'modification',
+            'expiry_change': 'modification'
+        };
+        return classes[eventType] || 'default';
+    }
+
     // Load and display guarantee history
     async function loadGuaranteeHistory(guaranteeNum = null) {
         if (!historyPanel || !historyTimeline) return;
@@ -214,8 +230,8 @@
 
         // Helper function to generate source link
         const getSourceLink = (item) => {
-            // Action (extension/release) → Session link
-            if (item.record_type && item.record_type !== 'import') {
+            // Timeline events → Session link
+            if (item.source === 'timeline' || (item.event_type && item.event_type !== 'import')) {
                 const date = new Date(item.date);
                 const dateStr = date.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
                 return `<div class="timeline-source">📋 <a href="/?session_id=${item.session_id}">إجراءات ${dateStr}</a></div>`;
@@ -231,13 +247,25 @@
 
         data.history.forEach((item, index) => {
             const isFirst = item.is_first;
-            const isRelease = item.record_type === 'release_action';
-            const isExtension = item.record_type === 'extension_action';
-            const isModification = item.record_type === 'modification';
+            const eventType = item.event_type || 'import';
 
-            // Generate action type badge (if applicable)
+            // ===================================================================
+            // NEW API FORMAT: Use event_type instead of record_type
+            // ===================================================================
+            const isRelease = eventType === 'release';
+            const isExtension = eventType === 'extension';
+            const isSupplierChange = eventType === 'supplier_change';
+            const isBankChange = eventType === 'bank_change';
+            const isAmountChange = eventType === 'amount_change';
+            const isModification = isSupplierChange || isBankChange || isAmountChange;
+
+            // Generate action type badge
             let actionBadge = '';
-            if (isRelease) {
+            if (item.badge) {
+                // Use badge from API if available
+                const badgeClass = getBadgeClass(eventType);
+                actionBadge = `<span class="status-badge-timeline ${badgeClass}">${item.badge}</span>`;
+            } else if (isRelease) {
                 actionBadge = '<span class="status-badge-timeline release">إفراج</span>';
             } else if (isExtension) {
                 actionBadge = '<span class="status-badge-timeline extension">تمديد</span>';
@@ -245,11 +273,13 @@
                 actionBadge = '<span class="status-badge-timeline modification">📝 تعديل</span>';
             }
 
-            // Generate status badge
+            // Generate status badge (for imports only)
             let statusBadge = '';
-            const statusClass = item.status === 'جاهز' ? 'ready' : 'pending';
-            const statusLabel = item.status;
-            statusBadge = `<span class="status-badge-timeline ${statusClass}">${statusLabel}</span>`;
+            if (item.status) {
+                const statusClass = item.status === 'جاهز' ? 'ready' : 'pending';
+                const statusLabel = item.status;
+                statusBadge = `<span class="status-badge-timeline ${statusClass}">${statusLabel}</span>`;
+            }
 
             const date = new Date(item.date);
             const formattedDate = date.toLocaleDateString('ar-SA', {
@@ -275,6 +305,14 @@
                         
                         ${getSourceLink(item)}
                         
+                        ${item.description ? `
+                            <div class="timeline-description">
+                                <i data-lucide="info" class="w-4 h-4"></i>
+                                ${item.description}
+                            </div>
+                        ` : ''}
+                        
+                        ${item.source === 'import' || eventType === 'import' ? `
                         <div class="timeline-info">
                             <div class="info-row">
                                 <span class="info-label">المورد:</span>
@@ -293,6 +331,7 @@
                                 <span class="info-value">${item.expiry_date || '-'}</span>
                             </div>
                         </div>
+                        ` : ''}
                         
                         ${item.changes && item.changes.length > 0 ? `
                             <div class="changes-list">

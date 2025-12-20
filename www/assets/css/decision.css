@@ -435,12 +435,31 @@
             margin-top: 4px;
         }
 
-        /* Timeline source link (batch/session) */
+        /* Source Link Styling in Timeline */
         .timeline-source {
+            margin-top: 8px;
             font-size: 12px;
-            color: #666;
-            margin-top: 6px;
-            padding: 4px 0;
+            color: #64748b;
+        }
+
+        /* Timeline Description Styling */
+        .timeline-description {
+            background: #f8fafc;
+            border-left: 3px solid #3b82f6;
+            padding: 10px 12px;
+            margin: 12px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #475569;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .timeline-description i {
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #3b82f6;
         }
 
         .timeline-source a {

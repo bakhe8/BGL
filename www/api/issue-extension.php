@@ -99,6 +99,23 @@ try {
     // Use adapter for dual-write (writes to both old and new tables)
     $ids = $adapter->createAction($actionData, $sessionId, null);
     
+    // ═══════════════════════════════════════════════════════════════════
+    // TIMELINE EVENT LOGGING (NEW SYSTEM)
+    // ═══════════════════════════════════════════════════════════════════
+    try {
+        $timelineService = new \App\Services\TimelineEventService();
+        $timelineService->logExtension(
+            $record['guarantee_number'],
+            $ids['old_id'],
+            $record['expiry_date'],
+            $newExpiryDate,
+            $sessionId
+        );
+    } catch (\Throwable $e) {
+        // Silent fail - don't break extension creation
+        error_log("Extension timeline event failed: " . $e->getMessage());
+    }
+    
     echo json_encode([
         'success' => true,
         'message' => 'تم إنشاء سجل التمديد بنجاح',
