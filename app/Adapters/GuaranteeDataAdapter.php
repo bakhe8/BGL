@@ -69,7 +69,9 @@ class GuaranteeDataAdapter
             bankId: $data['bank_id'] ?? null,
             bankDisplay: $data['bank_display'] ?? null,
             supplierDisplayName: $data['supplier_display_name'] ?? null,
-            createdAt: $data['created_at'] ?? date('Y-m-d H:i:s')
+            createdAt: $data['created_at'] ?? date('Y-m-d H:i:s'),
+            recordType: 'import',
+            importBatchId: $batchId
         );
         
         $oldRecord = $this->oldRepo->create($record);
