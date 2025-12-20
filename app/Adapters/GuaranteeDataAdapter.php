@@ -289,22 +289,25 @@ class GuaranteeDataAdapter
         // Detect changes
         $changes = [];
         
-        if (isset($data['supplier_id']) && $data['supplier_id'] != $original->supplierId) {
+        // Supplier change: only track if CHANGING from one supplier to another (not NULL → supplier)
+        if (isset($data['supplier_id']) && $original->supplierId && $data['supplier_id'] != $original->supplierId) {
             $changes['supplier'] = [
                 'from' => $original->supplierDisplayName ?? $original->rawSupplierName,
                 'to' => $data['supplier_display_name'] ?? 'Unknown',
             ];
         }
         
-        if (isset($data['bank_id']) && $data['bank_id'] != $original->bankId) {
+        // Bank change: only track if CHANGING from one bank to another (not NULL → bank)
+        if (isset($data['bank_id']) && $original->bankId && $data['bank_id'] != $original->bankId) {
             $changes['bank'] = [
                 'from' => $original->bankDisplay ?? $original->rawBankName,
                 'to' => $data['bank_display'] ?? 'Unknown',
             ];
         }
         
+        // Amount change: track any change (including NULL → value)
         if (isset($data['amount']) && $data['amount'] != $original->amount) {
-            $changes['amount'] = ['from' => $original->amount, 'to' => $data['amount']];
+            $changes['amount'] = ['from' => $original->amount ?? '0', 'to' => $data['amount']];
         }
         
         if (empty($changes)) {
