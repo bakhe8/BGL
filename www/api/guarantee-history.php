@@ -3,7 +3,7 @@
  * API Endpoint: Guarantee History
  * Returns complete history for a guarantee from timeline_events table
  * 
- * VERSION 2.0 (2025-12-20) - Timeline Events Integration
+ * VERSION 2.1.0 (2025-12-20) - Timeline Events Integration
  */
 
 require_once __DIR__ . '/../../app/Support/autoload.php';
@@ -34,13 +34,13 @@ try {
     // ========================================================================
     
     $stmt = $db->prepare("
-        -- Timeline Events
         SELECT 
             te.id,
             te.record_id,
             te.session_id,
             NULL as import_batch_id,
             'timeline' as source,
+            0 as source_priority,
             te.event_type,
             te.field_name,
             te.old_value,
@@ -50,6 +50,7 @@ try {
             te.supplier_display_name,
             te.bank_display,
             te.change_type,
+            te.snapshot_data,
             te.created_at,
             NULL as match_status,
             NULL as amount,
@@ -58,39 +59,7 @@ try {
             NULL as bank_id
         FROM guarantee_timeline_events te
         WHERE te.guarantee_number = :number
-        
-        UNION ALL
-        
-        -- Import Records (for context)
-        SELECT 
-            r.id,
-            r.id as record_id,
-            r.session_id,
-            r.import_batch_id,
-            'import' as source,
-            CASE 
-                WHEN r.record_type IS NULL OR r.record_type = 'import' THEN 'import'
-                ELSE r.record_type
-            END as event_type,
-            NULL as field_name,
-            NULL as old_value,
-            NULL as new_value,
-            NULL as old_id,
-            NULL as new_id,
-            r.supplier_display_name,
-            r.bank_display,
-            NULL as change_type,
-            r.created_at,
-            r.match_status,
-            r.amount,
-            r.expiry_date,
-            r.supplier_id,
-            r.bank_id
-        FROM imported_records r
-        WHERE r.guarantee_number = :number
-          AND (r.record_type IS NULL OR r.record_type = 'import')
-        
-        ORDER BY created_at DESC
+        ORDER BY te.created_at DESC, te.id DESC
         LIMIT 100
     ");
     
@@ -146,23 +115,24 @@ function buildTimelineEvent(array $row, PDO $db): array
         'record_id' => $row['record_id'],
         'session_id' => $row['session_id'],
         'import_batch_id' => null,
-        'source' => 'timeline',
+        'source' => $row['event_type'] === 'import' ? 'import' : 'timeline',
         'type' => 'event',
         'event_type' => $eventType,
         'badge' => $badge,
         'description' => $description,
         'field_name' => $row['field_name'],
-        'old_value' => $row['old_value'],
-        'new_value' => $row['new_value'],
+        'old_value' => $row['old_value'] ?? null,
+        'new_value' => $row['new_value'] ?? null,
         'old_id' => $row['old_id'],
         'new_id' => $row['new_id'],
-        'supplier_display_name' => $row['supplier_display_name'],  // Include name!
-        'bank_display' => $row['bank_display'],  // Include name!
+        'supplier_display_name' => $row['supplier_display_name'] ?? null,
+        'bank_display' => $row['bank_display'] ?? null,
         'change_type' => $row['change_type'],
         'created_at' => $row['created_at'],
         'date' => $row['created_at'],
         'changes' => buildChanges($row), // For compatibility
-        'is_first' => false
+        'is_first' => false,
+        'snapshot' => isset($row['snapshot_data']) && $row['snapshot_data'] ? json_decode($row['snapshot_data'], true) : null  // Historical letter data
     ];
 }
 
@@ -228,6 +198,7 @@ function getEventBadge(string $eventType): string
         'bank_change' => 'تعديل البنك',
         'amount_change' => 'تعديل المبلغ',
         'expiry_change' => 'تعديل التاريخ',
+        'status_change' => 'مطابقة',
         'modification' => 'تعديل'
     ];
     
@@ -256,6 +227,33 @@ function getEventDescription(array $row): string
             
         case 'amount_change':
             return "تغيير المبلغ من {$row['old_value']} إلى {$row['new_value']}";
+            
+        case 'status_change':
+            // Show matching transformation in consistent format
+            $lines = [];
+            $lines[] = "<strong>match_status:</strong> {$row['old_value']} ← {$row['new_value']}";
+            
+            if (!empty($row['snapshot_data'])) {
+                $snapshot = json_decode($row['snapshot_data'], true);
+                if ($snapshot && isset($snapshot['transformation'])) {
+                    $before = $snapshot['transformation']['before'] ?? [];
+                    $after = $snapshot['transformation']['after'] ?? [];
+                    
+                    // Show supplier transformation
+                    if (!empty($before['supplier']) && !empty($after['supplier'])) {
+                        $lines[] = "<strong>supplier:</strong> {$before['supplier']} ← {$after['supplier']}";
+                    }
+                    
+                    // Show bank transformation
+                    if (!empty($before['bank']) && !empty($after['bank'])) {
+                        $lines[] = "<strong>bank:</strong> {$before['bank']} ← {$after['bank']}";
+                    }
+                }
+            }
+            
+            // Wrap each line in div for proper spacing
+            $formatted = array_map(fn($line) => "<div>{$line}</div>", $lines);
+            return implode('', $formatted);
             
         default:
             return $row['new_value'] ?? '';

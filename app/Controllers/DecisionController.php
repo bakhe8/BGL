@@ -269,6 +269,93 @@ class DecisionController
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // TIMELINE EVENT LOGGING - MUST RUN BEFORE UPDATE!
+        // ═══════════════════════════════════════════════════════════════════
+        // Critical: Capture snapshot BEFORE updating to get OLD values
+        // ═══════════════════════════════════════════════════════════════════
+        try {
+            $timelineService = new \App\Services\TimelineEventService();
+            
+            // Log supplier change
+            if (isset($update['supplier_id']) && $update['supplier_id'] != $record->supplierId) {
+                // Get NEW supplier name from database
+                $newSupplierName = 'Unknown';
+                try {
+                    $supplierRepo = new SupplierRepository();
+                    $newSupplier = $supplierRepo->find((int) $update['supplier_id']);
+                    if ($newSupplier) {
+                        $newSupplierName = $newSupplier->officialName ?? 'Unknown';
+                    }
+                } catch (\Throwable $e) {
+                    // Fallback to display name from update
+                    $newSupplierName = $update['supplier_display_name'] ?? 'Unknown';
+                }
+                
+                $timelineService->logSupplierChange(
+                    $record->guaranteeNumber,
+                    $id,
+                    $record->supplierId,
+                    (int) $update['supplier_id'],
+                    $record->supplierDisplayName ?? $record->rawSupplierName,
+                    $newSupplierName,
+                    $record->sessionId
+                );
+            }
+
+            // Log bank change
+            if (isset($update['bank_id']) && $update['bank_id'] != $record->bankId) {
+                // Get NEW bank name from database
+                $newBankName = 'Unknown';
+                try {
+                    $bankRepo = new BankRepository();
+                    $newBank = $bankRepo->find((int) $update['bank_id']);
+                    if ($newBank) {
+                        $newBankName = $newBank->officialName ?? 'Unknown';
+                    }
+                } catch (\Throwable $e) {
+                    $newBankName = $update['bank_display'] ?? 'Unknown';
+                }
+                
+                $timelineService->logBankChange(
+                    $record->guaranteeNumber,
+                    $id,
+                    $record->bankId,
+                    (int) $update['bank_id'],
+                    $record->bankDisplay ?? $record->rawBankName,
+                    $newBankName,
+                    $record->sessionId
+                );
+            }
+
+            // Log amount change
+            if (isset($update['amount']) && $update['amount'] != $record->amount) {
+                $timelineService->logAmountChange(
+                    $record->guaranteeNumber,
+                    $id,
+                    $record->amount,
+                    $update['amount'],
+                    $record->sessionId
+                );
+            }
+            
+            // Log status change (pending → ready)
+            // This happens when user makes a matching decision
+            if (isset($update['match_status']) && $update['match_status'] != $record->matchStatus) {
+                $timelineService->logStatusChange(
+                    $record->guaranteeNumber,
+                    $id,
+                    $record->matchStatus ?? 'pending',
+                    $update['match_status'],
+                    $record->sessionId
+                );
+            }
+        } catch (\Throwable $e) {
+            // Silent fail - timeline logging should never break saveDecision
+            error_log("Timeline event logging failed: " . $e->getMessage());
+        }
+
+        // NOW update record with new values
         $this->records->updateDecision($id, $update);
 
         // ═══════════════════════════════════════════════════════════════════
@@ -448,64 +535,11 @@ class DecisionController
         }
 
         $updated = $this->records->find($id);
-        
-        // ═══════════════════════════════════════════════════════════════════
-        // TIMELINE EVENT LOGGING (NEW SYSTEM - PARALLEL MODE)
-        // ═══════════════════════════════════════════════════════════════════
-        // This runs alongside the old system for safety during migration.
-        // Both systems are active. Old system can be removed in cleanup phase.
-        // ═══════════════════════════════════════════════════════════════════
-        try {
-            $timelineService = new \App\Services\TimelineEventService();
-            
-            // Log supplier change
-            if (isset($update['supplier_id']) && $update['supplier_id'] != $record->supplierId) {
-                $timelineService->logSupplierChange(
-                    $record->guaranteeNumber,
-                    $id,
-                    $record->supplierId,
-                    (int) $update['supplier_id'],
-                    $record->supplierDisplayName ?? $record->rawSupplierName,
-                    $update['supplier_display_name'] ?? 'Unknown',
-                    $record->sessionId
-                );
-            }
-
-            // Log bank change
-            if (isset($update['bank_id']) && $update['bank_id'] != $record->bankId) {
-                $timelineService->logBankChange(
-                    $record->guaranteeNumber,
-                    $id,
-                    $record->bankId,
-                    (int) $update['bank_id'],
-                    $record->bankDisplay ?? $record->rawBankName,
-                    $update['bank_display'] ?? 'Unknown',
-                    $record->sessionId
-                );
-            }
-
-            // Log amount change
-            if (isset($update['amount']) && $update['amount'] != $record->amount) {
-                $timelineService->logAmountChange(
-                    $record->guaranteeNumber,
-                    $id,
-                    $record->amount,
-                    $update['amount'],
-                    $record->sessionId
-                );
-            }
-        } catch (\Throwable $e) {
-            // Silent fail - timeline logging should never break saveDecision
-            error_log("Timeline event logging failed: " . $e->getMessage());
-        }
 
         // ═══════════════════════════════════════════════════════════════════
-        // OLD MODIFICATION TRACKING (KEPT FOR SAFETY - PARALLEL MODE)
+        // Timeline logging is now handled in updateDecision() above
+        // Old logModificationIfNeeded() removed as deprecated
         // ═══════════════════════════════════════════════════════════════════
-        // TODO: Remove this in Phase 5 cleanup after verifying new system works
-        // ═══════════════════════════════════════════════════════════════════
-        file_put_contents(__DIR__ . '/../../debug.log', date('[Y-m-d H:i:s] ') . "saveDecision: Calling logModificationIfNeeded for record $id\n", FILE_APPEND);
-        $this->logModificationIfNeeded($id, $update);
 
 
 

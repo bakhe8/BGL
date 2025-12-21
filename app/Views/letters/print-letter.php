@@ -11,61 +11,102 @@ if (!$recordId) {
     die("معرف السجل مفقود.");
 }
 
-// Connect
-$db = Database::connect();
+// Check for historical snapshot parameter
+$snapshotParam = $_GET['snapshot'] ?? null;
+$eventDate = $_GET['date'] ?? null;
+$isHistorical = false;
+$snapshot = null;
 
-// Fetch Record
-$stmt = $db->prepare("SELECT * FROM imported_records WHERE id = :id LIMIT 1");
-$stmt->execute([':id' => $recordId]);
-$row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$row) {
-    die("السجل غير موجود.");
-}
-
-// Helper to hydrate object (simplified version of Repository map)
-// We need this because the view logic expects an object or array with specific keys.
-// Let's use an object to match decision-page logic style
-$record = (object) [
-    'id' => $row['id'],
-    'supplierId' => $row['supplier_id'],
-    'bankId' => $row['bank_id'],
-    'rawSupplierName' => $row['raw_supplier_name'],
-    'rawBankName' => $row['raw_bank_name'],
-    'guaranteeNumber' => $row['guarantee_number'],
-    'contractNumber' => $row['contract_number'],
-    'amount' => $row['amount'],
-    'expiryDate' => $row['expiry_date'],
-    'type' => $row['type'],
-    'recordType' => $row['record_type'] ?? 'import',
-    'matchStatus' => $row['match_status'] ?? 'pending',
-    'supplierDisplayName' => null,
-    'bankDisplay' => null
-];
-
-// Fetch Supplier Details
-$supplierName = $record->rawSupplierName;
-if ($record->supplierId) {
-    $supStmt = $db->prepare("SELECT official_name FROM suppliers WHERE id = :id");
-    $supStmt->execute([':id' => $record->supplierId]);
-    $sup = $supStmt->fetch(PDO::FETCH_COLUMN);
-    if ($sup) {
-        $record->supplierDisplayName = $sup;
-        $supplierName = $sup;
+if ($snapshotParam) {
+    $snapshot = @json_decode($snapshotParam, true);
+    if ($snapshot && is_array($snapshot)) {
+        $isHistorical = true;
     }
 }
 
-// Fetch Bank Details
-$bankName = $record->rawBankName;
-$bankDetails = null;
+// Connect
+$db = Database::connection();
 
-if ($record->bankId) {
-    $bankStmt = $db->prepare("SELECT * FROM banks WHERE id = :id");
-    $bankStmt->execute([':id' => $record->bankId]);
-    $bankDetails = $bankStmt->fetch(PDO::FETCH_ASSOC);
-    if ($bankDetails) {
-        $bankName = $bankDetails['official_name'];
-        $record->bankDisplay = $bankName;
+if ($isHistorical && $snapshot) {
+    // Use snapshot data for historical view
+    $record = (object) [
+        'id' => $recordId,
+        'supplierId' => null,  // No IDs in snapshot
+        'bankId' => null,
+        'rawSupplierName' => $snapshot['supplier_name'] ?? 'غير محدد',
+        'rawBankName' => $snapshot['bank_name'] ?? 'غير محدد',
+        'guaranteeNumber' => $snapshot['guarantee_number'] ?? '',
+        'contractNumber' => $snapshot['contract_number'] ?? '',
+        'amount' => $snapshot['amount'] ?? '0',
+        'expiryDate' => $snapshot['expiry_date'] ?? null,
+        'issueDate' => $snapshot['issue_date'] ?? null,
+        'type' => $snapshot['type'] ?? '',
+        'recordType' => $snapshot['record_type'] ?? 'import',
+        'matchStatus' => 'ready',  // Historical view always shows as ready
+        'supplierDisplayName' => $snapshot['supplier_name'] ?? 'غير محدد',
+        'bankDisplay' => $snapshot['bank_name'] ?? 'غير محدد'
+    ];
+    
+    $supplierName = $record->supplierDisplayName;
+    $bankName = $record->bankDisplay;
+    $bankDetails = null;  // No bank details for historical view
+    
+} else {
+    // Normal view - fetch from database
+    // Fetch Record
+    $stmt = $db->prepare("SELECT * FROM imported_records WHERE id = :id LIMIT 1");
+    $stmt->execute([':id' => $recordId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row) {
+        die("السجل غير موجود.");
+    }
+
+    // Helper to hydrate object (simplified version of Repository map)
+    // We need this because the view logic expects an object or array with specific keys.
+    // Let's use an object to match decision-page logic style
+    $record = (object) [
+        'id' => $row['id'],
+        'supplierId' => $row['supplier_id'],
+        'bankId' => $row['bank_id'],
+        'rawSupplierName' => $row['raw_supplier_name'],
+        'rawBankName' => $row['raw_bank_name'],
+        'guaranteeNumber' => $row['guarantee_number'],
+        'contractNumber' => $row['contract_number'],
+        'amount' => $row['amount'],
+        'expiryDate' => $row['expiry_date'],
+        'issueDate' => $row['issue_date'] ?? null,
+        'type' => $row['type'],
+        'recordType' => $row['record_type'] ?? 'import',
+        'matchStatus' => $row['match_status'] ?? 'pending',
+        'supplierDisplayName' => null,
+        'bankDisplay' => null
+    ];
+
+    // Fetch Supplier Details
+    $supplierName = $record->rawSupplierName;
+    if ($record->supplierId) {
+        $supStmt = $db->prepare("SELECT official_name FROM suppliers WHERE id = :id");
+        $supStmt->execute([':id' => $record->supplierId]);
+        $sup = $supStmt->fetch(PDO::FETCH_COLUMN);
+        if ($sup) {
+            $record->supplierDisplayName = $sup;
+            $supplierName = $sup;
+        }
+    }
+
+    // Fetch Bank Details
+    $bankName = $record->rawBankName;
+    $bankDetails = null;
+
+    if ($record->bankId) {
+        $bankStmt = $db->prepare("SELECT * FROM banks WHERE id = :id");
+        $bankStmt->execute([':id' => $record->bankId]);
+        $bankDetails = $bankStmt->fetch(PDO::FETCH_ASSOC);
+        if ($bankDetails) {
+            $bankName = $bankDetails['official_name'];
+            $record->bankDisplay = $bankName;
+        }
     }
 }
 
@@ -165,7 +206,35 @@ $isRelease = ($record->recordType === 'release_action');
     </style>
 </head>
 <body>
-    <div class="no-print" style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
+    <?php if ($isHistorical): ?>
+    <!-- Historical Snapshot Warning Banner -->
+    <div class="no-print" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 12px 24px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        font-weight: bold;
+    ">
+        <span style="font-size: 24px;">⚠️</span>
+        <div>
+            <div style="font-size: 18px;">عرض تاريخي - هذا هو الخطاب كما كان في تاريخ الحدث</div>
+            <?php if ($eventDate): ?>
+            <div style="font-size: 14px; opacity: 0.9;">التاريخ: <?= htmlspecialchars($eventDate) ?></div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+    
+    <div class="no-print" style="position: fixed; top: <?= $isHistorical ? '80px' : '20px' ?>; right: 20px; z-index: 9999;">
         <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg font-bold hover:bg-blue-700 transition-colors flex items-center gap-2">
             <span>🖨️</span> طباعة الخطاب
         </button>

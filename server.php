@@ -1,5 +1,12 @@
 <?php
 // Router script for PHP built-in server. Serves static files from www/; otherwise forwards to www/index.php.
+
+// Log all requests for debugging
+$logFile = __DIR__ . '/debug.log';
+$method = $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN';
+$uri = $_SERVER['REQUEST_URI'] ?? '/';
+file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "SERVER: $method $uri\n", FILE_APPEND);
+
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $file = __DIR__ . '/www' . $uri;
 

@@ -1,4 +1,34 @@
 <?php
+
+/**
+ * ImportedRecordRepository - Timeline Event Logging Hub
+ * 
+ * This repository handles record creation and is the CENTRAL POINT for timeline event logging.
+ * It manages the complex logic of:
+ * 
+ * 1. IMPORT EVENT LOGGING
+ *    - Only logs timeline events when recordType === 'import'
+ *    - Captures RAW Excel data in snapshot (before any matching)
+ *    - Passes pre-built snapshot to avoid DB re-fetch race conditions
+ * 
+ * 2. AUTOMATIC MATCHING EVENT LOGGING  
+ *    - Detects when record is auto-matched (matchStatus === 'ready' && supplierId exists)
+ *    - Fetches official names from suppliers/banks tables
+ *    - Logs transformation: Excel names → Official Arabic names
+ * 
+ * CRITICAL CONCEPTS:
+ * 
+ * - Deduplication: Extensions/releases also call create() but recordType differs
+ * - Snapshot Timing: Must capture from $record object, NOT re-fetch from DB
+ * - Transformation Display: Shows before/after matching for transparency
+ * 
+ * RELATED FILES:
+ * @see app/Services/TimelineEventService.php - Core event logging service
+ * @see www/api/guarantee-history.php - Timeline API endpoint
+ * @see docs/timeline-events.md - Complete documentation
+ * 
+ * @package App\Repositories
+ */
 declare(strict_types=1);
 
 namespace App\Repositories;
@@ -52,6 +82,94 @@ class ImportedRecordRepository
         ]);
 
         $record->id = (int) $pdo->lastInsertId();
+        
+        // Log import event to timeline ONLY for actual imports
+        // Do NOT log for extensions/releases (recordType = 'extension_action', 'release_action')
+        if ($record->guaranteeNumber && $record->recordType === 'import') {
+            try {
+                // Build snapshot from record object directly (more reliable than re-fetching)
+                $snapshotData = [
+                    'guarantee_number' => $record->guaranteeNumber ?? '',
+                    'contract_number' => $record->contractNumber ?? '',
+                    'supplier_name' => $record->rawSupplierName ?? 'غير محدد',
+                    'bank_name' => $record->rawBankName ?? 'غير محدد',
+                    'amount' => $record->amount ?? '',
+                    'expiry_date' => $record->expiryDate ?? '',
+                    'issue_date' => $record->issueDate ?? '',
+                    'type' => $record->type ?? '',
+                    'record_type' => 'import',
+                    'related_to' => $record->relatedTo ?? '',
+                    'match_status' => $record->matchStatus ?? 'pending'
+                ];
+                
+                $timelineService = new \App\Services\TimelineEventService();
+                
+                // 1. Log import event
+                $timelineService->logRecordCreation(
+                    $record->guaranteeNumber,
+                    $record->id,
+                    $record->sessionId,
+                    'import',
+                    $snapshotData  // Pass snapshot directly
+                );
+                
+                // 2. Log auto-matching event if system matched automatically
+                if ($record->matchStatus === 'ready' && $record->supplierId) {
+                    // Fetch OFFICIAL names from database
+                    $supplierOfficialName = null;
+                    $bankOfficialName = null;
+                    
+                    try {
+                        // Get official supplier name
+                        if ($record->supplierId) {
+                            $supplierRepo = new \App\Repositories\SupplierRepository();
+                            $supplier = $supplierRepo->find($record->supplierId);
+                            if ($supplier) {
+                                $supplierData = (array) $supplier;
+                                $supplierOfficialName = $supplierData['officialName'] ?? null;
+                            }
+                        }
+                        
+                        // Get official bank name
+                        if ($record->bankId) {
+                            $pdo = Database::connection();
+                            $stmt = $pdo->prepare("SELECT official_name FROM banks WHERE id = :id");
+                            $stmt->execute([':id' => $record->bankId]);
+                            $bankOfficialName = $stmt->fetchColumn() ?: null;
+                        }
+                    } catch (\Throwable $e) {
+                        error_log("Failed to fetch official names: " . $e->getMessage());
+                    }
+                    
+                    // Prepare raw names (from Excel)
+                    $rawNames = [
+                        'supplier' => $record->rawSupplierName ?? 'غير محدد',
+                        'bank' => $record->rawBankName ?? 'غير محدد'
+                    ];
+                    
+                    // Prepare official names (after matching)
+                    $officialNames = [
+                        'supplier' => $supplierOfficialName ?? $record->rawSupplierName ?? 'غير محدد',
+                        'bank' => $bankOfficialName ?? $record->rawBankName ?? 'غير محدد'
+                    ];
+                    
+                    // Log status change with transformation data
+                    $timelineService->logStatusChange(
+                        $record->guaranteeNumber,
+                        $record->id,
+                        'pending',
+                        'ready',
+                        $record->sessionId,
+                        $rawNames,
+                        $officialNames
+                    );
+                }
+            } catch (\Throwable $e) {
+                // Silent fail - don't break import
+                error_log("Import timeline event failed: " . $e->getMessage());
+            }
+        }
+        
         return $record;
     }
 

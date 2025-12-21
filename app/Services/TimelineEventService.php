@@ -27,21 +27,71 @@ namespace App\Services;
 use App\Repositories\TimelineEventRepository;
 use App\Repositories\ImportSessionRepository;
 use App\Repositories\SupplierSuggestionRepository;
+use App\Repositories\ImportedRecordRepository;
 
 class TimelineEventService
 {
     private TimelineEventRepository $timeline;
     private ImportSessionRepository $sessions;
     private SupplierSuggestionRepository $suggestions;
+    private ImportedRecordRepository $records;
     
     public function __construct(
         ?TimelineEventRepository $timeline = null,
         ?ImportSessionRepository $sessions = null,
-        ?SupplierSuggestionRepository $suggestions = null
+        ?SupplierSuggestionRepository $suggestions = null,
+        ?ImportedRecordRepository $records = null
     ) {
         $this->timeline = $timeline ?? new TimelineEventRepository();
         $this->sessions = $sessions ?? new ImportSessionRepository();
         $this->suggestions = $suggestions ?? new SupplierSuggestionRepository();
+        $this->records = $records ?? new ImportedRecordRepository();
+    }
+    
+    /**
+     * =========================================================================
+     * SNAPSHOT CAPTURE - Historical Letter Data
+     * =========================================================================
+     * 
+     * Captures complete letter state at time of event for historical viewing.
+     * This enables "time travel" - viewing letters as they were at any point.
+     * 
+     * @param int $recordId Record ID to capture snapshot from
+     * @return array|null Snapshot data or null if record not found
+     */
+    private function captureSnapshot(int $recordId): ?array
+    {
+        try {
+            $record = $this->records->find($recordId);
+            if (!$record) {
+                return null;
+            }
+            
+            // For import events, use RAW names (as they came from Excel)
+            // For other events, use display names (after matching)
+            $isImport = ($record->recordType === 'import' && $record->matchStatus === 'pending');
+            
+            return [
+                'guarantee_number' => $record->guaranteeNumber ?? '',
+                'contract_number' => $record->contractNumber ?? '',
+                'supplier_name' => $isImport 
+                    ? ($record->rawSupplierName ?? 'غير محدد')
+                    : ($record->supplierDisplayName ?? $record->rawSupplierName ?? 'غير محدد'),
+                'bank_name' => $isImport
+                    ? ($record->rawBankName ?? 'غير محدد')
+                    : ($record->bankDisplay ?? $record->rawBankName ?? 'غير محدد'),
+                'amount' => $record->amount ?? '',
+                'expiry_date' => $record->expiryDate ?? '',
+                'issue_date' => $record->issueDate ?? '',
+                'type' => $record->type ?? '',
+                'record_type' => $record->recordType ?? 'import',
+                'related_to' => $record->relatedTo ?? '',
+                'match_status' => $record->matchStatus ?? 'pending'
+            ];
+        } catch (\Throwable $e) {
+            // Fail gracefully - snapshot is nice-to-have
+            return null;
+        }
     }
     
     /**
@@ -77,20 +127,20 @@ class TimelineEventService
         ?int $sessionId = null
     ): int {
         // Get session
-        if ($sessionId) {
-            $session = $this->sessions->find($sessionId);
-        } else {
-            $session = $this->sessions->getOrCreateDailySession('daily_actions');
-        }
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        // Capture complete snapshot for historical viewing
+        $snapshot = $this->captureSnapshot($recordId);
+        $snapshotJson = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_UNICODE) : null;
         
         // Determine change type
         $changeType = $this->determineSupplierChangeType($oldSupplierId, $oldSupplierName, $newSupplierName);
         
         // Create timeline event
-        $eventId = $this->timeline->create([
+        $eventData = [
             'guarantee_number' => $guaranteeNumber,
             'record_id' => $recordId,
-            'session_id' => $session->id,
+            'session_id' => $session,
             'event_type' => 'supplier_change',
             'field_name' => 'supplier',
             'old_value' => $oldSupplierName ?? 'غير محدد',
@@ -98,8 +148,11 @@ class TimelineEventService
             'old_id' => $oldSupplierId,
             'new_id' => $newSupplierId,
             'supplier_display_name' => $newSupplierName,  // Store for fast access
-            'change_type' => $changeType
-        ]);
+            'change_type' => $changeType,
+            'snapshot_data' => $snapshotJson  // Historical letter data
+        ];
+        
+        $eventId = $this->timeline->create($eventData);
         
         // Update weights/learning (automatic side effect)
         try {
@@ -153,16 +206,16 @@ class TimelineEventService
         string $newBankName,
         ?int $sessionId = null
     ): int {
-        if ($sessionId) {
-            $session = $this->sessions->find($sessionId);
-        } else {
-            $session = $this->sessions->getOrCreateDailySession('daily_actions');
-        }
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        // Capture snapshot
+        $snapshot = $this->captureSnapshot($recordId);
+        $snapshotJson = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_UNICODE) : null;
         
         return $this->timeline->create([
             'guarantee_number' => $guaranteeNumber,
             'record_id' => $recordId,
-            'session_id' => $session->id,
+            'session_id' => $session,
             'event_type' => 'bank_change',
             'field_name' => 'bank',
             'old_value' => $oldBankName ?? 'غير محدد',
@@ -170,7 +223,8 @@ class TimelineEventService
             'old_id' => $oldBankId,
             'new_id' => $newBankId,
             'bank_display' => $newBankName,  // Store for fast access
-            'change_type' => $oldBankId ? 'entity_change' : 'initial_assignment'
+            'change_type' => $oldBankId ? 'entity_change' : 'initial_assignment',
+            'snapshot_data' => $snapshotJson
         ]);
     }
     
@@ -190,21 +244,81 @@ class TimelineEventService
         string $newAmount,
         ?int $sessionId = null
     ): int {
-        if ($sessionId) {
-            $session = $this->sessions->find($sessionId);
-        } else {
-            $session = $this->sessions->getOrCreateDailySession('daily_actions');
-        }
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        // Capture snapshot
+        $snapshot = $this->captureSnapshot($recordId);
+        $snapshotJson = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_UNICODE) : null;
         
         return $this->timeline->create([
             'guarantee_number' => $guaranteeNumber,
             'record_id' => $recordId,
-            'session_id' => $session->id,
+            'session_id' => $session,
             'event_type' => 'amount_change',
             'field_name' => 'amount',
             'old_value' => $oldAmount ?? '0',
-            'new_value' => $newAmount,
-            'change_type' => 'update'
+            'new_value' => $newAmount ?? '0',
+            'change_type' => 'update',
+            'snapshot_data' => $snapshotJson
+        ]);
+    }
+    
+    /**
+     * =========================================================================
+     * STATUS CHANGE (Pending → Ready)
+     * =========================================================================
+     */
+    
+    /**
+     * Log match status change event
+     * 
+     * Tracks when a record changes from "يحتاج قرار" to "جاهز"
+     * This represents the matching/decision moment
+     */
+    public function logStatusChange(
+        string $guaranteeNumber,
+        int $recordId,
+        string $oldStatus,
+        string $newStatus,
+        ?int $sessionId = null,
+        ?array $rawNames = null,      // Raw names from Excel (before matching)
+        ?array $officialNames = null  // Official names (after matching)
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        // Build snapshot showing transformation (before → after)
+        $snapshot = null;
+        if ($rawNames && $officialNames) {
+            $snapshot = [
+                'guarantee_number' => $guaranteeNumber,
+                'transformation' => [
+                    'before' => $rawNames,
+                    'after' => $officialNames
+                ]
+            ];
+        } else {
+            // Fallback: capture current state
+            $snapshot = $this->captureSnapshot($recordId);
+        }
+        $snapshotJson = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_UNICODE) : null;
+        
+        // Translate status for display
+        $statusLabels = [
+            'pending' => 'يحتاج قرار',
+            'ready' => 'جاهز',
+            'locked' => 'مقفل'
+        ];
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'status_change',
+            'field_name' => 'match_status',
+            'old_value' => $statusLabels[$oldStatus] ?? $oldStatus,
+            'new_value' => $statusLabels[$newStatus] ?? $newStatus,
+            'change_type' => 'status_update',
+            'snapshot_data' => $snapshotJson
         ]);
     }
     
@@ -224,6 +338,10 @@ class TimelineEventService
         string $newExpiryDate,
         int $sessionId
     ): int {
+        // Capture snapshot for historical view
+        $snapshot = $this->captureSnapshot($recordId);
+        $snapshotJson = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_UNICODE) : null;
+        
         return $this->timeline->create([
             'guarantee_number' => $guaranteeNumber,
             'record_id' => $recordId,
@@ -232,7 +350,8 @@ class TimelineEventService
             'field_name' => 'expiry_date',
             'old_value' => $oldExpiryDate,
             'new_value' => $newExpiryDate,
-            'change_type' => 'action'
+            'change_type' => 'action',
+            'snapshot_data' => $snapshotJson
         ]);
     }
     
@@ -244,12 +363,243 @@ class TimelineEventService
         int $recordId,
         int $sessionId
     ): int {
+        // Capture snapshot for historical view
+        $snapshot = $this->captureSnapshot($recordId);
+        $snapshotJson = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_UNICODE) : null;
+        
         return $this->timeline->create([
             'guarantee_number' => $guaranteeNumber,
             'record_id' => $recordId,
             'session_id' => $sessionId,
             'event_type' => 'release',
-            'change_type' => 'action'
+            'change_type' => 'action',
+            'snapshot_data' => $snapshotJson
+        ]);
+    }
+    
+    /**
+     * =========================================================================
+     * FIELD CHANGES (Comprehensive Tracking)
+     * =========================================================================
+     */
+    
+    /**
+     * Log guarantee number change
+     */
+    public function logGuaranteeNumberChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $newValue,  // Use new value as the reference
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'guarantee_number_change',
+            'field_name' => 'guarantee_number',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log contract number change
+     */
+    public function logContractNumberChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'contract_number_change',
+            'field_name' => 'contract_number',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log expiry date change (not extension)
+     */
+    public function logExpiryDateChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'expiry_date_change',
+            'field_name' => 'expiry_date',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log issue date change
+     */
+    public function logIssueDateChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'issue_date_change',
+            'field_name' => 'issue_date',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log type change
+     */
+    public function logTypeChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'type_change',
+            'field_name' => 'type',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log raw supplier name change
+     */
+    public function logRawSupplierNameChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'raw_supplier_name_change',
+            'field_name' => 'raw_supplier_name',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log raw bank name change
+     */
+    public function logRawBankNameChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'raw_bank_name_change',
+            'field_name' => 'raw_bank_name',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log comment change
+     */
+    public function logCommentChange(
+        string $guaranteeNumber,
+        int $recordId,
+        ?string $oldValue,
+        string $newValue,
+        ?int $sessionId = null
+    ): int {
+        $session = $sessionId ? $sessionId : $this->sessions->getOrCreateDailySession('daily_actions')->id;
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $session,
+            'event_type' => 'comment_change',
+            'field_name' => 'comment',
+            'old_value' => $oldValue ?? '',
+            'new_value' => $newValue,
+            'change_type' => 'field_update'
+        ]);
+    }
+    
+    /**
+     * Log record creation (import)
+     */
+    public function logRecordCreation(
+        string $guaranteeNumber,
+        int $recordId,
+        int $sessionId,
+        string $recordType = 'import',
+        ?array $snapshotData = null  // Optional pre-captured snapshot
+    ): int {
+        // Use provided snapshot or capture new one
+        if ($snapshotData) {
+            $snapshotJson = json_encode($snapshotData, JSON_UNESCAPED_UNICODE);
+        } else {
+            $snapshot = $this->captureSnapshot($recordId);
+            $snapshotJson = $snapshot ? json_encode($snapshot, JSON_UNESCAPED_UNICODE) : null;
+        }
+        
+        return $this->timeline->create([
+            'guarantee_number' => $guaranteeNumber,
+            'record_id' => $recordId,
+            'session_id' => $sessionId,
+            'event_type' => $recordType === 'import' ? 'import' : 'record_creation',
+            'change_type' => 'creation',
+            'snapshot_data' => $snapshotJson
         ]);
     }
     

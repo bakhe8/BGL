@@ -58,8 +58,8 @@ class TimelineEventRepository
                 event_type, field_name,
                 old_value, new_value, old_id, new_id,
                 supplier_display_name, bank_display,
-                change_type, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                change_type, snapshot_data, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -75,6 +75,7 @@ class TimelineEventRepository
             $data['supplier_display_name'] ?? null,
             $data['bank_display'] ?? null,
             $data['change_type'] ?? null,
+            $data['snapshot_data'] ?? null,  // Historical snapshot!
             $data['created_at'] ?? date('Y-m-d H:i:s')
         ]);
         
@@ -96,7 +97,7 @@ class TimelineEventRepository
                 event_type, field_name,
                 old_value, new_value, old_id, new_id,
                 supplier_display_name, bank_display,
-                change_type, created_at
+                change_type, snapshot_data, created_at
             FROM guarantee_timeline_events
             WHERE guarantee_number = ?
             ORDER BY created_at DESC

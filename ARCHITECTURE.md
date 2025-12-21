@@ -157,6 +157,7 @@ supplier_suggestions (
     star_rating            -- 1-3 نجوم
 )
 
+
 -- سجل كل قرارات المستخدم
 user_decisions (
     id,
@@ -165,6 +166,19 @@ user_decisions (
     chosen_supplier_id, chosen_display_name,
     decision_source,       -- user_click/propagation/auto_select/import
     decided_at
+)
+
+-- ⭐ سجل الأحداث الزمني (Timeline Events) - New in v2.1.0
+guarantee_timeline_events (
+    id,
+    guarantee_number, record_id, session_id,
+    event_type,            -- supplier_change, bank_change, extension, etc.
+    field_name,            -- supplier, bank, amount, expiry_date
+    old_value, new_value,
+    old_id, new_id,
+    supplier_display_name, bank_display,
+    change_type,           -- entity_change, correction, update, action
+    created_at
 )
 
 -- تعلم البنوك

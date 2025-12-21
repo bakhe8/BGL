@@ -308,7 +308,7 @@
                         ${item.description ? `
                             <div class="timeline-description">
                                 <i data-lucide="info" class="w-4 h-4"></i>
-                                ${item.description}
+                                <span>${item.description}</span>
                             </div>
                         ` : ''}
                         
@@ -316,19 +316,19 @@
                         <div class="timeline-info">
                             <div class="info-row">
                                 <span class="info-label">المورد:</span>
-                                <span class="info-value">${item.supplier || '-'}</span>
+                                <span class="info-value">${item.snapshot?.supplier_name || item.supplier || '-'}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">البنك:</span>
-                                <span class="info-value">${item.bank || '-'}</span>
+                                <span class="info-value">${item.snapshot?.bank_name || item.bank || '-'}</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">المبلغ:</span>
-                                <span class="info-value">${parseFloat(item.amount || 0).toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ريال</span>
+                                <span class="info-value">${parseFloat(item.snapshot?.amount || item.amount || 0).toLocaleString('ar-SA', { minimumFractionDigits: 2 })} ريال</span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">تاريخ الانتهاء:</span>
-                                <span class="info-value">${item.expiry_date || '-'}</span>
+                                <span class="info-value">${item.snapshot?.expiry_date || item.expiry_date || '-'}</span>
                             </div>
                         </div>
                         ` : ''}
@@ -353,13 +353,29 @@
                         
                         
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
-                            <a href="/?record_id=${item.record_id}&session_id=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
-                                عرض السجل
-                            </a>
+                            ${item.snapshot && Object.keys(item.snapshot).length > 0 ? `
+                                <!-- Historical snapshot available -->
+                                <button onclick="openHistoricalLetter(${item.record_id}, ${JSON.stringify(item.snapshot).replace(/"/g, '&quot;')}, '${item.created_at}')" 
+                                        class="view-record-btn" 
+                                        style="width: auto; padding: 6px 20px; text-align: center; justify-content: center; display: flex; align-items: center; gap: 5px;">
+                                    <i data-lucide="history" class="w-4 h-4"></i>
+                                    عرض السجل التاريخي
+                                </button>
+                            ` : `
+                                <!-- No snapshot, show current state -->
+                                <a href="/?record_id=${item.record_id}&session_id=${item.session_id}" class="view-record-btn" style="width: auto; padding: 6px 20px; text-align: center; justify-content: center;">
+                                    عرض السجل
+                                </a>
+                            `}
                             <button onclick="
                                 var recId = ${item.record_id || 0};
                                 if (!recId) { alert('خطأ: معرف السجل مفقود'); return; }
-                                window.open('/letters/print-letter.php?id=' + recId, '_blank', 'width=900,height=800');
+                                var url = '/letters/print-letter.php?id=' + recId;
+                                ${item.snapshot && Object.keys(item.snapshot).length > 0 ? `
+                                    // Add snapshot parameter as URL-encoded JSON
+                                    url += '&snapshot=' + encodeURIComponent(JSON.stringify(${JSON.stringify(item.snapshot).replace(/"/g, '&quot;')}));
+                                ` : ''}
+                                window.open(url, '_blank', 'width=900,height=800');
                             " 
                                     class="view-record-btn" 
                                     style="width: auto; padding: 6px 20px; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; text-decoration: none;"
@@ -378,6 +394,22 @@
     }
 
     // Event listeners
+
+    // Expose openHistoricalLetter globally for inline onclick in timeline
+    window.openHistoricalLetter = function (recordId, snapshot, eventDate) {
+        if (!snapshot || Object.keys(snapshot).length === 0) {
+            alert('لا توجد بيانات تاريخية متاحة لهذا الحدث');
+            return;
+        }
+
+        // Open print-letter with snapshot parameter
+        const url = '/letters/print-letter.php?id=' + recordId +
+            '&snapshot=' + encodeURIComponent(JSON.stringify(snapshot)) +
+            '&date=' + encodeURIComponent(eventDate);
+
+        window.open(url, '_blank', 'width=900,height=800');
+    };
+
     if (searchGoBtn) {
         // CRITICAL FIX: Wrap in arrow function to prevent passing Event object
         searchGoBtn.addEventListener('click', () => loadGuaranteeHistory());

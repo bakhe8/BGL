@@ -720,7 +720,7 @@
     <script src="/assets/js/shared/helpers.js"></script>
     
     <!-- Main Logic Script -->
-    <script src="/assets/js/decision.js"></script>
+    <script src="/assets/js/decision.js?v=<?= time() ?>"></script>
 
     <!-- Guarantee Search Feature -->
     <script src="/assets/js/guarantee-history.js"></script>

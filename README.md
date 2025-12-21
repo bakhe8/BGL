@@ -268,5 +268,5 @@ public function logNewEventType(
 ---
 
 **تم التحديث:** 2025-12-20  
-**الإصدار:** 2.0.0  
+**الإصدار:** 2.1.0  
 **الحالة:** Production Ready ✅

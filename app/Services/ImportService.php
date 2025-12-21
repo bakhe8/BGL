@@ -135,6 +135,7 @@ class ImportService
             $count = 0;
             $skipped = [];
             $rowIndex = $headerRowIndex + 1; // Start counting from header position + 1
+            $firstRecordId = null;  // Track first record for navigation
 
             foreach ($dataRows as $row) {
                 $rowIndex++;
@@ -231,13 +232,18 @@ class ImportService
                 // Use adapter to write to both old and new tables
                 $ids = $this->adapter->createGuarantee($recordData, $session->id, $batchId);
                 
+                // Track first record ID for navigation
+                if ($firstRecordId === null) {
+                    $firstRecordId = $ids['old_id'];
+                }
+                
                 // For compatibility, get the old record for auto-accept
                 $record = $this->records->find($ids['old_id']);
 
                 $this->autoAcceptService->tryAutoAccept($record, $candidates, $conflicts);
                 $this->autoAcceptService->tryAutoAcceptBank($record, $bankCandidatesArr, $conflicts);
 
-                // تسجيل التعلم المؤرَّخ للمورد والبنك (للسجلات الجديدة فقط)
+                // تسجيل التعلم المؤرَّخ للمورد والبنك (للسجلات الجديدة فقط)
                 $this->learningLog->create([
                     'raw_input' => (string) $supplier,
                     'normalized_input' => $match['normalized'] ?? '',
@@ -273,6 +279,7 @@ class ImportService
 
         return [
             'session_id' => $session->id,
+            'first_record_id' => $firstRecordId,  // Add first record for navigation
             'records_count' => $count,
             'skipped' => $skipped,
             'debug_map' => $map,

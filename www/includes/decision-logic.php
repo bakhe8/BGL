@@ -158,6 +158,7 @@ $prevId = $hasPrev ? $filteredRecords[$currentIndex - 1]->id : null;
 $nextId = $hasNext ? $filteredRecords[$currentIndex + 1]->id : null;
 
 // Smart Skip Logic: Find next pending record for the "Save & Next" action
+// First, try to find a pending (not ready/approved) record
 $nextPendingId = null;
 for ($i = $currentIndex + 1; $i < $totalRecords; $i++) {
     $r = $filteredRecords[$i];
@@ -166,7 +167,9 @@ for ($i = $currentIndex + 1; $i < $totalRecords; $i++) {
         break;
     }
 }
-// Fallback: If no pending records ahead, standard next behavior
+
+// Fallback: If no pending records ahead, go to next record anyway
+// This ensures we always navigate forward after save, even if all records are ready
 if (!$nextPendingId && $hasNext) {
     $nextPendingId = $nextId;
 }

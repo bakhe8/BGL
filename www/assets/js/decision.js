@@ -367,8 +367,13 @@
                     msg.innerHTML = '<span class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4"></i> تم الحفظ</span>';
                     lucide.createIcons();
                     msg.style.color = '#16a34a';
+                    
+                    // Navigate to next record or reload current page
                     if (nextUrl) {
                         setTimeout(() => window.location.href = nextUrl, 300);
+                    } else {
+                        // No next URL, reload current page to show updated data
+                        setTimeout(() => window.location.reload(), 300);
                     }
                 } else {
                     msg.textContent = 'خطأ: ' + (json.message || 'فشل الحفظ');
@@ -443,7 +448,12 @@
                 const res = await fetch('/api/import/excel', { method: 'POST', body: formData });
                 const json = await res.json();
                 if (json.success && json.data && json.data.session_id) {
-                    window.location.href = '/?session_id=' + json.data.session_id;
+                    // Navigate to first record if available, otherwise just session
+                    if (json.data.first_record_id) {
+                        window.location.href = `/?session_id=${json.data.session_id}&record_id=${json.data.first_record_id}`;
+                    } else {
+                        window.location.href = '/?session_id=' + json.data.session_id;
+                    }
                 } else {
                     showError('خطأ: ' + (json.message || 'فشل الاستيراد'));
                 }
