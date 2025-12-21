@@ -89,7 +89,9 @@ class SettingsController
             @copy(storage_path('settings.json'), $folder . '/settings.json');
             $zipPath = $folder;
         }
-        echo json_encode(['success' => true, 'path' => $zipPath]);
+        // إرجاع المسار النسبي بدلاً من الكامل (لسهولة النقل بين الأجهزة)
+        $relativePath = 'storage/backups/' . basename($zipPath);
+        echo json_encode(['success' => true, 'path' => $relativePath, 'filename' => basename($zipPath)]);
     }
 
     public function exportDictionary(): void
@@ -107,7 +109,9 @@ class SettingsController
             'banks' => $this->banks->allNormalized(),
         ];
         file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        echo json_encode(['success' => true, 'path' => $path]);
+        // إرجاع المسار النسبي بدلاً من الكامل (لسهولة النقل بين الأجهزة)
+        $relativePath = 'storage/backups/' . basename($path);
+        echo json_encode(['success' => true, 'path' => $relativePath, 'filename' => basename($path)]);
     }
 
     public function importDictionary(array $payload): void

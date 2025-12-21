@@ -1,55 +1,83 @@
 # دليل الاختبارات (Testing Guide)
 
-يعتمد النظام حالياً على مجموعة من السكربتات اليدوية (Manual Scripts) الموجودة في مجلد `scripts/` للتأكد من سلامة الوظائف الأساسية.
+يعتمد النظام على إطار اختبارات وحدة محلي (Native PHP Test Runner) بالإضافة إلى بعض السكربتات اليدوية.
 
-## 🧪 كيفية تشغيل الاختبارات
-
-يتم تشغيل الاختبارات من سطر الأوامر (Terminal).
-
-### 1. اختبار مستودع Timeline
-يتحقق من قدرة النظام على إنشاء وجلب الأحداث التاريخية.
+## 🧪 تشغيل اختبارات الوحدة (Unit Tests)
 
 ```bash
-php scripts/test_timeline_repository.php
-```
-**النتيجة المتوقعة**: ظهور رسائل "SUCCESS" لكل خطوة (إنشاء، جلب).
-
-### 2. اختبار خدمة Timeline (Service Layer)
-يتحقق من المنطق المعقد (اللقطات، التحويلات).
-
-```bash
-php scripts/test_timeline_service.php
+php tests/runner.php tests/unit
 ```
 
-### 3. اختبار التوافق مع PHP 8.1
-للتأكد من عدم وجود دوال ملغاة (Deprecated).
-
-```bash
-php -l app/Controllers/DecisionController.php
+**الناتج المتوقع:**
 ```
+🚀 Starting BGL Native Test Runner...
+---------------------------------------------------
+📂 Testing NormalizerTest:
+   ✅ testNormalizeSupplierName_Basic
+   ...
+
+📂 Testing ScoringConfigTest:
+   ✅ testGetStarRating_ThreeStars
+   ...
+
+📂 Testing SimilarityCalculatorTest:
+   ✅ testPerfectMatch
+   ...
+
+---------------------------------------------------
+🏁 Summary:
+   Passed: 22
+   Failed: 0
+
+✨ All tests passed!
+```
+
+---
+
+## 📋 الاختبارات المتوفرة
+
+| الملف | الوظيفة | عدد الاختبارات |
+|-------|---------|---------------|
+| `NormalizerTest.php` | تطبيع أسماء الموردين/البنوك | 10 |
+| `ScoringConfigTest.php` | ثوابت التقييم ودوال المساعدة | 7 |
+| `SimilarityCalculatorTest.php` | حساب التشابه النصي | 5 |
 
 ---
 
 ## 📝 كتابة اختبار جديد
 
-لإضافة اختبار جديد، قم بإنشاء ملف PHP في مجلد `scripts/` واستخدم الكلاسات مباشرة:
+لإضافة اختبار جديد، قم بإنشاء ملف في `tests/unit/`:
 
 ```php
 <?php
-require_once __DIR__ . '/../app/Support/autoload.php';
+require_once __DIR__ . '/../../app/Support/autoload.php';
+require_once __DIR__ . '/../TestCase.php';
 
 use App\Services\MyNewService;
 
-try {
-    $service = new MyNewService();
-    $result = $service->doSomething();
-    
-    if ($result === true) {
-        echo "✅ Test Passed\n";
-    } else {
-        echo "❌ Test Failed\n";
+class MyNewServiceTest extends TestCase
+{
+    public function testBasicFunctionality(): void
+    {
+        $service = new MyNewService();
+        $result = $service->doSomething();
+        
+        $this->assertTrue($result);
     }
-} catch (Exception $e) {
-    echo "❌ Error: " . $e->getMessage() . "\n";
 }
 ```
+
+---
+
+## 🔧 السكربتات اليدوية (Legacy)
+
+للاختبارات اليدوية القديمة:
+
+```bash
+# اختبار مستودع Timeline
+php scripts/test_timeline_repository.php
+
+# اختبار خدمة Timeline
+php scripts/test_timeline_service.php
+```
+

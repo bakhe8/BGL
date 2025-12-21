@@ -45,6 +45,7 @@ use App\Support\Normalizer;
 use App\Support\Settings;
 use App\Support\Config;
 use App\Support\SimilarityCalculator;
+use App\Support\ScoringConfig;
 
 class SupplierCandidateService
 {
@@ -89,9 +90,7 @@ class SupplierCandidateService
 
     private function assignStarRating(int $totalScore): int
     {
-        if ($totalScore >= 200) return 3;
-        if ($totalScore >= 120) return 2;
-        return 1;
+        return ScoringConfig::getStarRating($totalScore);
     }
 
     /**

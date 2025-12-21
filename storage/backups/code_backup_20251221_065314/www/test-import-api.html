@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار API الاستيراد</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            direction: rtl;
+        }
+
+        .container {
+            border: 2px solid #4CAF50;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        h1 {
+            color: #4CAF50;
+        }
+
+        .result {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            direction: ltr;
+            text-align: left;
+        }
+
+        pre {
+            background: #333;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+
+        .upload-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .upload-btn:hover {
+            background: #45a049;
+        }
+
+        .check {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .cross {
+            color: #f44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔍 اختبار API الاستيراد</h1>
+        <p>هذه الصفحة تتحقق من أن API الاستيراد ترجع <code>first_record_id</code></p>
+
+        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+            📁 اختر ملف Excel للاختبار
+        </button>
+
+        <div class="result" id="result" style="display:none">
+            <h3>النتيجة:</h3>
+            <div id="status"></div>
+            <h4>JSON Response:</h4>
+            <pre id="json"></pre>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const result = document.getElementById('result');
+        const status = document.getElementById('status');
+        const jsonPre = document.getElementById('json');
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                status.innerHTML = '⏳ جاري الاستيراد...';
+                result.style.display = 'block';
+                jsonPre.textContent = '';
+
+                const res = await fetch('/api/import/excel', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const json = await res.json();
+
+                // Display JSON
+                jsonPre.textContent = JSON.stringify(json, null, 2);
+
+                // Check result
+                let statusHTML = '';
+
+                if (json.success) {
+                    statusHTML += '<span class="check">✅</span> نجح الاستيراد<br>';
+                } else {
+                    statusHTML += '<span class="cross">❌</span> فشل الاستيراد<br>';
+                }
+
+                if (json.data) {
+                    if (json.data.session_id) {
+                        statusHTML += '<span class="check">✅</span> session_id موجود: ' + json.data.session_id + '<br>';
+                    } else {
+                        statusHTML += '<span class="cross">❌</span> session_id مفقود!<br>';
+                    }
+
+                    if (json.data.first_record_id) {
+                        statusHTML += '<span class="check">✅ ✅ ✅</span> <strong>first_record_id موجود: ' + json.data.first_record_id + '</strong><br>';
+                        statusHTML += '<br><strong>الرابط الصحيح:</strong><br>';
+                        statusHTML += `<code>/?session_id=${json.data.session_id}&record_id=${json.data.first_record_id}</code>`;
+                    } else {
+                        statusHTML += '<span class="cross">❌ ❌ ❌</span> <strong>first_record_id مفقود!</strong><br>';
+                        statusHTML += 'هذا يعني أن التعديلات لم تطبق بشكل صحيح.';
+                    }
+
+                    if (json.data.records_count) {
+                        statusHTML += '<br>عدد السجلات: ' + json.data.records_count;
+                    }
+                }
+
+                status.innerHTML = statusHTML;
+
+            } catch (err) {
+                status.innerHTML = '<span class="cross">❌</span> خطأ: ' + err.message;
+                result.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+
+</html>

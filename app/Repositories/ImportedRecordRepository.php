@@ -452,24 +452,28 @@ class ImportedRecordRepository
             return [];
         }
 
-        // 3. Update 'Ready' records
+        // 3. Update 'Ready' records (using prepared statements for safety)
         if (!empty($idsReady)) {
-            $inQueryReady = implode(',', array_map('intval', $idsReady));
-            $pdo->exec("UPDATE imported_records 
-                       SET supplier_id = $supplierId, 
-                           supplier_display_name = " . ($supplierDisplayName ? $pdo->quote($supplierDisplayName) : 'NULL') . ",
-                           match_status = 'ready'
-                       WHERE id IN ($inQueryReady)");
+            $placeholders = implode(',', array_fill(0, count($idsReady), '?'));
+            $stmt = $pdo->prepare("UPDATE imported_records 
+                SET supplier_id = ?, 
+                    supplier_display_name = ?,
+                    match_status = 'ready'
+                WHERE id IN ($placeholders)");
+            $params = array_merge([$supplierId, $supplierDisplayName], $idsReady);
+            $stmt->execute($params);
         }
 
-        // 4. Update 'Review' records
+        // 4. Update 'Review' records (using prepared statements for safety)
         if (!empty($idsReview)) {
-            $inQueryReview = implode(',', array_map('intval', $idsReview));
-            $pdo->exec("UPDATE imported_records 
-                       SET supplier_id = $supplierId, 
-                           supplier_display_name = " . ($supplierDisplayName ? $pdo->quote($supplierDisplayName) : 'NULL') . ",
-                           match_status = 'needs_review'
-                       WHERE id IN ($inQueryReview)");
+            $placeholders = implode(',', array_fill(0, count($idsReview), '?'));
+            $stmt = $pdo->prepare("UPDATE imported_records 
+                SET supplier_id = ?, 
+                    supplier_display_name = ?,
+                    match_status = 'needs_review'
+                WHERE id IN ($placeholders)");
+            $params = array_merge([$supplierId, $supplierDisplayName], $idsReview);
+            $stmt->execute($params);
         }
 
         return $updatedIds;

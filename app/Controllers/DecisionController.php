@@ -375,7 +375,7 @@ class DecisionController
                         $this->records->updateDecision($id, ['supplier_display_name' => $supplierName]);
                     }
                 } catch (\Throwable $e) {
-                    // Ignore display name fetch error
+                    \App\Support\Logger::warning('Failed to fetch supplier display name', ['error' => $e->getMessage(), 'supplier_id' => $update['supplier_id']]);
                 }
 
                 // 2. Sync to Dictionary (Visible Alias)
@@ -388,7 +388,7 @@ class DecisionController
                         'manual_review'
                     );
                 } catch (\Throwable $e) {
-                    // Ignore if exists
+                    // Expected: duplicate entry - no need to log
                 }
                 
                 // NOTE (Cleanup): Removed OLD learning write to supplier_aliases_learning
@@ -493,7 +493,7 @@ class DecisionController
                 try {
                     $supplierDisplayName = (new SupplierRepository())->find((int) $update['supplier_id'])?->officialName;
                 } catch (\Throwable $e) {
-                    // Ignore
+                    \App\Support\Logger::warning('Failed to fetch supplier name for propagation', ['error' => $e->getMessage()]);
                 }
 
                 $propagatedIds = $this->records->bulkUpdateSupplierByRawName(
@@ -676,112 +676,5 @@ class DecisionController
                 'session_id' => $maxSession
             ]
         ]);
-    }
-    
-    /**
-     * Log modification if values changed
-     * 
-     * @deprecated Since 2025-12-20. Use TimelineEventService instead.
-     *             This method is kept for backward compatibility only.
-     *             Will be removed in future release.
-     * 
-     * Creates a new record with type='modification' when supplier, bank, or amount changes.
-     * This is purely for audit trail - does NOT affect any other logic.
-     * 
-     * @param int $recordId ID of record being modified
-     * @param array $newData New data being saved
-     * @return void
-     */
-    private function logModificationIfNeeded(int $recordId, array $newData): void
-    {
-        $logFile = __DIR__ . '/../../debug.log';
-        
-        try {
-            // Get original record
-            $original = $this->records->find($recordId);
-            if (!$original) {
-                file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: Record $recordId not found!\n", FILE_APPEND);
-                return;
-            }
-            
-            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: Checking record $recordId, supplier_id={$original->supplierId}, bank_id={$original->bankId}\n", FILE_APPEND);
-            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: newData = " . json_encode($newData, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
-            
-            // Detect changes
-            $changes = [];
-            
-            // Supplier change
-            if (isset($newData['supplier_id']) && $newData['supplier_id'] != $original->supplierId) {
-                $changes['supplier'] = [
-                    'from' => $original->supplierDisplayName ?? $original->rawSupplierName ?? 'غير محدد',
-                    'to' => $newData['supplier_display_name'] ?? 'Unknown',
-                    'from_id' => $original->supplierId,
-                    'to_id' => $newData['supplier_id']
-                ];
-            }
-            
-            // Bank change
-            if (isset($newData['bank_id']) && $newData['bank_id'] != $original->bankId) {
-                $changes['bank'] = [
-                    'from' => $original->bankDisplay ?? $original->rawBankName ?? 'غير محدد',
-                    'to' => $newData['bank_display'] ?? 'Unknown',
-                    'from_id' => $original->bankId,
-                    'to_id' => $newData['bank_id']
-                ];
-            }
-            
-            // Amount change
-            if (isset($newData['amount']) && $newData['amount'] != $original->amount) {
-                $changes['amount'] = [
-                    'from' => $original->amount ?? '0',
-                    'to' => $newData['amount']
-                ];
-            }
-            
-            // No changes - return silently
-            if (empty($changes)) {
-                error_log("DecisionController::logModificationIfNeeded - No changes for record $recordId");
-                return;
-            }
-            
-            error_log("DecisionController::logModificationIfNeeded - Changes detected: " . json_encode($changes));
-            
-            // Get daily session
-            $sessionRepo = new \App\Repositories\ImportSessionRepository();
-            $session = $sessionRepo->getOrCreateDailySession('daily_actions');
-            
-            // Create modification record
-            $modificationRecord = new \App\Models\ImportedRecord(
-                id: null,
-                sessionId: $session->id,
-                rawSupplierName: $original->rawSupplierName,
-                rawBankName: $original->rawBankName,
-                amount: $newData['amount'] ?? $original->amount,
-                guaranteeNumber: $original->guaranteeNumber,
-                contractNumber: $original->contractNumber,
-                relatedTo: $original->relatedTo,
-                issueDate: $original->issueDate,
-                expiryDate: $original->expiryDate,
-                type: $original->type,
-                comment: json_encode(['changes' => $changes, 'modified_from' => $recordId]),
-                normalizedSupplier: $original->normalizedSupplier,
-                normalizedBank: $original->normalizedBank,
-                matchStatus: 'ready',
-                supplierId: $newData['supplier_id'] ?? $original->supplierId,
-                bankId: $newData['bank_id'] ?? $original->bankId,
-                bankDisplay: $newData['bank_display'] ?? $original->bankDisplay,
-                supplierDisplayName: $newData['supplier_display_name'] ?? $original->supplierDisplayName,
-                createdAt: date('Y-m-d H:i:s'),
-                recordType: 'modification',
-                importBatchId: null
-            );
-            
-            $this->records->create($modificationRecord);
-            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: Modification record created successfully!\n", FILE_APPEND);
-            
-        } catch (\Throwable $e) {
-            // Silent fail - never break saveDecision
-            file_put_contents($logFile, date('[Y-m-d H:i:s] ') . "logModificationIfNeeded: FAILED - " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND);
-        }
     }
 }

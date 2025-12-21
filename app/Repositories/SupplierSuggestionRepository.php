@@ -37,22 +37,20 @@
 namespace App\Repositories;
 
 use App\Support\Database;
+use App\Support\ScoringConfig;
 use PDO;
 
 class SupplierSuggestionRepository
 {
     private PDO $db;
     
-    // Source weights for scoring
+    // Source weights for scoring (использует ScoringConfig для النجوم)
     private const SOURCE_WEIGHTS = [
         'learning' => 100,      // من التعلم السابق
         'user_history' => 80,   // من قرار مستخدم
         'alternatives' => 60,   // من الأسماء البديلة
         'dictionary' => 40,     // من القاموس الرسمي
     ];
-    
-    // Block penalty per block count (gradual blocking)
-    private const BLOCK_PENALTY = 50;
     
     public function __construct()
     {
@@ -91,10 +89,10 @@ class SupplierSuggestionRepository
                 total_score,
                 star_rating,
                 COALESCE(block_count, 0) as block_count,
-                (total_score - COALESCE(block_count, 0) * " . self::BLOCK_PENALTY . ") as effective_score
+                (total_score - COALESCE(block_count, 0) * " . ScoringConfig::BLOCK_PENALTY . ") as effective_score
             FROM supplier_suggestions
             WHERE normalized_input = ?
-            AND (total_score - COALESCE(block_count, 0) * " . self::BLOCK_PENALTY . ") > 0
+            AND (total_score - COALESCE(block_count, 0) * " . ScoringConfig::BLOCK_PENALTY . ") > 0
             ORDER BY effective_score DESC
             LIMIT ?
         ");
@@ -230,12 +228,12 @@ class SupplierSuggestionRepository
     
     /**
      * Calculate total score (without block penalty - that's applied at query time)
-     * Formula: (fuzzy × 100) + source_weight + min(usage × 15, 75)
+     * Formula: (fuzzy × 100) + source_weight + min(usage × BONUS_PER_USE, BONUS_MAX)
      */
     private function calculateScore(float $fuzzyScore, int $sourceWeight, int $usageCount): float
     {
         $fuzzyPoints = $fuzzyScore * 100;
-        $usageBonus = min($usageCount * 15, 75);
+        $usageBonus = ScoringConfig::calculateUsageBonus($usageCount);
         return $fuzzyPoints + $sourceWeight + $usageBonus;
     }
     
@@ -308,15 +306,11 @@ class SupplierSuggestionRepository
     
     /**
      * Assign star rating based on total score
-     * UNIFIED THRESHOLDS (2025-12-17):
-     * >=200 = 3 stars, >=120 = 2 stars, else = 1 star
-     * (Matches CandidateService::assignStarRating)
+     * Uses ScoringConfig for unified thresholds
      */
     private function assignStarRating(float $totalScore): int
     {
-        if ($totalScore >= 200) return 3;
-        if ($totalScore >= 120) return 2;
-        return 1;
+        return ScoringConfig::getStarRating($totalScore);
     }
     
     /**
@@ -331,7 +325,7 @@ class SupplierSuggestionRepository
             SELECT supplier_id
             FROM supplier_suggestions
             WHERE normalized_input = ?
-            AND (total_score - COALESCE(block_count, 0) * " . self::BLOCK_PENALTY . ") <= 0
+            AND (total_score - COALESCE(block_count, 0) * " . ScoringConfig::BLOCK_PENALTY . ") <= 0
         ");
         $stmt->execute([$normalizedInput]);
         return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'supplier_id');

@@ -717,16 +717,27 @@
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="/assets/js/shared/helpers.js"></script>
     
-    <!-- Main Logic Script -->
-    <script src="/assets/js/decision.js?v=<?= time() ?>"></script>
-
-    <!-- Guarantee Search Feature -->
-    <script src="/assets/js/guarantee-history.js"></script>
+    <!-- BGL Core -->
+    <script src="/assets/js/core/api.js"></script>
+    <script src="/assets/js/core/dialog.js"></script>
     
-    <!-- Manual Entry Feature -->
-    <script src="/assets/js/manual-entry.js"></script>
+    <!-- BGL Components -->
+    <script src="/assets/js/components/autocomplete.js"></script>
+    <script src="/assets/js/components/chips.js"></script>
+    <script src="/assets/js/components/dropdown.js"></script>
+    
+    <!-- BGL Features -->
+    <script src="/assets/js/features/add-supplier.js"></script>
+    <script src="/assets/js/features/batch-print.js"></script>
+    <script src="/assets/js/features/import-excel.js"></script>
+    <script src="/assets/js/features/smart-paste.js"></script>
+    <script src="/assets/js/features/recalculate.js"></script>
+    <script src="/assets/js/features/manual-entry.js"></script>
+    
+    <!-- Page Script -->
+    <script src="/assets/js/pages/decision.js?v=<?= time() ?>"></script>
+    <script src="/assets/js/pages/guarantee-history.js"></script>
     
     <!-- Initialize Icons -->
     <script>
