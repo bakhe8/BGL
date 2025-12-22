@@ -31,10 +31,32 @@ class LabRouter {
             $this->renderFindings();
             return;
         }
+
+        // Findings Detail
+        if (strpos($path, 'findings/') === 0) {
+            $id = str_replace('findings/', '', $path);
+            $this->renderFindingDetail($id);
+            return;
+        }
+        
         
         // Metrics
         if ($path === 'metrics') {
             $this->renderMetrics();
+            return;
+        }
+        
+        // Docs - Markdown files
+        if (strpos($path, 'docs/') === 0) {
+            $file = str_replace('docs/', '', $path);
+            $this->renderMarkdown('docs', $file);
+            return;
+        }
+        
+        // Templates - Markdown files
+        if (strpos($path, 'templates/') === 0) {
+            $file = str_replace('templates/', '', $path);
+            $this->renderMarkdown('templates', $file);
             return;
         }
         
@@ -43,6 +65,7 @@ class LabRouter {
             $this->renderDocs();
             return;
         }
+
         
         // 404
         $this->render404();
@@ -77,6 +100,26 @@ class LabRouter {
     private function renderFindings() {
         require __DIR__ . '/../views/findings.php';
     }
+
+    /**
+     * عرض Finding تفصيلي
+     */
+    private function renderFindingDetail($id) {
+        $file = __DIR__ . "/../findings/{$id}.md";
+        if (!file_exists($file)) {
+            $this->render404();
+            return;
+        }
+        
+        // قراءة المحتوى
+        $content = file_get_contents($file);
+        
+        // تمرير المتغيرات
+        $findingId = $id;
+        $findingContent = $content;
+        
+        require __DIR__ . '/../views/finding-detail.php';
+    }
     
     /**
      * عرض Metrics
@@ -86,11 +129,34 @@ class LabRouter {
     }
     
     /**
+     * عرض ملف Markdown
+     */
+    private function renderMarkdown($folder, $filename) {
+        $file = __DIR__ . "/../{$folder}/{$filename}";
+        if (!file_exists($file)) {
+            $this->render404();
+            return;
+        }
+        
+        // قراءة المحتوى
+        $content = file_get_contents($file);
+        
+        // تمرير المتغيرات
+        $markdownContent = $content;
+        $pageTitle = basename($filename, '.md');
+        
+        require __DIR__ . '/../views/markdown-viewer.php';
+    }
+    
+    /**
      * عرض Docs
      */
     private function renderDocs() {
         header('Location: /design-lab/docs/');
     }
+
+    
+
     
     /**
      * 404
